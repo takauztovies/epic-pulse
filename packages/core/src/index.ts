@@ -1,4 +1,6 @@
+export * from './branch-pattern.js';
 export * from './checklist.js';
+export * from './config.js';
 export * from './github.js';
 export * from './gql-errors.js';
 export * from './queries.js';
