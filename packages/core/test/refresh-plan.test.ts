@@ -1,0 +1,57 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { refKey } from '../src/ref.js';
+import {
+  backingOff, BUDGET_WINDOW_MS, EPIC_TTL_MS, epicRefsOf, gatherRefs, groupByRepo, needsFetch, needsResolution,
+  phaseBBatchSize, phaseBCost, RESOLUTION_TTL_MS, rollUsage,
+} from '../src/refresh-plan.js';
+import { foldSession } from '../src/registry.js';
+import { RegistryLineSchema } from '../src/schemas/registry.js';
+import { demo, demoSnapshot } from './snapshot-helpers.js';
+
+const T0 = 1_800_000_000_000;
+const session = (id: string, lines: readonly unknown[]) => foldSession(id, lines.map((l) => RegistryLineSchema.parse(l)))!;
+
+test('the refresher gathers live, unexpired bindings and the pins, once each', () => {
+  const live = session('0f8e7c1a-2b3d-4e5f-8a9b-0c1d2e3f4a5b', [{ v: 1, ts: T0, ev: 'tool', binds: [{ ref: demo(4), via: 'gh' }, { ref: demo(5), via: 'branch' }] }]);
+  const ended = session('1a2b3c4d-5e6f-4a1b-9c2d-3e4f5a6b7c8d', [{ v: 1, ts: T0, ev: 'tool', binds: [{ ref: demo(6), via: 'gh' }] }, { v: 1, ts: T0 + 1, ev: 'end' }]);
+  const pins = [{ ref: demo(8), addedAt: T0 }, { ref: demo(4), addedAt: T0 }];
+  assert.deepEqual(gatherRefs([live, ended], pins, T0 + 10).map(refKey), [demo(4), demo(5), demo(8)].map(refKey));
+});
+
+test('refs are grouped per repository in first-seen order', () => {
+  const other = { ...demo(2), owner: 'other' };
+  const groups = groupByRepo([demo(4), other, demo(5)]);
+  assert.deepEqual(groups.map((g) => [g.repo.owner, g.refs.map((r) => r.number)]), [['takauztovies', [4, 5]], ['other', [2]]]);
+});
+
+test('Phase A re-asks after 30 minutes; Phase B after 2 minutes, oldest first', () => {
+  const snapshot = demoSnapshot(T0);
+  assert.deepEqual(needsResolution(snapshot, [demo(4), demo(6)], T0 + 1000).map((r) => r.number), [6]);
+  assert.deepEqual(needsResolution(snapshot, [demo(4)], T0 + RESOLUTION_TTL_MS).map((r) => r.number), [4]);
+  assert.deepEqual(epicRefsOf(snapshot, [demo(4), demo(1), demo(8), demo(6)]).map((r) => r.number), [1, 8]);
+  const older = { ...snapshot, epics: { ...snapshot.epics, [refKey(demo(8))]: { ...snapshot.epics[refKey(demo(8))]!, fetchedAt: T0 - 5000 } } };
+  assert.deepEqual(needsFetch(older, [demo(1), demo(8)], T0 + EPIC_TTL_MS - 1).map((r) => r.number), [8]);
+  assert.deepEqual(needsFetch(older, [demo(1), demo(8), demo(3)], T0 + EPIC_TTL_MS).map((r) => r.number), [3, 8, 1]);
+});
+
+test('the cost model matches GitHub: 3 points per epic as recorded, never below 1', () => {
+  assert.deepEqual([0, 1, 2, 10].map(phaseBCost), [1, 3, 6, 30]);
+  assert.equal(phaseBBatchSize({ windowStart: T0, points: 0 }), 10);
+  assert.equal(phaseBBatchSize({ windowStart: T0, points: 294 }), 2);
+  assert.equal(phaseBBatchSize({ windowStart: T0, points: 298 }), 0);
+});
+
+test('the hourly window resets after an hour, or when it starts in the future', () => {
+  const usage = { windowStart: T0, points: 120 };
+  assert.equal(rollUsage(usage, T0 + BUDGET_WINDOW_MS - 1), usage);
+  assert.deepEqual(rollUsage(usage, T0 + BUDGET_WINDOW_MS), { windowStart: T0 + BUDGET_WINDOW_MS, points: 0 });
+  assert.deepEqual(rollUsage(usage, T0 - 1), { windowStart: T0 - 1, points: 0 });
+});
+
+test('below 1000 remaining points the refresher backs off until GitHub resets', () => {
+  assert.equal(backingOff(null, T0), false);
+  assert.equal(backingOff({ remaining: 999, resetAt: T0 + 1 }, T0), true);
+  assert.equal(backingOff({ remaining: 999, resetAt: T0 }, T0), false);
+  assert.equal(backingOff({ remaining: 1000, resetAt: T0 + 1 }, T0), false);
+});
