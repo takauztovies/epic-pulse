@@ -1,0 +1,52 @@
+import { z } from 'zod';
+import { ErrorCodeSchema, IssueNumberSchema, StateKindSchema, StatusCountsSchema, StatusSchema } from './common.js';
+import { EpicKindSchema } from './snapshot.js';
+
+// The public, versioned contract behind `epic-pulse json`, read by the VS Code
+// extension and by anyone scripting against the CLI. Additive changes keep
+// `version: 1`; renames or removals require `version: 2`.
+export const JsonChildSchema = z
+  .object({
+    number: IssueNumberSchema.nullable(),
+    title: z.string(),
+    url: z.string().nullable(),
+    status: StatusSchema,
+    sessionCount: z.number().int().nonnegative(),
+  })
+  .readonly();
+
+export const JsonEpicSchema = z
+  .object({
+    number: IssueNumberSchema,
+    title: z.string(),
+    url: z.string(),
+    kind: EpicKindSchema,
+    counts: StatusCountsSchema,
+    percent: z.number().int().min(0).max(100),
+    children: z.array(JsonChildSchema),
+    fetchedAt: z.iso.datetime(),
+    stale: z.boolean(),
+    error: ErrorCodeSchema.nullable(),
+    truncated: z.boolean(),
+  })
+  .readonly();
+
+export const JsonV1Schema = z
+  .object({
+    version: z.literal(1),
+    generatedAt: z.iso.datetime(),
+    liveSessions: z.number().int().nonnegative(),
+    snapshot: z
+      .object({
+        state: StateKindSchema,
+        fetchedAt: z.iso.datetime().nullable(),
+        error: ErrorCodeSchema.nullable(),
+      })
+      .readonly(),
+    epics: z.array(JsonEpicSchema),
+  })
+  .readonly();
+
+export type JsonChild = z.infer<typeof JsonChildSchema>;
+export type JsonEpic = z.infer<typeof JsonEpicSchema>;
+export type JsonV1 = z.infer<typeof JsonV1Schema>;

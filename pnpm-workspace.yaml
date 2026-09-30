@@ -1,0 +1,6 @@
+packages:
+  - "packages/*"
+# esbuild's postinstall only verifies its platform binary, which arrives via
+# optionalDependencies; allow it so `pnpm install` stays warning-free on pnpm 10.
+onlyBuiltDependencies:
+  - esbuild
