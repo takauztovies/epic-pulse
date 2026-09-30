@@ -2,8 +2,10 @@ import { fail, ok, type Result } from './result.js';
 import { CONFIG_LIMITS } from './schemas/config.js';
 
 // The number that opens a branch name, behind at most one prefix segment:
-// `123-login`, `fix/123-login`, `feat/#77`, `42`.
-export const DEFAULT_BRANCH_PATTERN = /^(?:[\w.-]+\/)?#?(\d+)(?:[-_/.]|$)/;
+// `123-login`, `fix/123-login`, `feat/#77`, `42`. Only `-`, `_` or the end may
+// follow it. An earlier version also took `.` and `/`, which read
+// `release/1.2.3` as issue #1 and `hotfix/2.0` as #2.
+export const DEFAULT_BRANCH_PATTERN = /^(?:[\w.-]+\/)?#?(\d+)(?:[-_]|$)/;
 
 // Git allows longer names, but no branch that names an issue needs one, and the
 // cap bounds the work a user pattern can do on each hook call.

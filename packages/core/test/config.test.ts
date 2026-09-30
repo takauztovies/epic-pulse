@@ -8,8 +8,16 @@ import { tempDir } from './repo-helpers.js';
 
 test('the default pattern reads a leading issue number behind at most one prefix segment', () => {
   const cases: readonly (readonly [string, number | undefined])[] = [
-    ['fix/123-thing', 123], ['feat/77-widget', 77], ['42', 42], ['#12-x', 12], ['fix/#9_x', 9], ['7.x', 7],
+    ['fix/123-thing', 123], ['feat/77-widget', 77], ['42', 42], ['#12-x', 12], ['fix/#9_x', 9], ['7.x', undefined],
     ['main', undefined], ['fix/agent-eval', undefined], ['feature/v2-api', undefined], ['a/b/12-x', undefined], ['12abc', undefined],
+  ];
+  for (const [branch, expected] of cases) assert.equal(branchIssueNumber(branch, DEFAULT_BRANCH_PATTERN), expected, branch);
+});
+
+test('the default pattern needs a dash, an underscore or the end after the number, so a version never binds', () => {
+  const cases: readonly (readonly [string, number | undefined])[] = [
+    ['feat/123-x', 123], ['fix/123_x', 123], ['123-x', 123], ['feat/123', 123],
+    ['release/1.2.3', undefined], ['v2', undefined], ['hotfix/2.0', undefined], ['deps/1.0.0-beta', undefined],
   ];
   for (const [branch, expected] of cases) assert.equal(branchIssueNumber(branch, DEFAULT_BRANCH_PATTERN), expected, branch);
 });
