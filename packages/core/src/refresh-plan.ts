@@ -9,7 +9,8 @@ import type { Snapshot } from './schemas/snapshot.js';
 export const RESOLUTION_TTL_MS = 30 * 60 * 1000;
 export const EPIC_TTL_MS = 2 * 60 * 1000;
 // Our own ceiling, far below GitHub's 5,000 an hour, so the user's other tools
-// keep theirs. Every session of a repository shares it through the snapshot.
+// keep theirs. Every session of a repository shares it through the snapshot,
+// and every repository of the user through the usage ledger (usage-ledger.ts).
 export const HOURLY_BUDGET_POINTS = 300;
 export const BUDGET_WINDOW_MS = 60 * 60 * 1000;
 // With fewer points than this left on the token, wait for GitHub's reset.

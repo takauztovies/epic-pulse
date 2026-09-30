@@ -4,25 +4,31 @@ import { parsePhaseA, parsePhaseB, phaseADocument, phaseBDocument, type Failure,
 import { applyEpics, applyResolutions, chargePoints, chargeRate, markEpicErrors, rateLimited } from './refresh-apply.js';
 import { backingOff, HOURLY_BUDGET_POINTS, PHASE_A_COST, phaseBCost } from './refresh-plan.js';
 import { fail, ok, type Result } from './result.js';
-import type { ErrorCode, IssueRef, RepoRef } from './schemas/common.js';
+import type { IssueRef, RepoRef } from './schemas/common.js';
 import type { Snapshot } from './schemas/snapshot.js';
+import { recordUsage, reserveUsage, type UsageLedger } from './usage-ledger.js';
 
 // One refresh in progress. `now` is the run's single timestamp: every entry
-// it writes is stamped with it.
+// it writes is stamped with it. `spent` is what every refresher of the user
+// spent in the last hour, as the usage ledger last said; absent, only this
+// repository's own budget applies.
 export interface Run {
   readonly now: number;
   readonly snapshot: Snapshot;
   readonly requests: number;
   readonly points: number;
   readonly failure: Failure | null;
+  readonly spent?: number;
 }
 
 // Tokens live here, in memory, for one run; nothing in `Run` or the snapshot
-// has a field that could hold one.
+// has a field that could hold one. Without a ledger no request is charged
+// to the user's hour.
 export interface Context {
   readonly tokens: ReadonlyMap<string, string>;
   readonly lock: Lock;
   readonly clock: () => number;
+  readonly ledger?: UsageLedger;
 }
 
 export interface Batch {
@@ -39,12 +45,37 @@ export function blocked(snapshot: Snapshot, cost: number, now: number): boolean 
   return snapshot.usage.points + cost > HOURLY_BUDGET_POINTS || backingOff(snapshot.rateLimit, now);
 }
 
+// This repository's hour, the token's own limit, and the user's hour as the
+// ledger last reported it. In memory only: the locked check in `reserve` is
+// the one that counts.
+export function overBudget(run: Run, cost: number): boolean {
+  return blocked(run.snapshot, cost, run.now) || (run.spent ?? 0) + cost > HOURLY_BUDGET_POINTS;
+}
+
 // The budget is checked before the token, so a spent hour reads as "budget"
 // even where the token is missing too.
-function admit(run: Run, batch: Batch, ctx: Context): Result<string, ErrorCode> {
-  if (blocked(run.snapshot, costOf(batch), run.now)) return fail('budget');
+function admit(run: Run, batch: Batch, ctx: Context): Result<string, Failure> {
+  if (overBudget(run, costOf(batch))) return fail({ code: 'budget', detail: null });
   const token = ctx.tokens.get(batch.repo.host);
-  return token === undefined ? fail('no_token') : ok(token);
+  return token === undefined ? fail({ code: 'no_token', detail: null }) : ok(token);
+}
+
+// The charge goes into the user's ledger before the request is sent, and only
+// if the hour still has room for it, so two refreshers of different
+// repositories can not both take the last points.
+async function reserve(run: Run, batch: Batch, ctx: Context): Promise<{ readonly run: Run; readonly failure: Failure | null }> {
+  if (!ctx.ledger) return { run, failure: null };
+  const outcome = await reserveUsage(ctx.ledger, { ts: run.now, host: batch.repo.host, points: costOf(batch) }, ctx.clock());
+  const next = { ...run, spent: outcome.spent ?? run.spent };
+  return { run: next, failure: outcome.granted ? null : { code: 'budget', detail: outcome.detail } };
+}
+
+// GitHub bills what it bills. A reservation below the charged cost is topped
+// up; one above it stands, since over-counting only slows us down.
+async function topUp(run: Run, extra: { readonly host: string; readonly points: number }, ctx: Context): Promise<Run> {
+  if (!ctx.ledger || extra.points <= 0) return run;
+  await recordUsage(ctx.ledger, { ts: run.now, ...extra }, ctx.clock());
+  return { ...run, spent: (run.spent ?? 0) + extra.points };
 }
 
 // The only network call. A thrown error goes through describeFetchError's
@@ -95,9 +126,12 @@ function answered(run: Run, batch: Batch, res: RawResponse): Run {
 
 export async function runBatch(run: Run, batch: Batch, ctx: Context): Promise<Run> {
   const token = admit(run, batch, ctx);
-  if (!token.ok) return failed(run, batch, { code: token.error, detail: null });
+  if (!token.ok) return failed(run, batch, token.error);
+  const reserved = await reserve(run, batch, ctx);
+  if (reserved.failure) return failed(reserved.run, batch, reserved.failure);
   const sent = await send(token.value, batch);
   await touchLock(ctx.lock, ctx.clock());
-  const counted = { ...run, requests: run.requests + 1 };
-  return sent.ok ? answered(counted, batch, sent.value) : failed(counted, batch, sent.error);
+  const counted = { ...reserved.run, requests: reserved.run.requests + 1 };
+  const next = sent.ok ? answered(counted, batch, sent.value) : failed(counted, batch, sent.error);
+  return topUp(next, { host: batch.repo.host, points: next.points - counted.points - costOf(batch) }, ctx);
 }

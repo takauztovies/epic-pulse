@@ -25,10 +25,13 @@ export function demoSnapshot(now: number): Snapshot {
 }
 
 // An empty PATH: `gh` can not be found, so only env vars can supply a token.
+// A private cache directory: no test reads or charges the user's real usage
+// ledger.
 export function noGhEnv(t: TestContext, extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   const dir = mkdtempSync(join(tmpdir(), 'ep-nogh-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  return { PATH: dir, ...extra };
+  const cache = mkdtempSync(join(tmpdir(), 'ep-cache-'));
+  t.after(() => [dir, cache].forEach((path) => rmSync(path, { recursive: true, force: true })));
+  return { PATH: dir, EPIC_PULSE_CACHE_DIR: cache, ...extra };
 }
 
 export function filesUnder(dir: string): readonly string[] {

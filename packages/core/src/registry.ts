@@ -107,7 +107,7 @@ export function isHookInactive(session: SessionState | undefined): boolean {
   return session === undefined;
 }
 
-async function readTail(file: string): Promise<string> {
+export async function readTail(file: string): Promise<string> {
   const handle = await open(file, 'r');
   try {
     const { size } = await handle.stat();

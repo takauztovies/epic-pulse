@@ -28,4 +28,5 @@ export * from './shell.js';
 export * from './shell-words.js';
 export * from './snapshot.js';
 export * from './status.js';
+export * from './usage-ledger.js';
 export * from './view.js';

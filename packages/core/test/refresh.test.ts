@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { test, type TestContext } from 'node:test';
 import { acquireLock, releaseLock } from '../src/lock.js';
 import { pathsFor, type RegistryPaths } from '../src/paths.js';
@@ -14,6 +15,15 @@ import { demo, demoSnapshot, filesUnder, noGhEnv } from './snapshot-helpers.js';
 
 const SESSION = '0f8e7c1a-2b3d-4e5f-8a9b-0c1d2e3f4a5b';
 const SENTINEL = 'SENTINEL-7f3a-never-persist';
+const invalid = (number: number) => makeRef({ host: 'epic-pulse.invalid', owner: 'acme', repo: 'widgets', number })!;
+// A line another repository's refresher left in the user's usage ledger.
+const otherRepo = (ts: number, points: number) => `${JSON.stringify({ ts, host: 'github.com', repo: 'f'.repeat(16), points })}\n`;
+
+// With a token for the `.invalid` host every admitted request really goes out
+// and really fails, offline (see the token test at the end).
+function sendingEnv(t: TestContext, cache: string): NodeJS.ProcessEnv {
+  return noGhEnv(t, { GH_ENTERPRISE_TOKEN: 'x', EPIC_PULSE_CACHE_DIR: cache });
+}
 
 async function boundRegistry(t: TestContext, refs: readonly IssueRef[]): Promise<RegistryPaths> {
   const paths = pathsFor(tempDir(t));
@@ -38,9 +48,11 @@ test('a second refresher finds the lock held and leaves without touching anythin
 
 test('with nothing bound or pinned a refresh makes no request, writes nothing and releases the lock', async (t) => {
   const paths = pathsFor(tempDir(t));
-  assert.deepEqual(await refresh({ dir: paths.dir, now: Date.now(), env: {} }), { status: 'done', requests: 0, points: 0, error: null });
+  const cache = tempDir(t);
+  assert.deepEqual(await refresh({ dir: paths.dir, now: Date.now(), env: { EPIC_PULSE_CACHE_DIR: cache } }), { status: 'done', requests: 0, points: 0, error: null });
   assert.equal(existsSync(paths.snapshotFile), false);
   assert.equal(existsSync(paths.lockFile), false);
+  assert.deepEqual(readdirSync(cache), []);
 });
 
 test('a spent hourly budget makes no request and is recorded as budget', async (t) => {
@@ -69,6 +81,49 @@ test('a low rate limit backs off until its reset, then lets requests through', a
   assert.deepEqual(later, { status: 'done', requests: 0, points: 0, error: 'no_token' });
 });
 
+test('the hourly cap is shared by every repository of the user through the usage ledger', async (t) => {
+  // Without a token the user's spent hour still reads as budget, like this repository's own.
+  const cases = [[300, true, { requests: 0, error: 'budget' }], [299, true, { requests: 1, error: 'network' }],
+    [300, false, { requests: 0, error: 'budget' }]] as const;
+  for (const [spent, token, expected] of cases) {
+    const now = Date.now();
+    const cache = tempDir(t);
+    writeFileSync(join(cache, 'usage.jsonl'), otherRepo(now - 60_000, spent));
+    const paths = await boundRegistry(t, [invalid(4)]);
+    const env = token ? sendingEnv(t, cache) : noGhEnv(t, { EPIC_PULSE_CACHE_DIR: cache });
+    const outcome = await refresh({ dir: paths.dir, now, env });
+    assert.deepEqual(outcome, { status: 'done', points: 0, ...expected }, `another repository spent ${spent}, token ${token}`);
+  }
+});
+
+test('each request is charged to the user ledger before it is sent, under a hash rather than a path', async (t) => {
+  const now = Date.now();
+  const cache = tempDir(t);
+  const paths = await boundRegistry(t, [invalid(4)]);
+  await refresh({ dir: paths.dir, now, env: sendingEnv(t, cache) });
+  const text = readFileSync(join(cache, 'usage.jsonl'), 'utf8');
+  const lines = text.split('\n').filter(Boolean).map((raw) => JSON.parse(raw) as Record<string, unknown>);
+  assert.deepEqual(lines.map(({ repo, ...rest }) => [typeof repo, rest]), [['string', { ts: now, host: 'epic-pulse.invalid', points: 1 }]]);
+  assert.match(String(lines[0]?.['repo']), /^[0-9a-f]{16}$/);
+  assert.equal(text.includes(paths.dir), false);
+});
+
+test('a repository refreshes again only once its last cost is paid off at its share of the hour', async (t) => {
+  const now = Date.now();
+  const cache = tempDir(t);
+  writeFileSync(join(cache, 'usage.jsonl'), otherRepo(now - 60_000, 3)); // so two repositories share the hour
+  const paths = await boundRegistry(t, [invalid(4)]);
+  const env = sendingEnv(t, cache);
+  const at = (ms: number) => refresh({ dir: paths.dir, now: now + ms, env });
+  const sent = { status: 'done', requests: 1, points: 0, error: 'network' };
+  assert.deepEqual(await at(0), sent);
+  const before = readFileSync(paths.snapshotFile);
+  // The request was charged 1 point: at 300 an hour that is 12 s, times the 2 repositories.
+  assert.deepEqual(await at(23_999), { status: 'done', requests: 0, points: 0, error: 'budget' });
+  assert.deepEqual(readFileSync(paths.snapshotFile), before, 'a paced run leaves the snapshot alone');
+  assert.deepEqual(await at(24_000), sent);
+});
+
 test('a fresh snapshot makes no request and is not rewritten', async (t) => {
   const now = Date.now();
   const paths = await boundRegistry(t, [demo(4)]);
@@ -86,11 +141,13 @@ test('a fresh snapshot makes no request and is not rewritten', async (t) => {
 test('a token never reaches any file the refresher writes, whatever the failure', async (t) => {
   const cases = [[SENTINEL, 'network'], [`${SENTINEL}\u0000x`, 'invalid_token']] as const;
   for (const [token, code] of cases) {
-    const paths = await boundRegistry(t, [makeRef({ host: 'epic-pulse.invalid', owner: 'acme', repo: 'widgets', number: 4 })!]);
-    const outcome = await refresh({ dir: paths.dir, now: Date.now(), env: noGhEnv(t, { GH_ENTERPRISE_TOKEN: token }) });
+    const paths = await boundRegistry(t, [invalid(4)]);
+    const cache = tempDir(t);
+    const outcome = await refresh({ dir: paths.dir, now: Date.now(), env: noGhEnv(t, { GH_ENTERPRISE_TOKEN: token, EPIC_PULSE_CACHE_DIR: cache }) });
     assert.deepEqual(outcome, { status: 'done', requests: 1, points: 0, error: code });
-    const files = filesUnder(paths.dir);
+    const files = [...filesUnder(paths.dir), ...filesUnder(cache)];
     assert.ok(files.some((file) => file === paths.snapshotFile), 'the failure was written to disk');
+    assert.ok(files.some((file) => file === join(cache, 'usage.jsonl')), 'the charge was written to the ledger');
     for (const file of files) assert.equal(readFileSync(file, 'utf8').includes('SENTINEL'), false, file);
   }
 });
