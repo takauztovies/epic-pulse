@@ -8,7 +8,7 @@ import {
   activeBindings, appendRegistryLine, BINDING_TTL_MS, foldSession, isHookInactive, isLive, LIVE_WINDOW_MS,
   parseLines, PRUNE_AFTER_MS, pruneSessions, readLiveSessions, readSession, sessionFile,
 } from '../src/registry.js';
-import { RegistryLineSchema, type RegistryLineInput } from '../src/schemas/registry.js';
+import { RegistryLineSchema, type RegistryLine, type RegistryLineInput } from '../src/schemas/registry.js';
 import { tempDir } from './repo-helpers.js';
 
 const ID = '0f8e7c1a-2b3d-4e5f-8a9b-0c1d2e3f4a5b';
@@ -104,6 +104,18 @@ test('a binding expires six hours after it was last seen; a pin does not, and st
   assert.deepEqual(at(t0 + BINDING_TTL_MS), ['gh:5', 'pin:8', 'branch:9']);
   assert.deepEqual(at(t0 + BINDING_TTL_MS + 1), ['pin:8', 'branch:9']);
   assert.deepEqual(at(t0 + 1000 + BINDING_TTL_MS + 1), ['pin:8']);
+});
+
+test('an unbind keeps later non-pin binds of that issue away for the rest of the session; only a pin lifts it', () => {
+  const bind = (ts: number, number: number, via: 'branch' | 'gh' | 'closing' | 'pin') => line({ v: 1, ts, ev: 'tool', binds: [{ ref: ref(number), via }] });
+  const unbind = (ts: number, number: number) => line({ v: 1, ts, ev: 'tool', unbinds: [ref(number)] });
+  const untracked = [bind(10, 5, 'branch'), unbind(20, 5), bind(30, 5, 'branch'), bind(30, 6, 'branch'), bind(40, 5, 'gh'),
+    line({ v: 1, ts: 50, ev: 'end' }), bind(60, 5, 'closing')];
+  const at = (lines: readonly RegistryLine[]) => foldSession(ID, lines)!.bindings.map((b) => `${b.via}:${b.ref.number}@${b.ts}`);
+  assert.deepEqual(at(untracked), ['branch:6@30']);
+  const retracked = [...untracked, bind(70, 5, 'pin'), bind(80, 5, 'branch')];
+  assert.deepEqual(at(retracked), ['branch:6@30', 'pin:5@80']);
+  assert.deepEqual(at([...retracked, unbind(90, 5), bind(100, 5, 'gh')]), ['branch:6@30']);
 });
 
 test('only live sessions are listed, and a file untouched for the live window is not read', async (t) => {

@@ -95,14 +95,20 @@ async function toolActions(payload: HookPayload): Promise<readonly Action[]> {
   return run([{ path: resolve(payload.cwd ?? '', path) }]);
 }
 
-// Later actions win; when two signals bind the same issue the stronger `via`
-// is kept, so a pin is never downgraded to a branch match.
+// Whether an earlier action on an issue stands against a later one: an unbind
+// against any bind but a pin (the rule foldSession applies across calls), and
+// the stronger `via` between two binds, so a pin is never downgraded.
+function outranks(previous: Action, next: Action): boolean {
+  if (next.op === 'unbind') return false;
+  return previous.op === 'unbind' ? next.via !== 'pin' : VIA_RANK[previous.via] > VIA_RANK[next.via];
+}
+
+// Otherwise later actions win.
 function settle(actions: readonly Action[]): Pick<Extraction, 'binds' | 'unbinds'> {
   const final = new Map<string, Action>();
   for (const action of actions) {
     const previous = final.get(refKey(action.ref));
-    const keep = action.op === 'bind' && previous?.op === 'bind' && VIA_RANK[previous.via] > VIA_RANK[action.via];
-    final.set(refKey(action.ref), keep ? previous : action);
+    final.set(refKey(action.ref), previous && outranks(previous, action) ? previous : action);
   }
   if (final.size > MAX_REFS) return { binds: [], unbinds: [] };
   const settled = [...final.values()];

@@ -2,8 +2,12 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { extract } from '../src/extract.js';
+import { pathsFor } from '../src/paths.js';
+import { refKey } from '../src/ref.js';
+import { appendRegistryLine, readSession } from '../src/registry.js';
+import type { HookPayload } from '../src/schemas/hook.js';
 import { bash, fileTool, quoted, SESSION, signals, widgetsRepo, writeConfig } from './extract-helpers.js';
-import { addWorktree, git, makeRepo } from './repo-helpers.js';
+import { addWorktree, git, makeRepo, tempDir } from './repo-helpers.js';
 
 const W12 = 'branch:github.com/acme/widgets#12';
 
@@ -65,6 +69,24 @@ test('tools that do not write files, and unresolvable relative paths, bind nothi
   assert.deepEqual(await signals({ session_id: SESSION, tool_name: 'Bash', tool_input: { file_path: join(wt, 'a.ts') } }), []);
   assert.deepEqual(await signals(fileTool('Edit', 'src/a.ts')), []);
   assert.deepEqual(await signals(fileTool('Edit', 'src/a.ts', wt)), [W12]);
+});
+
+test('untrack on a branch-bound issue survives the next edits in its worktree until a track', async (t) => {
+  const { wt } = widgetsRepo(t);
+  const paths = pathsFor(tempDir(t));
+  let ts = Date.now();
+  // The real hook path, one call per payload: extract, then one registry line.
+  const hook = async (payload: HookPayload) => {
+    const { ev, binds, unbinds } = await extract(payload);
+    assert.ok((await appendRegistryLine(paths, SESSION, { v: 1, ts: (ts += 1), ev, binds, unbinds })).ok);
+    return (await readSession(paths, SESSION))!.bindings.map((b) => `${b.via}:${refKey(b.ref)}`);
+  };
+  assert.deepEqual(await hook(fileTool('Edit', join(wt, 'a.ts'))), [W12]);
+  assert.deepEqual(await hook(bash('epic-pulse untrack 12', wt)), []);
+  assert.deepEqual(await hook(fileTool('Edit', join(wt, 'a.ts'))), []);
+  assert.deepEqual(await hook(fileTool('Write', join(wt, 'b.ts'))), []);
+  assert.deepEqual(await hook(bash('epic-pulse track 12', wt)), ['pin:github.com/acme/widgets#12']);
+  assert.deepEqual(await hook(fileTool('Edit', join(wt, 'a.ts'))), ['pin:github.com/acme/widgets#12']);
 });
 
 test('SessionStart and SessionEnd carry their event and no signals', async (t) => {

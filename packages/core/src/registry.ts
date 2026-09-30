@@ -75,17 +75,27 @@ export function parseLines(text: string): readonly RegistryLine[] {
 // Lines apply in time order (a stable sort keeps file order for ties): a bind
 // refreshes the binding, an unbind removes it. A pin stays a pin when a weaker
 // signal later sees the same issue, so it keeps its exemption from the TTL.
+// An unbind also keeps every later non-pin bind of that issue out for the rest
+// of the session; without that, `untrack` on a branch-bound issue was undone
+// by the next edit in its worktree. Only a pin (`track`) lets it back in.
 export function foldSession(id: string, lines: readonly RegistryLine[]): SessionState | undefined {
   const ordered = [...lines].sort((a, b) => a.ts - b.ts);
   const last = ordered.at(-1);
   if (!last) return undefined;
   const bindings = new Map<string, Binding>();
+  const untracked = new Set<string>();
   for (const line of ordered) {
     for (const bind of line.binds) {
-      const via = bindings.get(refKey(bind.ref))?.via === 'pin' ? 'pin' : bind.via;
-      bindings.set(refKey(bind.ref), { ref: bind.ref, via, ts: line.ts });
+      const key = refKey(bind.ref);
+      if (bind.via === 'pin') untracked.delete(key);
+      if (untracked.has(key)) continue;
+      const via = bindings.get(key)?.via === 'pin' ? 'pin' : bind.via;
+      bindings.set(key, { ref: bind.ref, via, ts: line.ts });
     }
-    for (const ref of line.unbinds) bindings.delete(refKey(ref));
+    for (const ref of line.unbinds) {
+      bindings.delete(refKey(ref));
+      untracked.add(refKey(ref));
+    }
   }
   return { id, lastTs: last.ts, ended: last.ev === 'end', bindings: [...bindings.values()] };
 }

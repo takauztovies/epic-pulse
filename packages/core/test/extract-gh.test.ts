@@ -91,9 +91,10 @@ test('a command with a glob or with more than three issues binds nothing', async
   assert.deepEqual(await signals(bash('gh issue edit 1 2 3 --add-label x', wt)), [`gh:${W}#1`, `gh:${W}#2`, `gh:${W}#3`]);
 });
 
-test('a later action on the same issue wins, and the strongest via is kept', async (t) => {
+test('a later action on the same issue wins, except that only a pin undoes an untrack; the strongest via is kept', async (t) => {
   const { wt } = widgetsRepo(t);
-  assert.deepEqual(await signals(bash('epic-pulse untrack 5 && gh issue comment 5 -b x', wt)), [`gh:${W}#5`]);
+  assert.deepEqual(await signals(bash('epic-pulse untrack 5 && gh issue comment 5 -b x', wt)), [`-${W}#5`]);
+  assert.deepEqual(await signals(bash('epic-pulse untrack 5 && epic-pulse track 5', wt)), [`pin:${W}#5`]);
   assert.deepEqual(await signals(bash('gh issue comment 5 -b x && epic-pulse untrack 5', wt)), [`-${W}#5`]);
   assert.deepEqual(await signals(bash('gh issue comment 5 -b x && git commit -m "Fixes #5"', wt)), [`gh:${W}#5`]);
 });
