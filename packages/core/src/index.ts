@@ -1,3 +1,6 @@
+export * from './github.js';
+export * from './gql-errors.js';
+export * from './queries.js';
 export * from './ref.js';
 export * from './result.js';
 export * from './schemas/index.js';

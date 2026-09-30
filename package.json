@@ -13,7 +13,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "tsx --test --test-concurrency=2 \"packages/*/test/**/*.test.ts\"",
-    "test:live": "EPIC_PULSE_LIVE=1 tsx --test --test-concurrency=1 \"packages/*/test/**/*.test.ts\""
+    "test:live": "EPIC_PULSE_LIVE=1 tsx --test --test-concurrency=1 \"packages/*/test/**/*.test.ts\"",
+    "record-fixtures": "tsx scripts/record-fixtures.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
