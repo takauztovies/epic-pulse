@@ -11,12 +11,14 @@ export interface SimpleCommand {
   // `> file` targets are paths the command touches, never arguments, so a
   // trailing `2>&1` can not become an issue number.
   readonly targets: readonly string[];
+  // An unquoted `*`, `?` or `[...]` in this command: it works on a set of
+  // files, so its paths say nothing about one issue. Set by parseShell.
+  readonly glob?: boolean;
 }
 
 export interface ParsedShell {
   readonly commands: readonly SimpleCommand[];
-  // An unquoted `*`, `?` or `[...]` anywhere: the command works on a set of
-  // files, not on one issue.
+  // Whether any of the commands has a glob.
   readonly glob: boolean;
 }
 
@@ -90,8 +92,8 @@ function group(tokens: readonly Token[]): ParsedShell {
   let glob = false;
   for (const token of [...tokens, BREAK]) {
     if (token.kind === 'break') {
-      if (words.length + targets.length > 0) commands.push({ words, targets });
-      [words, targets, expectTarget] = [[], [], false];
+      if (words.length + targets.length > 0) commands.push({ words, targets, glob });
+      [words, targets, expectTarget, glob] = [[], [], false, false];
     } else if (token.kind === 'redirect') {
       expectTarget = token.takesTarget;
     } else {
@@ -100,7 +102,7 @@ function group(tokens: readonly Token[]): ParsedShell {
       expectTarget = false;
     }
   }
-  return { commands, glob };
+  return { commands, glob: commands.some((command) => command.glob === true) };
 }
 
 export function parseShell(src: string): ParsedShell {

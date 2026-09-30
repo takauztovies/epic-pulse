@@ -54,6 +54,14 @@ test('unquoted *, ? and [..] are globs; quoted or escaped ones are not', () => {
   }
 });
 
+test('each simple command carries its own glob flag, and the parse says whether any has one', () => {
+  const parsed = parseShell('git add src/*.ts && git commit -m "Fixes #6" > out.log; ls a? | wc -l');
+  assert.deepEqual(parsed.commands.map((command) => command.glob), [true, false, true, false]);
+  assert.equal(parsed.glob, true);
+  assert.deepEqual(parseShell('echo x > *.log && echo y').commands.map((command) => command.glob), [true, false]);
+  assert.equal(parseShell('echo "*" && ls').glob, false);
+});
+
 test('unterminated quotes and substitutions end at the end of the input instead of looping', () => {
   assert.deepEqual(words('echo "open'), [['echo', 'open']]);
   assert.deepEqual(words("echo 'open"), [['echo', 'open']]);

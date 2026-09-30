@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import { bash, quoted, signals, widgetsRepo } from './extract-helpers.js';
 import { git, makeRepo, tempDir } from './repo-helpers.js';
@@ -83,9 +84,23 @@ test('quoted text, comments and heredoc bodies never bind', async (t) => {
   }
 });
 
-test('a command with a glob or with more than three issues binds nothing', async (t) => {
+test('a glob skips the paths of its own segment only; gh, closing and track signals still bind', async (t) => {
+  const { repo, wt } = widgetsRepo(t);
+  const cases: readonly (readonly [string, readonly string[]])[] = [
+    ['git add src/*.ts && git commit -m "Fixes #6"', [`closing:${W}#6`]],
+    [`cat ${quoted(join(wt, 'src'))}/*.ts && gh issue comment 5 -b x`, [`gh:${W}#5`]],
+    [`ls /tmp/*.log && sed -i s/a/b/ ${quoted(join(wt, 'src', 'x.ts'))}`, [`branch:${W}#12`]],
+    [`ls ${quoted(wt)}/*.ts`, []],
+    ['git commit -m "Fixes #7" -- src/*.ts', [`closing:${W}#7`]],
+    ['epic-pulse track 8 && rm -f *.log', [`pin:${W}#8`]],
+    // Where a globbed cd lands is unknowable, so nothing after it binds.
+    [`cd ${quoted(join(wt, 'sr'))}* && git commit -m "Fixes #6"`, []],
+  ];
+  for (const [command, expected] of cases) assert.deepEqual(await signals(bash(command, repo.root)), expected, command);
+});
+
+test('a command with more than three issues binds nothing', async (t) => {
   const { wt } = widgetsRepo(t);
-  assert.deepEqual(await signals(bash('git add src/*.ts && git commit -m "Fixes #6"', wt)), []);
   assert.deepEqual(await signals(bash('gh issue edit 1 2 3 4 --add-label x', wt)), []);
   assert.deepEqual(await signals(bash('gh issue close 1 && gh issue close 2 && gh issue close 3 && gh issue close 4', wt)), []);
   assert.deepEqual(await signals(bash('gh issue edit 1 2 3 --add-label x', wt)), [`gh:${W}#1`, `gh:${W}#2`, `gh:${W}#3`]);

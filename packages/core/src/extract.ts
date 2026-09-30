@@ -62,17 +62,22 @@ function itemActions(item: PlanItem, contexts: Contexts): readonly Action[] {
 }
 
 // Pure pass over the commands, in order, following `cd` so that a later
-// `git commit` is attributed to the directory it runs in.
+// `git commit` is attributed to the directory it runs in. A glob only costs its
+// own command its paths: the command's signals, and every other command, still
+// count. Where a globbed `cd` lands is unknowable, so the pass stops there
+// rather than guess a repository.
 function plan(commands: readonly SimpleCommand[], cwd: string): readonly PlanItem[] {
   const items: PlanItem[] = [];
   let dir = cwd;
   let paths = 0;
   for (const command of commands) {
+    const cd = command.words[0] === 'cd' ? command.words[1] : undefined;
+    if (cd !== undefined && command.glob) break;
     items.push(...commandSignals(command.words, dir).map((signal) => ({ signal })));
-    const found = absolutePaths([...command.words, ...command.targets]).slice(0, Math.max(0, MAX_PATHS - paths));
+    const found = command.glob ? [] : absolutePaths([...command.words, ...command.targets]).slice(0, Math.max(0, MAX_PATHS - paths));
     items.push(...found.map((path) => ({ path })));
     paths += found.length;
-    if (command.words[0] === 'cd' && command.words[1] !== undefined) dir = resolve(dir, command.words[1]);
+    if (cd !== undefined) dir = resolve(dir, cd);
   }
   return items;
 }
@@ -87,8 +92,7 @@ async function toolActions(payload: HookPayload): Promise<readonly Action[]> {
   const input = payload.tool_input;
   const tool = payload.tool_name ?? '';
   if (tool === 'Bash' && input?.command !== undefined && payload.cwd !== undefined) {
-    const parsed = parseShell(input.command);
-    return parsed.glob ? [] : run(plan(parsed.commands, payload.cwd));
+    return run(plan(parseShell(input.command).commands, payload.cwd));
   }
   const path = PATH_TOOLS.has(tool) ? (input?.file_path ?? input?.notebook_path) : undefined;
   if (path === undefined || (!isAbsolute(path) && payload.cwd === undefined)) return [];
