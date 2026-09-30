@@ -17,6 +17,7 @@ export * from './registry.js';
 export * from './render.js';
 export * from './result.js';
 export * from './schemas/index.js';
+export * from './settings-merge.js';
 export * from './shell.js';
 export * from './shell-words.js';
 export * from './status.js';
