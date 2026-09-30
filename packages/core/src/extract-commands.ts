@@ -35,6 +35,9 @@ const PR_CREATE_VALUE_FLAGS = new Set([...REPO_FLAGS, '-a', '--assignee', '-B', 
   '-H', '--head', '-l', '--label', '-m', '--milestone', '-p', '--project', '-r', '--reviewer', '-T', '--template', '-t', '--title']);
 // Shell words that can open a simple command before the program itself.
 const RESERVED = new Set(['!', '{', '}', 'if', 'then', 'else', 'elif', 'do', 'while', 'until', 'time']);
+// `NAME=value` words before the program set its environment: `X=1 gh ...`.
+const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
+const GH_REPO = 'GH_REPO=';
 
 // pflag conventions, as gh uses them: `--name=value`, `--name value`,
 // `-n value` and `-nvalue`; `--` ends the flags. A flag not in `valueFlags` is
@@ -70,11 +73,21 @@ export function parseRepoFlag(value: string): RepoRef | undefined {
   return parsed.success ? parsed.data : undefined;
 }
 
-// An unreadable `-R` yields no hint at all: falling back to the cwd would bind
-// an issue in the wrong repository.
-function repoHint(flags: Flags, dir: string): RepoHint | undefined {
+// Where a gh command without `-R` works: an inline `GH_REPO=` prefix, which gh
+// reads like `-R` (an empty one counts as unset), or the directory's repository.
+function envHint(prefix: readonly string[], dir: string): RepoHint | undefined {
+  const value = prefix.filter((word) => word.startsWith(GH_REPO)).at(-1)?.slice(GH_REPO.length);
+  if (!value) return { dir };
+  const repo = parseRepoFlag(value);
+  return repo ? { repo } : undefined;
+}
+
+// `-R` wins over GH_REPO, as in gh. An unreadable `-R` or GH_REPO yields no
+// hint at all: falling back to the cwd would bind an issue in the wrong
+// repository.
+function repoHint(flags: Flags, fallback: RepoHint | undefined): RepoHint | undefined {
   const value = flags.values.filter(([flag]) => REPO_FLAGS.includes(flag)).at(-1)?.[1];
-  if (value === undefined) return { dir };
+  if (value === undefined) return fallback;
   const repo = parseRepoFlag(value);
   return repo ? { repo } : undefined;
 }
@@ -89,11 +102,11 @@ function splitVerb(args: readonly string[]): { readonly verb: string | undefined
   return { verb: undefined, rest: [] };
 }
 
-function ghIssueSignals(args: readonly string[], dir: string): readonly CommandSignal[] {
+function ghIssueSignals(args: readonly string[], fallback: RepoHint | undefined): readonly CommandSignal[] {
   const { verb, rest } = splitVerb(args);
   if (verb === undefined || !Object.hasOwn(MUTATING_ISSUE_VERBS, verb)) return [];
   const flags = parseFlags(rest, new Set([...REPO_FLAGS, ...(MUTATING_ISSUE_VERBS[verb] ?? [])]));
-  const hint = repoHint(flags, dir);
+  const hint = repoHint(flags, fallback);
   if (!hint) return [];
   return flags.positionals.flatMap((text) => {
     const target = parseIssueTarget(text);
@@ -103,11 +116,11 @@ function ghIssueSignals(args: readonly string[], dir: string): readonly CommandS
 
 // Only the body of `gh pr create`: GitHub reads closing keywords there, not in
 // the title.
-function ghPrSignals(args: readonly string[], dir: string): readonly CommandSignal[] {
+function ghPrSignals(args: readonly string[], fallback: RepoHint | undefined): readonly CommandSignal[] {
   const { verb, rest } = splitVerb(args);
   if (verb !== 'create') return [];
   const flags = parseFlags(rest, PR_CREATE_VALUE_FLAGS);
-  const hint = repoHint(flags, dir);
+  const hint = repoHint(flags, fallback);
   const bodies = flags.values.filter(([flag]) => flag === '-b' || flag === '--body').map(([, text]) => text);
   return hint ? bodies.map((text) => ({ kind: 'closing', text, hint }) as const) : [];
 }
@@ -159,13 +172,15 @@ function programName(word: string): string {
 }
 
 export function commandSignals(words: readonly string[], dir: string): readonly CommandSignal[] {
-  const start = words.findIndex((word) => !RESERVED.has(word));
+  const start = words.findIndex((word) => !RESERVED.has(word) && !ASSIGNMENT.test(word));
   if (start === -1) return [];
   const [group, ...args] = words.slice(start + 1);
   switch (programName(words[start]!)) {
-    case 'gh':
-      if (group === 'issue') return ghIssueSignals(args, dir);
-      return group === 'pr' ? ghPrSignals(args, dir) : [];
+    case 'gh': {
+      const hint = envHint(words.slice(0, start), dir);
+      if (group === 'issue') return ghIssueSignals(args, hint);
+      return group === 'pr' ? ghPrSignals(args, hint) : [];
+    }
     case 'git':
       return gitSignals(words.slice(start + 1), dir);
     case 'epic-pulse':

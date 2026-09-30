@@ -34,6 +34,25 @@ test('-R/--repo and issue URLs name the repository; an unreadable -R binds nothi
   for (const [command, expected] of cases) assert.deepEqual(await signals(bash(command, wt)), expected, command);
 });
 
+test('leading NAME=value words do not hide the program, and an inline GH_REPO names the repository like -R', async (t) => {
+  const { wt } = widgetsRepo(t);
+  const cases: readonly (readonly [string, readonly string[]])[] = [
+    ['X=1 gh issue comment 5 -b x', [`gh:${W}#5`]],
+    ['GH_REPO=o/r gh issue close 7', ['gh:github.com/o/r#7']],
+    ['A=1 GH_REPO=ghe.example.com/team/tool gh issue comment 7 -b x', ['gh:ghe.example.com/team/tool#7']],
+    ['GH_REPO=o/r gh issue close 7 -R other/tools', ['gh:github.com/other/tools#7']],
+    ['GH_REPO=not-a-repo gh issue close 7', []],
+    ['GH_REPO= gh issue close 7', [`gh:${W}#7`]],
+    ['GH_REPO=o/r gh pr create -b "Fixes #3"', ['closing:github.com/o/r#3']],
+    ['X=1 Y=2 git commit -m "Fixes #3"', [`closing:${W}#3`]],
+    ['GH_REPO=o/r git commit -m "Fixes #3"', [`closing:${W}#3`]],
+    ['LANG=C epic-pulse track 8', [`pin:${W}#8`]],
+    ['if GH_REPO=o/r gh issue close 7; then :; fi', ['gh:github.com/o/r#7']],
+    ['GH_REPO=o/r; gh issue close 7', [`gh:${W}#7`]],
+  ];
+  for (const [command, expected] of cases) assert.deepEqual(await signals(bash(command, wt)), expected, command);
+});
+
 test('flag values are never taken for targets', async (t) => {
   const { wt } = widgetsRepo(t);
   for (const command of ['gh issue close 5 --comment 6 --reason "not planned"', 'gh issue close 5 --duplicate-of 6',
