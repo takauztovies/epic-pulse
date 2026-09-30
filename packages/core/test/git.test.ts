@@ -37,15 +37,29 @@ test('outside any repository there is no worktree', async (t) => {
   assert.equal(await findWorktree(tempDir(t)), undefined);
 });
 
-test('the remote is read from the shared config, origin first, credentials dropped', async (t) => {
+test('the remote is read from the shared config, origin before other names, credentials dropped', async (t) => {
   const repo = makeRepo(t);
   const wt = addWorktree(repo, 'wt-three', 'fix/5-x');
   assert.equal(await readRemote((await findWorktree(repo.root))!.commonDir), undefined);
-  git(repo.root, ['remote', 'add', 'upstream', 'git@github.com:Upstream/Repo.git']);
+  git(repo.root, ['remote', 'add', 'mirror', 'git@github.com:Mirror/Repo.git']);
   git(repo.root, ['remote', 'add', 'origin', 'https://user:secret@github.com/Acme/Widgets.git']);
   const viaWorktree = await readRemote((await findWorktree(wt))!.commonDir);
   assert.deepEqual(viaWorktree, { host: 'github.com', owner: 'acme', repo: 'widgets' });
   assert.ok(!JSON.stringify(viaWorktree).includes('secret'));
+});
+
+test('a fork reads its base: the remote gh set as default, then upstream, then origin, then the first', async (t) => {
+  const repo = makeRepo(t);
+  const wt = addWorktree(repo, 'wt-fork', 'fix/5-x');
+  const owner = async () => (await readRemote((await findWorktree(wt))!.commonDir))?.owner;
+  git(repo.root, ['remote', 'add', 'mirror', 'https://github.com/Mirror/Widgets.git']);
+  assert.equal(await owner(), 'mirror');
+  git(repo.root, ['remote', 'add', 'origin', 'git@github.com:Me/Widgets.git']);
+  assert.equal(await owner(), 'me');
+  git(repo.root, ['remote', 'add', 'upstream', 'https://github.com/Acme/Widgets.git']);
+  assert.equal(await owner(), 'acme');
+  git(repo.root, ['config', 'remote.mirror.gh-resolved', 'base']); // what `gh repo set-default` writes
+  assert.equal(await owner(), 'mirror');
 });
 
 test('remote URL forms', () => {

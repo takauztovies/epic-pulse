@@ -139,6 +139,14 @@ test('shell keywords before the program do not hide it', async (t) => {
   assert.deepEqual(await signals(bash('{ gh issue comment 5 -b x; }', wt)), [`gh:${W}#5`]);
 });
 
+test('in a fork checkout an issue binds in the base repository, not in the fork', async (t) => {
+  const { root } = makeRepo(t, '12-login');
+  git(root, ['remote', 'add', 'origin', 'https://github.com/Me/Widgets.git']);
+  git(root, ['remote', 'add', 'upstream', 'https://github.com/Acme/Widgets.git']);
+  assert.deepEqual(await signals(bash('gh issue comment 5 -b x', root)), [`gh:${W}#5`]);
+  assert.deepEqual(await signals(bash(`touch ${quoted(join(root, 'a.ts'))}`, root)), [`branch:${W}#12`]);
+});
+
 test('outside a repository only targets that name their own repository bind', async (t) => {
   const outside = tempDir(t);
   assert.deepEqual(await signals(bash('gh issue comment 5 -b x', outside)), []);

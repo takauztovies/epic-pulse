@@ -105,17 +105,36 @@ export function parseRemoteUrl(url: string): RepoRef | undefined {
   return parsed.success ? parsed.data : undefined;
 }
 
-// `origin` when present, otherwise the first remote in the file.
-export async function readRemote(commonDir: string): Promise<RepoRef | undefined> {
-  const config = (await readSmall(join(commonDir, 'config'))) ?? '';
-  const urls = new Map<string, string>();
+interface RemoteSection {
+  readonly name: string;
+  readonly url: string | undefined;
+  readonly base: boolean;
+}
+
+// Every `[remote "name"]` in the file, in order, merged by name: the first url
+// wins, and `gh-resolved = base` marks the remote `gh repo set-default` chose.
+function remoteSections(config: string): readonly RemoteSection[] {
+  const remotes = new Map<string, RemoteSection>();
   let section: string | undefined;
   for (const line of config.split(/\r?\n/)) {
     const header = /^\s*\[(.*)\]\s*$/.exec(line);
     if (header) section = /^remote\s+"([^"]+)"$/.exec(header[1]!.trim())?.[1];
-    const value = /^\s*url\s*=\s*(.+?)\s*$/.exec(line)?.[1];
-    if (section && value && !urls.has(section)) urls.set(section, value);
+    if (section === undefined) continue;
+    const entry = remotes.get(section) ?? { name: section, url: undefined, base: false };
+    const url = entry.url ?? /^\s*url\s*=\s*(.+?)\s*$/.exec(line)?.[1];
+    remotes.set(section, { ...entry, url, base: entry.base || /^\s*gh-resolved\s*=\s*base\s*$/.test(line) });
   }
-  const chosen = urls.get('origin') ?? [...urls.values()][0];
-  return chosen ? parseRemoteUrl(chosen) : undefined;
+  return [...remotes.values()];
+}
+
+// The repository the checkout works on, which in a fork is the base, not the
+// fork: the remote gh set as default, then `upstream`, then `origin`, then the
+// first remote in the file. An earlier version took `origin` first, which in
+// a fork is the fork.
+export async function readRemote(commonDir: string): Promise<RepoRef | undefined> {
+  const config = (await readSmall(join(commonDir, 'config'))) ?? '';
+  const remotes = remoteSections(config).filter((remote) => remote.url !== undefined);
+  const named = (name: string) => remotes.find((remote) => remote.name === name);
+  const chosen = remotes.find((remote) => remote.base) ?? named('upstream') ?? named('origin') ?? remotes[0];
+  return chosen?.url ? parseRemoteUrl(chosen.url) : undefined;
 }
