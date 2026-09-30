@@ -8,8 +8,9 @@ export const SessionIdSchema = z.string().regex(SESSION_ID_PATTERN);
 
 // Hook and status-line payloads are parsed leniently: unknown keys pass through
 // (Claude Code adds fields between releases) and only what we read is typed.
-// Nothing outside `HookInput` (input.ts) is ever kept, so file contents in
-// `tool_input.content` can not leak into the registry.
+// Nothing but the `Extraction` extract.ts derives from a payload (the event
+// and issue refs) is ever kept, so file contents in `tool_input.content` can
+// not leak into the registry.
 const ToolInputSchema = z.looseObject({
   command: z.string().optional().catch(undefined),
   file_path: z.string().optional().catch(undefined),
