@@ -15,7 +15,7 @@ const DROPPED_REASONS: ReadonlySet<string> = new Set(['NOT_PLANNED', 'DUPLICATE'
 
 // GitHub's closing keywords, with the optional colon it accepts ("Fixes: #4").
 // Three reference forms: `#4`, `owner/repo#4` and a full issue URL.
-const CLOSING =
+export const CLOSING =
   /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\b[ \t]*:?[ \t]+(?:([\w.-]+\/[\w.-]+)#|#|https?:\/\/[^\s/]+\/([\w.-]+\/[\w.-]+)\/issues\/)(\d+)(?!\d)/gi;
 
 function slugOf(repo: RepoRef): string {
