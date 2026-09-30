@@ -23,7 +23,7 @@ export const JsonEpicSchema = z
     kind: EpicKindSchema,
     counts: StatusCountsSchema,
     percent: z.number().int().min(0).max(100),
-    children: z.array(JsonChildSchema),
+    children: z.array(JsonChildSchema).readonly(),
     fetchedAt: z.iso.datetime(),
     stale: z.boolean(),
     error: ErrorCodeSchema.nullable(),
@@ -43,7 +43,7 @@ export const JsonV1Schema = z
         error: ErrorCodeSchema.nullable(),
       })
       .readonly(),
-    epics: z.array(JsonEpicSchema),
+    epics: z.array(JsonEpicSchema).readonly(),
   })
   .readonly();
 

@@ -21,7 +21,7 @@ export const EpicEntrySchema = z
     title: z.string().max(300),
     url: z.string().max(500),
     kind: EpicKindSchema,
-    children: z.array(ChildSchema).max(500),
+    children: z.array(ChildSchema).max(500).readonly(),
     truncated: z.boolean(),
     fetchedAt: z.number().int().nonnegative(),
     error: ErrorCodeSchema.nullable(),

@@ -11,13 +11,13 @@ export const RegistryLineSchema = z
     v: z.literal(1),
     ts: z.number().int().nonnegative(),
     ev: z.enum(['start', 'tool', 'end']),
-    binds: z.array(BindEntrySchema).max(50).default([]),
-    unbinds: z.array(IssueRefSchema).max(50).default([]),
+    binds: z.array(BindEntrySchema).max(50).readonly().default([]),
+    unbinds: z.array(IssueRefSchema).max(50).readonly().default([]),
   })
   .readonly();
 
 export const PinSchema = z.object({ ref: IssueRefSchema, addedAt: z.number().int().nonnegative() }).readonly();
-export const PinsFileSchema = z.object({ v: z.literal(1), pins: z.array(PinSchema).max(200) }).readonly();
+export const PinsFileSchema = z.object({ v: z.literal(1), pins: z.array(PinSchema).max(200).readonly() }).readonly();
 
 export type BindEntry = z.infer<typeof BindEntrySchema>;
 export type RegistryLine = z.infer<typeof RegistryLineSchema>;
