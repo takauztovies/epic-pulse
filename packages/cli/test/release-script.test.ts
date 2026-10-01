@@ -94,9 +94,11 @@ test('a manifest with a second version field, or none where its version is read,
   const repo = releaseRepo(t);
   const marketplace = join(repo, '.claude-plugin', 'marketplace.json');
   const original = readFileSync(marketplace, 'utf8');
+  // A Windows checkout may have turned the line ends into CRLF.
+  const eol = original.includes('\r\n') ? '\r\n' : '\n';
   const variants: readonly (readonly [string, RegExp])[] = [
-    [original.replace('"metadata": {', '"metadata": {\n    "version": "1.0.0",'), /marketplace\.json has 2 "version" fields, expected exactly one/],
-    [original.replace('"name": "epic-pulse",\n      "source"', '"name": "renamed",\n      "source"'), /marketplace\.json: the "version" field is not where its version is read/],
+    [original.replace('"metadata": {', `"metadata": {${eol}    "version": "1.0.0",`), /marketplace\.json has 2 "version" fields, expected exactly one/],
+    [original.replace(`"name": "epic-pulse",${eol}      "source"`, `"name": "renamed",${eol}      "source"`), /marketplace\.json: the "version" field is not where its version is read/],
   ];
   for (const [text, reason] of variants) {
     assert.notEqual(text, original, 'the edit did not apply, so this would test the untouched file');
