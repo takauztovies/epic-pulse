@@ -52,11 +52,22 @@ function envNames(host: string, env: NodeJS.ProcessEnv): readonly TokenSource[] 
   return namedHosts(env).has(host) ? ['GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN'] : [];
 }
 
+// gh prefers these to its own logins: GH_ENTERPRISE_TOKEN for any host,
+// GH_TOKEN for *.ghe.com. Left in its environment, gh would hand one to a host
+// envNames has just refused it, so gh sees none of them and answers only with
+// a login the user made. Windows reads a name in any case, so any case goes.
+const TOKEN_VARIABLES: ReadonlySet<string> = new Set(['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN']);
+
+export function ghChildEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const kept = Object.entries(env).filter(([name]) => !TOKEN_VARIABLES.has(name.toUpperCase()));
+  return { ...Object.fromEntries(kept), GH_PROMPT_DISABLED: '1' };
+}
+
 async function ghCliToken(host: string, env: NodeJS.ProcessEnv): Promise<string | undefined> {
   try {
     const { stdout } = await run('gh', ['auth', 'token', '--hostname', host], {
       timeout: 5000,
-      env: { ...env, GH_PROMPT_DISABLED: '1' },
+      env: ghChildEnv(env),
       windowsHide: true,
     });
     return stdout.trim() || undefined;

@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { test } from 'node:test';
-import { apiUrl, describeFetchError, postGraphql, resolveToken } from '../src/github.js';
+import { apiUrl, describeFetchError, ghChildEnv, postGraphql, resolveToken } from '../src/github.js';
 
 // An empty directory as PATH makes `gh` unfindable, so only env vars can answer.
 async function withNoGh<T>(run: (path: string) => Promise<T>): Promise<T> {
@@ -62,6 +63,42 @@ test('GH_HOST, or an entry of EPIC_PULSE_HOSTS, trusts its host however it is sp
     const second = await resolveToken('other.example', { PATH, GITHUB_ENTERPRISE_TOKEN: 'second', EPIC_PULSE_HOSTS: 'other.example' });
     assert.deepEqual(second, { token: 'second', source: 'GITHUB_ENTERPRISE_TOKEN' });
   });
+});
+
+// The real gh from this machine's PATH, with a config directory of its own
+// that holds one login, for ghe.example.com. Skipped where gh is missing;
+// GitHub's runners all have it.
+const GH_DIR = (process.env['PATH'] ?? '').split(delimiter).find((dir) => dir !== '' && existsSync(join(dir, process.platform === 'win32' ? 'gh.exe' : 'gh')));
+const HOSTS_YML = 'ghe.example.com:\n    users:\n        someone:\n            oauth_token: gh-login-token\n    git_protocol: https\n    user: someone\n    oauth_token: gh-login-token\n';
+
+async function withGhLogin(run: (env: NodeJS.ProcessEnv) => Promise<void>): Promise<void> {
+  const home = await mkdtemp(join(tmpdir(), 'ep-gh-'));
+  try {
+    await writeFile(join(home, 'hosts.yml'), HOSTS_YML);
+    const system = process.env['SystemRoot'] === undefined ? {} : { SystemRoot: process.env['SystemRoot'] };
+    await run({ PATH: GH_DIR, HOME: home, USERPROFILE: home, GH_CONFIG_DIR: home, GH_NO_UPDATE_NOTIFIER: '1', ...system });
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+}
+
+// gh prefers these variables to its own logins: GH_ENTERPRISE_TOKEN for any
+// host, GH_TOKEN for *.ghe.com. Left in its environment, gh would hand one to
+// a host resolveToken has just refused it.
+test('gh is asked without the token variables, so it answers only with its own logins', { skip: GH_DIR === undefined && 'needs gh on the PATH' }, async () => {
+  await withGhLogin(async (env) => {
+    const secret = 'env-secret';
+    const leaked = { ...env, GH_TOKEN: secret, GITHUB_TOKEN: secret, GH_ENTERPRISE_TOKEN: secret, GITHUB_ENTERPRISE_TOKEN: secret };
+    assert.deepEqual(await resolveToken('ghe.example.com', leaked), { token: 'gh-login-token', source: 'gh-cli' });
+    assert.equal(await resolveToken('untrusted.example', leaked), undefined);
+    assert.equal(await resolveToken('acme.ghe.com', leaked), undefined);
+  });
+});
+
+test('gh gets the whole environment but the four token variables, whatever their case', () => {
+  const env = Object.freeze({ PATH: '/bin', GH_HOST: 'ghe.example.com', GH_TOKEN: 'a', gh_token: 'b', GitHub_Token: 'c', GH_ENTERPRISE_TOKEN: 'd',
+    github_enterprise_token: 'e', GH_TOKEN_FILE: 'kept' });
+  assert.deepEqual(ghChildEnv(env), { PATH: '/bin', GH_HOST: 'ghe.example.com', GH_TOKEN_FILE: 'kept', GH_PROMPT_DISABLED: '1' });
 });
 
 test('a host that is not a plain hostname never reaches the gh command line', async () => {

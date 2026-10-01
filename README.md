@@ -166,7 +166,8 @@ if you trust it:
   `GITHUB_ENTERPRISE_TOKEN`, then `gh auth token --hostname <host>`. `gh` itself ties the two
   Enterprise variables to no host, which is why epic-pulse asks you to name one;
 - any other host takes only `gh auth token --hostname <host>`: a host you logged in to with
-  `gh auth login --hostname <host>` is one you trust. Without that login it gets no token, and its
+  `gh auth login --hostname <host>` is one you trust. `gh` is asked without the four token
+  variables, so it answers with that login alone. Without one the host gets no token, and its
   refresh stops with `no_token`.
 
 The token is held in memory for one refresh and never written to disk, logged or put into an error
