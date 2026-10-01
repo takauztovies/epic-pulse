@@ -52,6 +52,26 @@ test('a trigger during a run asks for exactly one more run, after it, and joins 
   await poller.dispose();
 });
 
+// The run waits until released, so ticks land while it is in flight for as
+// long as the test likes. Focus then goes, so only a queued run could start.
+test('a tick that finds a run in flight is dropped, not queued behind it', async () => {
+  let runs = 0;
+  let release = () => {};
+  const run = () => {
+    runs += 1;
+    return new Promise<void>((resolve) => (release = resolve));
+  };
+  const poller = new Poller({ run, intervalMs: 5, focused: true, onError: rethrow });
+  void poller.trigger();
+  await sleep(40);
+  poller.setFocused(false);
+  release();
+  await sleep(20);
+  assert.equal(runs, 1, 'a tick during the run queued another');
+  release();
+  await poller.dispose();
+});
+
 test('ticks wait for focus, and focus coming back runs at once', async () => {
   const work = probe(1);
   const poller = new Poller({ run: work.run, intervalMs: 5, focused: false, onError: rethrow });
