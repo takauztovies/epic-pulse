@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import {
-  errnoOf, findWorktree, LIVE_WINDOW_MS, mergeStatusLine, pathsFor, readRemote, registryDirFor, repoKey, resolveToken,
+  DEFAULT_HOST, errnoOf, findWorktree, LIVE_WINDOW_MS, mergeStatusLine, pathsFor, readRemote, registryDirFor, repoKey, resolveToken,
   type MergeResult, type RepoRef,
 } from '@epic-pulse/core';
 import { lastHookActivity } from './activity.js';
@@ -46,9 +46,12 @@ export async function repoChecks(cwd: string): Promise<{ readonly checks: readon
 }
 
 // The source's name only. The token itself stays in memory and is dropped.
+// Another host takes an Enterprise variable only once the user names it.
 export async function tokenCheck(host: string, env: NodeJS.ProcessEnv): Promise<Check> {
   const found = await resolveToken(host, env);
-  return ['token', found ? `from ${found.source}` : `none for ${host}: set GH_TOKEN or run \`gh auth login\``];
+  if (found) return ['token', `from ${found.source}`];
+  if (host === DEFAULT_HOST) return ['token', `none for ${host}: set GH_TOKEN or run \`gh auth login\``];
+  return ['token', `none for ${host}: run \`gh auth login --hostname ${host}\`, or set GH_ENTERPRISE_TOKEN and name the host in GH_HOST or EPIC_PULSE_HOSTS`];
 }
 
 function hookState(last: number | undefined, now: number): string {

@@ -25,12 +25,42 @@ test('github.com reads GH_TOKEN before GITHUB_TOKEN and trims it', async () => {
   });
 });
 
-test('a github.com token is never offered to another host', async () => {
+test('a github.com token is never offered to another host, not even one the user named', async () => {
   await withNoGh(async (PATH) => {
-    const env = { PATH, GH_TOKEN: 'dotcom-secret', GITHUB_TOKEN: 'dotcom-secret' };
+    const env = { PATH, GH_TOKEN: 'dotcom-secret', GITHUB_TOKEN: 'dotcom-secret', GH_HOST: 'ghe.example.com' };
     assert.equal(await resolveToken('ghe.example.com', env), undefined);
     const enterprise = await resolveToken('ghe.example.com', { ...env, GH_ENTERPRISE_TOKEN: 'ghes-secret' });
     assert.deepEqual(enterprise, { token: 'ghes-secret', source: 'GH_ENTERPRISE_TOKEN' });
+  });
+});
+
+// The host comes from repository data (a remote, `gh -R`, an issue URL), which
+// a hostile checkout controls. gh ties the Enterprise variables to no host, so
+// they go only to a host the user named.
+test('the Enterprise variables go to no host the user has not named in GH_HOST or EPIC_PULSE_HOSTS', async () => {
+  await withNoGh(async (PATH) => {
+    const secret = { PATH, GH_ENTERPRISE_TOKEN: 'ghes-secret', GITHUB_ENTERPRISE_TOKEN: 'ghes-secret' };
+    for (const named of [{}, { GH_HOST: 'ghe.example.com' }, { EPIC_PULSE_HOSTS: 'ghe.example.com,other.example' }]) {
+      assert.equal(await resolveToken('untrusted.example', { ...secret, ...named }), undefined, JSON.stringify(named));
+    }
+    // Exact hosts only: no suffix, prefix or other port of a named host is that host.
+    const named = { ...secret, EPIC_PULSE_HOSTS: 'ghe.example.com', GH_HOST: 'other.example' };
+    for (const host of ['evil-ghe.example.com', 'ghe.example.com.evil.example', 'example.com', 'ghe.example.com:8443', 'acme.ghe.com']) {
+      assert.equal(await resolveToken(host, named), undefined, host);
+    }
+  });
+});
+
+test('GH_HOST, or an entry of EPIC_PULSE_HOSTS, trusts its host however it is spaced or cased', async () => {
+  await withNoGh(async (PATH) => {
+    const enterprise = { token: 'ghes-secret', source: 'GH_ENTERPRISE_TOKEN' };
+    const env = { PATH, GH_ENTERPRISE_TOKEN: 'ghes-secret' };
+    assert.deepEqual(await resolveToken('ghe.example.com', { ...env, GH_HOST: ' GHE.Example.com ' }), enterprise);
+    const listed = { ...env, EPIC_PULSE_HOSTS: 'not a host,, other.example ,GHE.example.com:8443' };
+    assert.deepEqual(await resolveToken('ghe.example.com:8443', listed), enterprise);
+    assert.deepEqual(await resolveToken('other.example', listed), enterprise);
+    const second = await resolveToken('other.example', { PATH, GITHUB_ENTERPRISE_TOKEN: 'second', EPIC_PULSE_HOSTS: 'other.example' });
+    assert.deepEqual(second, { token: 'second', source: 'GITHUB_ENTERPRISE_TOKEN' });
   });
 });
 

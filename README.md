@@ -156,12 +156,20 @@ a field that is wrong falls back to its default without voiding the others.
 is a read: epic-pulse sends no mutation. There is no telemetry and no other service. The hook never
 uses the network at all; only the refresher does.
 
-**Your token.** For github.com it comes from `GH_TOKEN`, then `GITHUB_TOKEN`, then `gh auth token`;
-for any other host from `GH_ENTERPRISE_TOKEN`, then `GITHUB_ENTERPRISE_TOKEN`, then
-`gh auth token --hostname <host>`. A github.com token is never sent to another host. The two
-Enterprise variables, as in `gh`, are not tied to one host: epic-pulse offers them to any host other
-than github.com that an issue names, so set them only where you trust every repository you open. The
-token is held in memory for one refresh and never written to disk, logged or put into an error
+**Your token.** For github.com it comes from `GH_TOKEN`, then `GITHUB_TOKEN`, then `gh auth token`,
+and a github.com token is never sent to another host. Any other host is named by repository data (a
+remote, `gh -R`, an issue URL), which whatever repository you open controls, so it gets a token only
+if you trust it:
+
+- a host you name in `GH_HOST`, or list in `EPIC_PULSE_HOSTS` (comma-separated, exact hosts:
+  `EPIC_PULSE_HOSTS=ghe.example.com,acme.ghe.com`), takes `GH_ENTERPRISE_TOKEN`, then
+  `GITHUB_ENTERPRISE_TOKEN`, then `gh auth token --hostname <host>`. `gh` itself ties the two
+  Enterprise variables to no host, which is why epic-pulse asks you to name one;
+- any other host takes only `gh auth token --hostname <host>`: a host you logged in to with
+  `gh auth login --hostname <host>` is one you trust. Without that login it gets no token, and its
+  refresh stops with `no_token`.
+
+The token is held in memory for one refresh and never written to disk, logged or put into an error
 message; `doctor` shows only where it came from.
 
 **Which scope.** epic-pulse reads issues and pull requests. The token `gh auth login` creates works.
@@ -234,7 +242,9 @@ epic-pulse doctor
 - **`hook inactive`** means no hook has run for this session. Enable the plugin, start a new session,
   and check that `node` 22 or newer is on Claude Code's `PATH`: a native Claude Code install without
   Node can not run the hooks.
-- **`error (no_token)`**: set `GH_TOKEN`, or run `gh auth login`. **`unauthorized`**: GitHub refused
+- **`error (no_token)`**: set `GH_TOKEN`, or run `gh auth login`. On a GitHub Enterprise host, run
+  `gh auth login --hostname <host>`, or set `GH_ENTERPRISE_TOKEN` and name the host in `GH_HOST` or
+  `EPIC_PULSE_HOSTS` (see [Your token](#privacy-and-security)). **`unauthorized`**: GitHub refused
   the token. **`budget`**: the 300 points of the last hour are spent; it resumes by itself.
   **`rate_limited`**: GitHub asked to slow down; epic-pulse waits five minutes.
 - **`loading…` that does not end**: run `epic-pulse refresh` in the repository to see what a refresh

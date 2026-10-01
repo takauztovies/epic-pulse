@@ -48,8 +48,9 @@ Epic Pulse uses VS Code's GitHub sign-in, and the GitHub Enterprise one when `gi
 is set. It asks for the `repo` scope because GitHub has no read-only scope that reaches private
 repositories. Epic Pulse only ever sends GraphQL queries; it never changes anything on GitHub.
 
-You do not have to sign in. Without a VS Code sign-in it uses `GH_TOKEN` or `GITHUB_TOKEN`
-(`GH_ENTERPRISE_TOKEN` for an Enterprise host), then `gh auth token`, exactly like the epic-pulse CLI.
+You do not have to sign in. Without a VS Code sign-in it uses `GH_TOKEN` or `GITHUB_TOKEN`, then
+`gh auth token`, exactly like the epic-pulse CLI. An Enterprise host takes `GH_ENTERPRISE_TOKEN` only
+when `GH_HOST` or `EPIC_PULSE_HOSTS` names it, and otherwise only your `gh auth login` for that host.
 Only when none of these yields a token GitHub accepts does the view offer **Sign in to GitHub**.
 
 ## Privacy

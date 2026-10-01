@@ -19,10 +19,11 @@ const invalid = (number: number) => makeRef({ host: 'epic-pulse.invalid', owner:
 // A line another repository's refresher left in the user's usage ledger.
 const otherRepo = (ts: number, points: number) => `${JSON.stringify({ ts, host: 'github.com', repo: 'f'.repeat(16), points })}\n`;
 
-// With a token for the `.invalid` host every admitted request really goes out
-// and really fails, offline (see the token test at the end).
+// With a token for the `.invalid` host, which EPIC_PULSE_HOSTS names, every
+// admitted request really goes out and really fails, offline (see the token
+// test at the end).
 function sendingEnv(t: TestContext, cache: string): NodeJS.ProcessEnv {
-  return noGhEnv(t, { GH_ENTERPRISE_TOKEN: 'x', EPIC_PULSE_CACHE_DIR: cache });
+  return noGhEnv(t, { GH_ENTERPRISE_TOKEN: 'x', EPIC_PULSE_HOSTS: 'epic-pulse.invalid', EPIC_PULSE_CACHE_DIR: cache });
 }
 
 async function boundRegistry(t: TestContext, refs: readonly IssueRef[]): Promise<RegistryPaths> {
@@ -143,7 +144,8 @@ test('a token never reaches any file the refresher writes, whatever the failure'
   for (const [token, code] of cases) {
     const paths = await boundRegistry(t, [invalid(4)]);
     const cache = tempDir(t);
-    const outcome = await refresh({ dir: paths.dir, now: Date.now(), env: noGhEnv(t, { GH_ENTERPRISE_TOKEN: token, EPIC_PULSE_CACHE_DIR: cache }) });
+    const env = noGhEnv(t, { GH_ENTERPRISE_TOKEN: token, EPIC_PULSE_HOSTS: 'epic-pulse.invalid', EPIC_PULSE_CACHE_DIR: cache });
+    const outcome = await refresh({ dir: paths.dir, now: Date.now(), env });
     assert.deepEqual(outcome, { status: 'done', requests: 1, points: 0, error: code });
     const files = [...filesUnder(paths.dir), ...filesUnder(cache)];
     assert.ok(files.some((file) => file === paths.snapshotFile), 'the failure was written to disk');
@@ -176,7 +178,7 @@ test('a token the caller hands over is used for its own host and for no other', 
 test('a token the caller hands over comes before the environment and gh', async (t) => {
   const cache = tempDir(t);
   const paths = await boundRegistry(t, [invalid(4)]);
-  const env = noGhEnv(t, { GH_ENTERPRISE_TOKEN: 'from-env', EPIC_PULSE_CACHE_DIR: cache });
+  const env = noGhEnv(t, { GH_ENTERPRISE_TOKEN: 'from-env', EPIC_PULSE_HOSTS: 'epic-pulse.invalid', EPIC_PULSE_CACHE_DIR: cache });
   const outcome = await refresh({ dir: paths.dir, now: Date.now(), env, tokens: { 'epic-pulse.invalid': `${SENTINEL}\u0000x` } });
   assert.deepEqual(outcome, { status: 'done', requests: 1, points: 0, error: 'invalid_token' });
 });

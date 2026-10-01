@@ -8,15 +8,15 @@ import { documentedFiles, documentedForm, filesContaining, inventory, run, scene
 
 // A token must reach no file and no output, even on the paths that hold it.
 // The repository's remote is an Enterprise host on 127.0.0.1:1, a port fetch
-// refuses inside the process ("bad port"), so a real refresh resolves the
-// token, charges the ledger and sends the request, yet nothing leaves the
-// machine and no server, real or fake, is involved.
+// refuses inside the process ("bad port"). EPIC_PULSE_HOSTS names it, so a
+// real refresh resolves the token, charges the ledger and sends the request,
+// yet nothing leaves the machine and no server, real or fake, is involved.
 
 const SENTINEL = 'ghp_PRIVACYSENTINEL000000000000000000000';
 const REMOTE = 'https://127.0.0.1:1/takauztovies/epic-pulse.git';
 
 function tokenEnv(token: string): NodeJS.ProcessEnv {
-  return { GH_ENTERPRISE_TOKEN: token, GITHUB_ENTERPRISE_TOKEN: token, GH_TOKEN: token, GITHUB_TOKEN: token };
+  return { GH_ENTERPRISE_TOKEN: token, GITHUB_ENTERPRISE_TOKEN: token, GH_TOKEN: token, GITHUB_TOKEN: token, EPIC_PULSE_HOSTS: '127.0.0.1:1' };
 }
 
 interface Outcome {

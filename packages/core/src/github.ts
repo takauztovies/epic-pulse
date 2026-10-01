@@ -32,12 +32,24 @@ export interface FetchFailure {
 
 const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
 
-// github.com and GitHub Enterprise Server use different env vars, exactly like
-// `gh` itself. The split is a security boundary: the host comes from a git
-// remote, which a hostile checkout controls, so a github.com token must never be
-// offered to any other host.
-function envNames(host: string): readonly TokenSource[] {
-  return host === DEFAULT_HOST ? ['GH_TOKEN', 'GITHUB_TOKEN'] : ['GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN'];
+// The hosts the user named: GH_HOST, as gh reads it, and the comma-separated
+// EPIC_PULSE_HOSTS. Each is trimmed, lowercased as refs are, and kept only if
+// it is a plain host.
+function namedHosts(env: NodeJS.ProcessEnv): ReadonlySet<string> {
+  const named = [env['GH_HOST'] ?? '', ...(env['EPIC_PULSE_HOSTS'] ?? '').split(',')].map((host) => host.trim().toLowerCase());
+  return new Set(named.filter((host) => HostSchema.safeParse(host).success));
+}
+
+// github.com and every other host use different env vars, like `gh` itself.
+// The split is a security boundary: the host comes from repository data (a
+// remote, `gh -R`, an issue URL), which a hostile checkout controls. So a
+// github.com token is never offered to any other host, and the Enterprise
+// variables, which gh ties to no host at all, only to a host the user named.
+// Any other host gets `gh auth token` alone: a host the user logged in to
+// with gh is one the user trusts.
+function envNames(host: string, env: NodeJS.ProcessEnv): readonly TokenSource[] {
+  if (host === DEFAULT_HOST) return ['GH_TOKEN', 'GITHUB_TOKEN'];
+  return namedHosts(env).has(host) ? ['GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN'] : [];
 }
 
 async function ghCliToken(host: string, env: NodeJS.ProcessEnv): Promise<string | undefined> {
@@ -58,7 +70,7 @@ async function ghCliToken(host: string, env: NodeJS.ProcessEnv): Promise<string 
 // field for it; only the `source` label may be shown to a user.
 export async function resolveToken(host: string, env: NodeJS.ProcessEnv): Promise<ResolvedToken | undefined> {
   if (!HostSchema.safeParse(host).success) return undefined;
-  for (const name of envNames(host)) {
+  for (const name of envNames(host, env)) {
     const value = env[name]?.trim();
     if (value) return { token: value, source: name };
   }
