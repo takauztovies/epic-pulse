@@ -1,0 +1,41 @@
+# Weekly, and by hand from the Actions tab: the live tests run the real
+# refresher against this repository's public demo issues, so a change in
+# GitHub's schema or in how it links pull requests shows up here first.
+name: Live
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: live
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # epic-pulse reads GITHUB_TOKEN when GH_TOKEN is not set.
+      - name: live tests against the demo issues
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm test:live
