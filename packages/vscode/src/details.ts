@@ -20,8 +20,7 @@ export interface DetailsInput {
 }
 
 const TOKEN_TEXT: Readonly<Record<TokenUse, string>> = {
-  session: 'from the VS Code sign-in',
-  withheld: 'VS Code sign-in withheld, because the registry also names a host it does not belong to; GH_TOKEN or gh is used',
+  session: 'from the VS Code sign-in, for the host it belongs to; any other host as the CLI does',
   none: 'GH_TOKEN or `gh auth token`, as the CLI does: no VS Code sign-in covers this repository',
 };
 

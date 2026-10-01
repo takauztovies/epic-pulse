@@ -57,9 +57,9 @@ Only when none of these yields a token GitHub accepts does the view offer **Sign
 - **Network.** Only the GitHub GraphQL API of the host your issues live on: `api.github.com`, or
   your Enterprise server. No telemetry and no other service.
 - **Your token** is held in memory for one refresh. It is never written to disk, logged or put in an
-  error. A token from VS Code is used only when every host named in the repository's registry is
-  a host you signed in to in VS Code; otherwise it is withheld, and the environment or `gh` is used
-  instead.
+  error. A token from VS Code goes only to the host it belongs to: the GitHub sign-in's to
+  github.com, the GitHub Enterprise one's to the server `github-enterprise.uri` names. Any other host
+  the repository names gets a token the way the CLI finds one, never one from VS Code.
 - **Stored in the repository**, in `epic-pulse/` inside its git directory (created owner-only on
   macOS and Linux):
   - `sessions/*.jsonl`, written by the plugin's hook: issue references and timestamps for each

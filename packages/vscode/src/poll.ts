@@ -3,7 +3,7 @@ import {
   buildView, gatherRefs, pathsFor, pinsOf, readLiveSessions, readPins, readSnapshot, refresh,
   type JsonV1, type RefreshOutcome, type RegistryPaths,
 } from '@epic-pulse/core';
-import { refreshEnv, type Grant, type TokenUse } from './grant.js';
+import { tokenUse, type Grant, type TokenUse } from './grant.js';
 import type { RepoTarget } from './repos.js';
 
 // `skipped`: the registry does not exist, so nothing was refreshed. `failed`:
@@ -60,11 +60,13 @@ async function registryHosts(paths: RegistryPaths, now: number): Promise<Readonl
 }
 
 // `refresh` throws only when the registry can not be written. That is reported
-// as `failed`, and the view is still read from what is there.
+// as `failed`, and the view is still read from what is there. The grant goes
+// to core as it is, keyed by host: core offers each token to its own host
+// only, so another host in the registry needs no special case.
 async function runRefresh(dir: string, options: PollOptions): Promise<Pick<RepoResult, 'refresh' | 'token'>> {
-  const { env, use } = refreshEnv(options.env, options.grant, await registryHosts(pathsFor(dir), options.now));
+  const use = tokenUse(options.grant, await registryHosts(pathsFor(dir), options.now));
   try {
-    return { refresh: await refresh({ dir, now: options.now, env }), token: use };
+    return { refresh: await refresh({ dir, now: options.now, env: options.env, tokens: options.grant }), token: use };
   } catch {
     return { refresh: { status: 'failed' }, token: use };
   }

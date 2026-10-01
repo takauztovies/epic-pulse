@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { makeRef, type IssueRef } from '@epic-pulse/core';
 import { detailsText, errorLabel, outcomeLine } from '../src/details.js';
-import { enterpriseHostOf, refreshEnv } from '../src/grant.js';
+import { enterpriseHostOf, grantOf, sessionRequests, tokenUse } from '../src/grant.js';
 import { buildModel } from '../src/model.js';
 import { pollAll } from '../src/poll.js';
 import { statusBarOf } from '../src/status-model.js';
@@ -25,7 +25,7 @@ test('a VS Code token reaches no file a refresh writes, and nothing the extensio
     const now = Date.now();
     const repo = await makeRegistry(t, { sessions: [{ id: SESSION_A, binds: [invalid(4)] }] }, now);
     const env = noGhEnv(t);
-    const results = await pollAll([repo], { now, env, grant: { enterprise: { host: HOST, token } } });
+    const results = await pollAll([repo], { now, env, grant: grantOf({ 'github-enterprise': token }, HOST) });
     assert.deepEqual([results[0]?.token, results[0]?.refresh], ['session', { status: 'done', requests: 1, points: 0, error: code }]);
     const cache = env['EPIC_PULSE_CACHE_DIR'] ?? assert.fail('no cache dir');
     const files = [...filesUnder(repo.dir), ...filesUnder(cache)];
@@ -38,26 +38,50 @@ test('a VS Code token reaches no file a refresh writes, and nothing the extensio
   }
 });
 
-test('a token is withheld from a refresh whose registry also names a host it does not belong to', async (t) => {
+// Every request is charged to the ledger, under its host, before it is sent.
+function chargedHosts(cache: string): readonly string[] {
+  const file = join(cache, 'usage.jsonl');
+  if (!existsSync(file)) return [];
+  return readFileSync(file, 'utf8').split('\n').filter(Boolean).map((raw) => String((JSON.parse(raw) as Record<string, unknown>)['host']));
+}
+
+// The sign-in's host gets its token; the other host gets none from VS Code,
+// and with no variable and no gh core finds none either, so nothing is sent
+// there. The environment the poll was given is frozen: nothing writes to it.
+test('the token of a sign-in goes to its own host, and another host in the registry does not hold it back', async (t) => {
   const now = Date.now();
   const repo = await makeRegistry(t, { sessions: [{ id: SESSION_A, binds: [invalid(4), invalid(5, 'elsewhere.invalid')] }] }, now);
-  const results = await pollAll([repo], { now, env: noGhEnv(t), grant: { enterprise: { host: HOST, token: SENTINEL } } });
-  // Core then found no token of its own (no variable, no gh), so no request went anywhere.
-  assert.deepEqual([results[0]?.token, results[0]?.refresh], ['withheld', { status: 'done', requests: 0, points: 0, error: 'no_token' }]);
+  const env = Object.freeze(noGhEnv(t));
+  const results = await pollAll([repo], { now, env, grant: grantOf({ 'github-enterprise': SENTINEL }, HOST) });
+  const refreshed = results[0]?.refresh;
+  assert.deepEqual([results[0]?.token, refreshed?.status === 'done' ? refreshed.requests : refreshed], ['session', 1]);
+  assert.deepEqual(chargedHosts(env['EPIC_PULSE_CACHE_DIR'] ?? assert.fail('no cache dir')), [HOST]);
 });
 
-test('only the tokens for hosts the registry names enter the environment, and the base is left alone', () => {
-  const base = Object.freeze({ PATH: '/bin', GH_TOKEN: 'from-shell' });
-  const grant = { github: 'gho_session', enterprise: { host: 'ghes.example', token: 'ghes_session' } };
-  const github = refreshEnv(base, grant, new Set(['github.com']));
-  assert.deepEqual([github.use, github.env['GH_TOKEN'], github.env['GH_ENTERPRISE_TOKEN']], ['session', 'gho_session', undefined]);
-  const both = refreshEnv(base, grant, new Set(['github.com', 'ghes.example']));
-  assert.deepEqual([both.use, both.env['GH_TOKEN'], both.env['GH_ENTERPRISE_TOKEN']], ['session', 'gho_session', 'ghes_session']);
-  assert.deepEqual(refreshEnv(base, grant, new Set(['github.com', 'evil.example'])), { env: base, use: 'withheld' });
-  assert.deepEqual(refreshEnv(base, grant, new Set(['evil.example'])), { env: base, use: 'none' });
-  assert.deepEqual(refreshEnv(base, {}, new Set(['github.com'])), { env: base, use: 'none' });
-  assert.deepEqual(refreshEnv(base, grant, new Set()), { env: base, use: 'none' });
-  assert.deepEqual(base, { PATH: '/bin', GH_TOKEN: 'from-shell' });
+test('each sign-in is read silently, and the Enterprise one only when a server is configured', () => {
+  const silent = { scopes: ['repo'], options: { createIfNone: false, silent: true } };
+  assert.deepEqual(sessionRequests(undefined), [{ provider: 'github', ...silent }]);
+  assert.deepEqual(sessionRequests('ghes.example'), [{ provider: 'github', ...silent }, { provider: 'github-enterprise', ...silent }]);
+});
+
+test('each token is keyed by the host its sign-in belongs to: github.com for GitHub, the configured server for Enterprise', () => {
+  assert.deepEqual(grantOf({ github: 'gho', 'github-enterprise': 'ghes' }, 'ghes.example'), { 'github.com': 'gho', 'ghes.example': 'ghes' });
+  assert.deepEqual(grantOf({ github: 'gho' }, 'ghes.example'), { 'github.com': 'gho' });
+  assert.deepEqual(grantOf({ 'github-enterprise': 'ghes' }, 'ghes.example'), { 'ghes.example': 'ghes' });
+  // Without a configured server an Enterprise token has no host it belongs to.
+  assert.deepEqual(grantOf({ 'github-enterprise': 'ghes' }, undefined), {});
+  // A provider without a session answers undefined, which readAuth passes on as it is.
+  assert.deepEqual(grantOf({ github: undefined, 'github-enterprise': undefined }, 'ghes.example'), {});
+  assert.deepEqual([grantOf({}, 'ghes.example'), grantOf({}, undefined)], [{}, {}]);
+});
+
+test('a refresh is labelled session when a sign-in covers a host the registry names, none otherwise', () => {
+  const grant = { 'github.com': 'gho' };
+  assert.equal(tokenUse(grant, new Set(['github.com', 'elsewhere.example'])), 'session');
+  assert.equal(tokenUse(grant, new Set(['elsewhere.example'])), 'none');
+  assert.equal(tokenUse(grant, new Set()), 'none');
+  // `constructor` is a valid host and a key every object inherits.
+  assert.equal(tokenUse({}, new Set(['github.com', 'constructor'])), 'none');
 });
 
 test('the GitHub Enterprise host comes from a valid http(s) URI, lowercased, and is never github.com', () => {

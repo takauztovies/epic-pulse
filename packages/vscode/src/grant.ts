@@ -1,45 +1,58 @@
 import { DEFAULT_HOST, HostSchema } from '@epic-pulse/core';
 import { z } from 'zod';
 
-// What VS Code's GitHub sign-ins handed over for one poll. It lives as long as
-// that poll and goes nowhere but the environment of its refresh: no result,
-// log line or label the extension builds has a field for a token.
-export interface Grant {
-  readonly github?: string;
-  readonly enterprise?: { readonly host: string; readonly token: string };
+// What VS Code's GitHub sign-ins handed over for one poll: each token under
+// the one host it belongs to. It lives as long as that poll and goes nowhere
+// but core's refresh, which offers a host its own entry and nothing to any
+// other: no result, log line or label the extension builds has a field for a
+// token.
+export type Grant = Readonly<Record<string, string>>;
+
+// How a refresh got its token, as a label. `session`: a VS Code sign-in
+// covers a host the registry names, and that host gets its token. `none`: no
+// sign-in does, so core falls back to GH_TOKEN and `gh auth token` exactly as
+// the CLI does.
+export type TokenUse = 'session' | 'none';
+
+export type Provider = 'github' | 'github-enterprise';
+
+// GitHub has no read-only scope that reaches private repositories, so reading
+// their issues takes `repo`. Epic Pulse sends GraphQL queries only.
+export const SCOPES: readonly string[] = ['repo'];
+
+// One `vscode.authentication.getSession` call, as data.
+export interface SessionRequest {
+  readonly provider: Provider;
+  readonly scopes: readonly string[];
+  readonly options: { readonly createIfNone: false; readonly silent: true };
 }
 
-// How a refresh got its token, as a label. `session`: from VS Code's sign-in.
-// `withheld`: a sign-in exists, but the registry also names a host it does not
-// belong to. `none`: no sign-in covers the repository, so core falls back to
-// GH_TOKEN and `gh auth token` exactly as the CLI does.
-export type TokenUse = 'session' | 'withheld' | 'none';
-
-export interface RefreshEnv {
-  readonly env: NodeJS.ProcessEnv;
-  readonly use: TokenUse;
+// Silent: no prompt, and no badge on the Accounts menu. Someone whose `gh` is
+// signed in never needs this sign-in, and the tree offers it when it is due.
+// The Enterprise sign-in serves only the server `github-enterprise.uri`
+// names, so without one it is not asked at all.
+export function sessionRequests(enterpriseHost: string | undefined): readonly SessionRequest[] {
+  const providers: readonly Provider[] = enterpriseHost === undefined ? ['github'] : ['github', 'github-enterprise'];
+  return providers.map((provider) => ({ provider, scopes: SCOPES, options: { createIfNone: false, silent: true } }));
 }
 
-function ownedHosts(grant: Grant): ReadonlySet<string> {
-  return new Set([...(grant.github ? [DEFAULT_HOST] : []), ...(grant.enterprise ? [grant.enterprise.host] : [])]);
+// Each provider's access token, where it had a session.
+export type SessionTokens = Partial<Readonly<Record<Provider, string>>>;
+
+// The GitHub sign-in's token belongs to github.com and the Enterprise one's to
+// the configured server. Core offers each to that host only, so this pairing
+// is the whole boundary between a sign-in and every other host.
+export function grantOf(sessions: SessionTokens, enterpriseHost: string | undefined): Grant {
+  const github = sessions.github === undefined ? [] : [[DEFAULT_HOST, sessions.github] as const];
+  const enterprise = sessions['github-enterprise'];
+  const ghes = enterprise === undefined || enterpriseHost === undefined ? [] : [[enterpriseHost, enterprise] as const];
+  return Object.fromEntries([...github, ...ghes]);
 }
 
-// Core offers GH_ENTERPRISE_TOKEN to every host that is not github.com, and
-// passes its environment, GH_TOKEN included, to `gh auth token` for any host it
-// has no variable for; gh hands GH_TOKEN on for *.ghe.com. So a VS Code token
-// enters the environment only when every host the registry names is one a
-// sign-in belongs to, and then only the tokens for hosts actually named. The
-// refresh reads the registry again under its lock: a binding to a new host that
-// lands between the two reads is the gap this can not close from outside core.
-export function refreshEnv(base: NodeJS.ProcessEnv, grant: Grant, hosts: ReadonlySet<string>): RefreshEnv {
-  const owned = ownedHosts(grant);
-  const covered = [...hosts].filter((host) => owned.has(host));
-  if (covered.length === 0) return { env: base, use: 'none' };
-  if (covered.length < hosts.size) return { env: base, use: 'withheld' };
-  const github = grant.github !== undefined && hosts.has(DEFAULT_HOST) ? { GH_TOKEN: grant.github } : {};
-  const { enterprise } = grant;
-  const ghes = enterprise !== undefined && hosts.has(enterprise.host) ? { GH_ENTERPRISE_TOKEN: enterprise.token } : {};
-  return { env: { ...base, ...github, ...ghes }, use: 'session' };
+// `constructor` is a valid host name and a key every object inherits, so a
+// host counts only through the grant's own entries.
+export function tokenUse(grant: Grant, hosts: ReadonlySet<string>): TokenUse {
+  return [...hosts].some((host) => Object.hasOwn(grant, host)) ? 'session' : 'none';
 }
 
 const EnterpriseUriSchema = z.url({ protocol: /^https?$/ }).max(2048);
