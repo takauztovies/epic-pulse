@@ -1,0 +1,5 @@
+#!/bin/sh
+# Claude Code puts this directory on the Bash tool's PATH, so `epic-pulse
+# track 12` works in a session without a global install. It runs the same
+# bundle the hooks run.
+exec node "$(dirname -- "$0")/../dist/epic-pulse.mjs" "$@"

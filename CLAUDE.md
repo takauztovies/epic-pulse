@@ -71,5 +71,7 @@ pnpm record-fixtures
   bundled into every artifact.
 - `packages/cli` the npm package `epic-pulse`: one bundled file, no runtime
   dependencies. Its tests run the built bundle as a real process.
+- `plugin` the Claude Code plugin (hooks, bin shims, the track skill), listed by
+  `.claude-plugin/marketplace.json`. `plugin/dist` is release-owned.
 - `fixtures/graphql` recorded GitHub responses.
 - `scripts` tooling: fixture recorder, build and release.
