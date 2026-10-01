@@ -1,0 +1,34 @@
+# Changelog
+
+Every notable change to epic-pulse is listed here. Versions follow
+[Semantic Versioning](https://semver.org/).
+
+## Unreleased
+
+## 0.1.0 (unreleased)
+
+The first release.
+
+### Added
+
+- A Claude Code plugin, listed by this repository's own marketplace. Its hooks record, offline and
+  asynchronously, which issues a session works on: mutating `gh issue` commands, closing keywords in
+  `gh pr create` bodies and commit messages, edits in a worktree whose branch name carries an issue
+  number, and `epic-pulse track` pins. `/epic-pulse:track` pins an issue or epic to the session.
+- The `epic-pulse` command on npm, with no runtime dependencies: `statusline`,
+  `statusline install [--dry-run] [--project]`, `json`, `track`, `untrack`, `refresh`, `doctor`, and
+  `hook`, which the plugin runs.
+- A status line that shows the session's epic as a percentage, a bar and the sub-issues in review and
+  in progress, renders from disk, and names every state it can be in.
+- Statuses derived from GitHub: todo, in progress, in review, done and dropped. Progress is
+  done / (total − dropped). Epics made of a task list count their boxes.
+- One shared refresher per repository with a 300-points-an-hour budget across every repository on the
+  machine, and backing off when GitHub rate-limits.
+- A VS Code extension, Epic Pulse, on the Visual Studio Marketplace and Open VSX.
+- `.epic-pulse.json` with `branchIssuePattern`, `ignorePaths` and `ignoreMainCheckout`.
+- GitHub Enterprise Server and GitHub Enterprise Cloud (data residency) hosts, with the Enterprise
+  token variables kept apart from github.com's. Not yet tested against a live Enterprise server.
+- Tests that hold the shipped code to its privacy promises: an offline hook, read-only GraphQL, an
+  allowlist of every address in the bundle, the documented list of written files, and no token on disk.
+- CI on macOS, Linux and Windows with Node 22 and 24, a release workflow with provenance, and a weekly
+  live check against the public demo issues.
