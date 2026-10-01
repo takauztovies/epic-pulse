@@ -1,0 +1,34 @@
+{
+  "name": "epic-pulse",
+  "version": "0.1.0",
+  "description": "Shows how far the GitHub epics behind a Claude Code session have got, in its status line.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "epic-pulse": "dist/epic-pulse.mjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/takauztovies/epic-pulse.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/takauztovies/epic-pulse#readme",
+  "bugs": "https://github.com/takauztovies/epic-pulse/issues",
+  "keywords": [
+    "claude-code",
+    "github",
+    "epic",
+    "sub-issues",
+    "status-line"
+  ],
+  "devDependencies": {
+    "@epic-pulse/core": "workspace:*",
+    "zod": "^4.6.5"
+  }
+}

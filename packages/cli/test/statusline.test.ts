@@ -1,0 +1,111 @@
+import assert from 'node:assert/strict';
+import { existsSync, mkdirSync, utimesSync, writeFileSync } from 'node:fs';
+import { test, type TestContext } from 'node:test';
+import { readSnapshot, sessionFile, writeSnapshot, type RegistryPaths } from '@epic-pulse/core';
+import { bashPayload, demoSnapshot, eventPayload, statusPayload } from './fixtures.js';
+import { cliEnv, demoRepo, registryOf, runCli, sandbox, tempDir, waitFor, type CliRun, type Sandbox } from './helpers.js';
+
+const OTHER_SESSION = '1a2b3c4d-5e6f-4a1b-9c2d-3e4f5a6b7c8d';
+const CANARY_SESSION = '2b3c4d5e-6f7a-4b1c-8d2e-3f4a5b6c7d8e';
+const EPIC_LINE = '#1 ▓▓░░░░░░░░ 20% 1/5 · rev 1 · wip 2';
+const ELEVEN_MINUTES = 11 * 60 * 1000;
+const EIGHT_DAYS_S = 8 * 24 * 60 * 60;
+
+interface Bound {
+  readonly repo: string;
+  readonly box: Sandbox;
+  readonly paths: RegistryPaths;
+}
+
+// A session that started and then commented on demo sub-issue #4, both
+// recorded by the real hook.
+async function boundSession(t: TestContext): Promise<Bound> {
+  const repo = demoRepo(t);
+  const box = sandbox(t);
+  for (const input of [eventPayload('SessionStart', repo), bashPayload('gh issue comment 4 -b hi', repo)]) {
+    assert.equal((await runCli(['hook'], { cwd: repo, env: cliEnv(box), input })).code, 0);
+  }
+  return { repo, box, paths: registryOf(repo) };
+}
+
+async function statusLine(where: Pick<Bound, 'repo' | 'box'>, input = statusPayload(where.repo)): Promise<CliRun> {
+  const run = await runCli(['statusline'], { cwd: where.repo, env: cliEnv(where.box), input });
+  assert.deepEqual([run.code, run.stderr], [0, '']);
+  return run;
+}
+
+// A session file untouched for eight days. Pruning it is the refresher's last
+// step before it releases the lock, so once it and the lock are gone a
+// refresh has run to the end; while it stays, none has.
+function plantCanary(paths: RegistryPaths): string {
+  const file = sessionFile(paths, CANARY_SESSION)!;
+  mkdirSync(paths.sessionsDir, { recursive: true });
+  writeFileSync(file, '');
+  const then = Date.now() / 1000 - EIGHT_DAYS_S;
+  utimesSync(file, then, then);
+  return file;
+}
+
+async function refreshFinished(paths: RegistryPaths, canary: string): Promise<void> {
+  assert.ok(await waitFor(() => !existsSync(canary) && !existsSync(paths.lockFile)), 'no detached refresh ran to the end');
+}
+
+// The sandbox has no token and no `gh`, so a refresh ends by recording that.
+async function snapshotError(paths: RegistryPaths): Promise<unknown> {
+  const read = await readSnapshot(paths.snapshotFile);
+  return read.status === 'ok' ? read.snapshot.error : read.status;
+}
+
+test('a fresh snapshot renders the session\'s epic from disk and starts no refresh', async (t) => {
+  const bound = await boundSession(t);
+  await writeSnapshot(bound.paths.snapshotFile, demoSnapshot(Date.now()));
+  const canary = plantCanary(bound.paths);
+  assert.equal((await statusLine(bound)).stdout, `${EPIC_LINE}\n`);
+  // A spawned refresh would prune the canary within this second; none may.
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  assert.equal(existsSync(canary), true);
+});
+
+test('a missing snapshot shows loading, and the detached refresh records why it could not fetch', async (t) => {
+  const bound = await boundSession(t);
+  const first = plantCanary(bound.paths);
+  assert.equal((await statusLine(bound)).stdout, 'epic-pulse: loading…\n');
+  await refreshFinished(bound.paths, first);
+  assert.equal(await snapshotError(bound.paths), 'no_token');
+  const second = plantCanary(bound.paths);
+  assert.equal((await statusLine(bound)).stdout, 'epic-pulse: error (no_token)\n');
+  await refreshFinished(bound.paths, second);
+});
+
+test('a corrupt snapshot shows loading and is replaced by the refresh', async (t) => {
+  const bound = await boundSession(t);
+  writeFileSync(bound.paths.snapshotFile, '{"v":1,"updatedAt":');
+  const canary = plantCanary(bound.paths);
+  assert.equal((await statusLine(bound)).stdout, 'epic-pulse: loading…\n');
+  await refreshFinished(bound.paths, canary);
+  assert.equal(await snapshotError(bound.paths), 'no_token');
+});
+
+test('a stale snapshot still shows the epic, marked stale, and then why the refresh failed', async (t) => {
+  const bound = await boundSession(t);
+  await writeSnapshot(bound.paths.snapshotFile, demoSnapshot(Date.now() - ELEVEN_MINUTES));
+  const first = plantCanary(bound.paths);
+  assert.equal((await statusLine(bound)).stdout, `${EPIC_LINE} · stale\n`);
+  await refreshFinished(bound.paths, first);
+  const second = plantCanary(bound.paths);
+  assert.equal((await statusLine(bound)).stdout, `${EPIC_LINE} · stale (no_token)\n`);
+  await refreshFinished(bound.paths, second);
+});
+
+test('a session the hook never wrote for, or no session at all, is hook-inactive', async (t) => {
+  const bound = await boundSession(t);
+  await writeSnapshot(bound.paths.snapshotFile, demoSnapshot(Date.now()));
+  for (const input of [statusPayload(bound.repo, OTHER_SESSION), '', 'not json', '{"session_id":"../../etc"}']) {
+    assert.equal((await statusLine(bound, input)).stdout, 'epic-pulse: hook inactive\n', input);
+  }
+});
+
+test('outside a repository there is no epic to show', async (t) => {
+  const dir = tempDir(t);
+  assert.equal((await statusLine({ repo: dir, box: sandbox(t) })).stdout, 'epic-pulse: no epic\n');
+});
