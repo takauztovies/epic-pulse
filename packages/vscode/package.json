@@ -1,0 +1,139 @@
+{
+  "name": "epic-pulse",
+  "displayName": "Epic Pulse",
+  "description": "GitHub epic progress for Claude Code sessions",
+  "version": "0.1.0",
+  "publisher": "takauztovies",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/takauztovies/epic-pulse",
+    "directory": "packages/vscode"
+  },
+  "homepage": "https://github.com/takauztovies/epic-pulse#readme",
+  "bugs": {
+    "url": "https://github.com/takauztovies/epic-pulse/issues"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "keywords": [
+    "claude code",
+    "github",
+    "epic",
+    "sub-issues",
+    "progress"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.cjs",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Epic Pulse reads the repository's git metadata and refreshes from GitHub with your token, so it waits until you trust the folder."
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "Epic Pulse reads the registry inside the repository's .git directory, which needs a folder on disk."
+    }
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "epicPulse",
+          "title": "Epic Pulse",
+          "icon": "$(pulse)"
+        }
+      ]
+    },
+    "views": {
+      "epicPulse": [
+        {
+          "id": "epicPulse.epics",
+          "name": "Epics"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "epicPulse.refresh",
+        "title": "Refresh",
+        "category": "Epic Pulse",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "epicPulse.openIssue",
+        "title": "Open on GitHub",
+        "category": "Epic Pulse"
+      },
+      {
+        "command": "epicPulse.signIn",
+        "title": "Sign in to GitHub",
+        "category": "Epic Pulse"
+      },
+      {
+        "command": "epicPulse.showStatus",
+        "title": "Show status details",
+        "category": "Epic Pulse"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "epicPulse.openIssue",
+          "when": "false"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "epicPulse.refresh",
+          "when": "view == epicPulse.epics",
+          "group": "navigation"
+        },
+        {
+          "command": "epicPulse.showStatus",
+          "when": "view == epicPulse.epics"
+        },
+        {
+          "command": "epicPulse.signIn",
+          "when": "view == epicPulse.epics"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Epic Pulse",
+      "properties": {
+        "epicPulse.refreshSeconds": {
+          "type": "integer",
+          "default": 60,
+          "minimum": 30,
+          "maximum": 86400,
+          "markdownDescription": "How often, in seconds, Epic Pulse refreshes while this window has focus. GitHub usage stays inside the hourly budget every epic-pulse refresher shares, whatever this is set to."
+        },
+        "epicPulse.statusBar.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the progress of the current epic in the status bar."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "vscode:prepublish": "node scripts/build.mjs",
+    "package": "pnpm dlx @vscode/vsce@3 package --no-dependencies --no-gitHubIssueLinking"
+  },
+  "devDependencies": {
+    "@epic-pulse/core": "workspace:*",
+    "@types/vscode": "~1.90.0",
+    "zod": "^4.6.5"
+  }
+}

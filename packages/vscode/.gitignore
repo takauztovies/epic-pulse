@@ -1,0 +1,3 @@
+# `pnpm --filter ./packages/vscode package` writes the .vsix here. It is a
+# build output, like dist/, and is never committed.
+*.vsix
