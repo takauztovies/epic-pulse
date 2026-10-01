@@ -28,6 +28,11 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         node: [22, 24]
     steps:
+      # Windows runners check text files out with CRLF line ends. The build and
+      # the tests are meant to see the bytes the repository holds.
+      - name: keep the committed line ends
+        if: runner.os == 'Windows'
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
