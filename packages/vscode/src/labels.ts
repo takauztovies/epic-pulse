@@ -27,7 +27,7 @@ export const STATE_TEXT: Readonly<Record<Exclude<DisplayState, 'ok'>, StateText>
   unsupported: { label: 'Unsupported host', detail: 'This GitHub host has no sub-issues, which epic-pulse needs.', icon: 'circle-slash' },
   'signed-out': {
     label: 'Sign in to GitHub',
-    detail: 'No GitHub token was found. Sign in so Epic Pulse can read your epics.',
+    detail: 'No GitHub token that works was found. Sign in so Epic Pulse can read your epics.',
     icon: 'account',
   },
 };
