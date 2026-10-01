@@ -18,6 +18,10 @@ export interface RefreshOptions {
   readonly dir: string;
   readonly now: number;
   readonly env: NodeJS.ProcessEnv;
+  // Tokens the caller already holds, each under the one host it belongs to.
+  // A host's own entry comes before the environment and `gh`; no other host
+  // ever sees it. In memory only, like every token.
+  readonly tokens?: Readonly<Record<string, string>>;
 }
 
 export type RefreshOutcome =
@@ -72,10 +76,13 @@ function pendingRefs(snapshot: Snapshot, refs: readonly IssueRef[], now: number)
 // Tokens are looked up only for hosts with work to do and only when even the
 // cheapest request fits the budget, so a warm cache or a spent hour never
 // spawns `gh auth token`. Epics found in Phase A share their issue's host.
-async function tokensFor(run: Run, refs: readonly IssueRef[], env: NodeJS.ProcessEnv): Promise<ReadonlyMap<string, string>> {
+// The caller's map is read through its own entries only: `constructor` is a
+// valid host name, and every object inherits a value under it.
+async function tokensFor(run: Run, refs: readonly IssueRef[], options: RefreshOptions): Promise<ReadonlyMap<string, string>> {
   if (overBudget(run, PHASE_A_COST)) return new Map();
+  const given = new Map(Object.entries(options.tokens ?? {}));
   const hosts = [...new Set(pendingRefs(run.snapshot, refs, run.now).map((ref) => ref.host))];
-  const found = await Promise.all(hosts.map(async (host) => [host, (await resolveToken(host, env))?.token] as const));
+  const found = await Promise.all(hosts.map(async (host) => [host, given.get(host) ?? (await resolveToken(host, options.env))?.token] as const));
   return new Map(found.flatMap(([host, token]) => (token === undefined ? [] : [[host, token] as const])));
 }
 
@@ -122,7 +129,7 @@ async function refreshLocked(options: RefreshOptions, lock: Lock): Promise<Refre
   if (usage.paced && pendingRefs(start.snapshot, refs, now).length > 0) return { status: 'done', requests: 0, points: 0, error: 'budget' };
   const started = performance.now();
   const clock = () => now + Math.round(performance.now() - started);
-  const ctx: Context = { tokens: await tokensFor(start, refs, options.env), lock, clock, ledger: usage.ledger };
+  const ctx: Context = { tokens: await tokensFor(start, refs, options), lock, clock, ledger: usage.ledger };
   const run = await runPhaseB(await runPhaseA(start, refs, ctx), refs, ctx);
   const next = finalSnapshot(run, refs);
   if (run.requests > 0 || !unchanged(before, next, refs)) await writeSnapshot(paths.snapshotFile, { ...next, updatedAt: now });
