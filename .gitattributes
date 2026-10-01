@@ -1,0 +1,4 @@
+# The sh shim also runs under Git Bash on Windows, where a CRLF would break its
+# shebang; cmd.exe wants CRLF in the .cmd one.
+plugin/bin/epic-pulse text eol=lf
+*.cmd text eol=crlf

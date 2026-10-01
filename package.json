@@ -12,8 +12,9 @@
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "tsx --test --test-concurrency=2 \"packages/*/test/**/*.test.ts\"",
-    "test:live": "EPIC_PULSE_LIVE=1 tsx --test --test-concurrency=1 \"packages/*/test/**/*.test.ts\"",
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/build.mjs && tsx --test --test-concurrency=2 \"packages/*/test/**/*.test.ts\"",
+    "test:live": "node scripts/build.mjs && EPIC_PULSE_LIVE=1 tsx --test --test-concurrency=1 \"packages/*/test/**/*.test.ts\"",
     "record-fixtures": "tsx scripts/record-fixtures.mjs"
   },
   "devDependencies": {

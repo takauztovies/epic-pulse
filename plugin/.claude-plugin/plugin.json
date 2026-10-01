@@ -1,0 +1,13 @@
+{
+  "name": "epic-pulse",
+  "version": "0.1.0",
+  "description": "Shows how far the GitHub epics behind a Claude Code session have got: percent done and sub-issues by status.",
+  "author": {
+    "name": "takauztovies",
+    "url": "https://github.com/takauztovies"
+  },
+  "homepage": "https://github.com/takauztovies/epic-pulse",
+  "repository": "https://github.com/takauztovies/epic-pulse",
+  "license": "MIT",
+  "keywords": ["github", "epic", "sub-issues", "progress", "status-line"]
+}

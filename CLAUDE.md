@@ -59,7 +59,8 @@ ESLint fails at 250 and 30 lines. Treat that as the ceiling, not the target.
 ```
 pnpm lint          # eslint, includes the size and any rules
 pnpm typecheck     # tsc --noEmit
-pnpm test          # offline tests
+pnpm build         # esbuild: packages/cli/dist and plugin/dist, the same bytes
+pnpm test          # builds, then runs the offline tests
 pnpm test:live     # also runs the tests that call GitHub (needs a token)
 pnpm record-fixtures
 ```
@@ -68,5 +69,9 @@ pnpm record-fixtures
 
 - `packages/core/src` shared logic, one module per responsibility. Private and
   bundled into every artifact.
+- `packages/cli` the npm package `epic-pulse`: one bundled file, no runtime
+  dependencies. Its tests run the built bundle as a real process.
+- `plugin` the Claude Code plugin (hooks, bin shims, the track skill), listed by
+  `.claude-plugin/marketplace.json`. `plugin/dist` is release-owned.
 - `fixtures/graphql` recorded GitHub responses.
 - `scripts` tooling: fixture recorder, build and release.
