@@ -5,8 +5,9 @@ import { test } from 'node:test';
 import { makeRef, type IssueRef } from '@epic-pulse/core';
 import { detailsText, errorLabel, outcomeLine } from '../src/details.js';
 import { enterpriseHostOf, grantOf, sessionRequests, tokenUse } from '../src/grant.js';
-import { buildModel } from '../src/model.js';
+import { buildModel, signedOutHosts } from '../src/model.js';
 import { pollAll } from '../src/poll.js';
+import { configureMessage, signInStep } from '../src/sign-in.js';
 import { statusBarOf } from '../src/status-model.js';
 import { treeOf } from '../src/tree-model.js';
 import { filesUnder, makeRegistry, noGhEnv, SESSION_A } from './registry-helpers.js';
@@ -82,6 +83,39 @@ test('a refresh is labelled session when a sign-in covers a host the registry na
   assert.equal(tokenUse(grant, new Set()), 'none');
   // `constructor` is a valid host and a key every object inherits.
   assert.equal(tokenUse({}, new Set(['github.com', 'constructor'])), 'none');
+});
+
+// A repository on a host no VS Code sign-in serves stays signed out after a
+// github.com sign-in, so the action names the setting that would serve it.
+test('Sign in for a repository on another host opens the Enterprise setting when none names that host', async (t) => {
+  const now = Date.now();
+  const repo = await makeRegistry(t, { sessions: [{ id: SESSION_A, binds: [invalid(4, 'ghe.invalid')] }] }, now);
+  const results = await pollAll([repo], { now, env: noGhEnv(t), grant: {} });
+  assert.deepEqual([buildModel({ results, now }).state, [...signedOutHosts(results)]], ['signed-out', ['ghe.invalid']]);
+  assert.deepEqual(signInStep(signedOutHosts(results), undefined), { kind: 'configure', host: 'ghe.invalid', configured: undefined });
+  assert.deepEqual(signInStep(new Set(['github.com', 'ghe.invalid']), undefined), { kind: 'configure', host: 'ghe.invalid', configured: undefined });
+  assert.equal(configureMessage({ host: 'ghe.invalid', configured: undefined }), 'Epic Pulse: this repository is on ghe.invalid, and '
+    + 'VS Code signs in to a GitHub Enterprise server only once `github-enterprise.uri` names it. Set it to https://ghe.invalid '
+    + 'and sign in again, or run `gh auth login --hostname ghe.invalid`.');
+});
+
+test('Sign in names the mismatch when the configured Enterprise server is another host', () => {
+  assert.deepEqual(signInStep(new Set(['ghe.invalid']), 'other.example'), { kind: 'configure', host: 'ghe.invalid', configured: 'other.example' });
+  assert.equal(configureMessage({ host: 'ghe.invalid', configured: 'other.example' }), 'Epic Pulse: this repository is on ghe.invalid, but '
+    + '`github-enterprise.uri` names other.example, the one GitHub Enterprise server VS Code signs in to. Point it at https://ghe.invalid '
+    + 'and sign in again, or run `gh auth login --hostname ghe.invalid`.');
+});
+
+test('Sign in goes straight to the sign-in that serves the signed-out hosts, and asks only when two do', () => {
+  const signIn = (providers: readonly string[]) => ({ kind: 'sign-in', providers });
+  assert.deepEqual(signInStep(new Set(['github.com']), undefined), signIn(['github']));
+  assert.deepEqual(signInStep(new Set(['github.com']), 'ghe.invalid'), signIn(['github']));
+  assert.deepEqual(signInStep(new Set(['ghe.invalid']), 'ghe.invalid'), signIn(['github-enterprise']));
+  assert.deepEqual(signInStep(new Set(['github.com', 'ghe.invalid']), 'ghe.invalid'), signIn(['github', 'github-enterprise']));
+  // One server signs in now; the host it can not serve is named on the next click.
+  assert.deepEqual(signInStep(new Set(['ghe.invalid', 'other.invalid']), 'ghe.invalid'), signIn(['github-enterprise']));
+  // Run from the palette, with nothing signed out, every sign-in is offered.
+  assert.deepEqual([signInStep(new Set(), undefined), signInStep(new Set(), 'ghe.invalid')], [signIn(['github']), signIn(['github', 'github-enterprise'])]);
 });
 
 test('the GitHub Enterprise host comes from a valid http(s) URI, lowercased, and is never github.com', () => {

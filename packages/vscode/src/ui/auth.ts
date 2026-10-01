@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { DEFAULT_HOST } from '@epic-pulse/core';
 import { errorLabel, type Accounts } from '../details.js';
 import { enterpriseHostOf, grantOf, SCOPES, sessionRequests, type Grant, type Provider, type SessionRequest } from '../grant.js';
+import { configureMessage, ENTERPRISE_URI_SETTING, signInStep } from '../sign-in.js';
 
 export const PROVIDERS: ReadonlySet<string> = new Set<Provider>(['github', 'github-enterprise']);
 
@@ -34,8 +35,8 @@ export async function readAuth(log: vscode.LogOutputChannel): Promise<Auth> {
   return { grant, accounts: { github: Object.hasOwn(grant, DEFAULT_HOST), enterprise } };
 }
 
-async function pickProvider(host: string | undefined): Promise<Provider | undefined> {
-  if (host === undefined) return 'github';
+async function pickProvider(providers: readonly Provider[], host: string | undefined): Promise<Provider | undefined> {
+  if (providers.length === 1 || host === undefined) return providers[0];
   const items = [
     { label: 'GitHub.com', provider: 'github' as const },
     { label: `GitHub Enterprise (${host})`, provider: 'github-enterprise' as const },
@@ -44,9 +45,17 @@ async function pickProvider(host: string | undefined): Promise<Provider | undefi
 }
 
 // True once a sign-in exists. A dismissed prompt is not a failure: it is
-// logged, and nothing else happens.
-export async function signIn(log: vscode.LogOutputChannel): Promise<boolean> {
-  const provider = await pickProvider(enterpriseHost());
+// logged, and nothing else happens. A repository on a host no sign-in serves
+// gets the setting that would serve it, and no sign-in (see sign-in.ts).
+export async function signIn(log: vscode.LogOutputChannel, signedOut: ReadonlySet<string>): Promise<boolean> {
+  const host = enterpriseHost();
+  const step = signInStep(signedOut, host);
+  if (step.kind === 'configure') {
+    void vscode.window.showWarningMessage(configureMessage(step));
+    await vscode.commands.executeCommand('workbench.action.openSettings', ENTERPRISE_URI_SETTING);
+    return false;
+  }
+  const provider = await pickProvider(step.providers, host);
   if (provider === undefined) return false;
   try {
     await vscode.authentication.getSession(provider, SCOPES, { createIfNone: true });

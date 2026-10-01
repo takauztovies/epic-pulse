@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { detailsText, type DetailsInput } from '../details.js';
 import { COMMAND } from '../ids.js';
 import { issueLink } from '../links.js';
+import { signedOutHosts } from '../model.js';
 import type { Poller } from '../poller.js';
 import { signIn } from './auth.js';
 
@@ -28,7 +29,7 @@ function showStatus(deps: CommandDeps): void {
 }
 
 async function signInAndRefresh(deps: CommandDeps): Promise<void> {
-  if (await signIn(deps.log)) await deps.poller.trigger();
+  if (await signIn(deps.log, signedOutHosts(deps.latest()?.results ?? []))) await deps.poller.trigger();
 }
 
 export function registerCommands(deps: CommandDeps): readonly vscode.Disposable[] {

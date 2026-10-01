@@ -20,6 +20,8 @@ export interface RepoResult extends RepoState {
   readonly repo: RepoTarget;
   readonly refresh: RefreshSummary;
   readonly token: TokenUse;
+  // The hosts the registry names, which the Sign in action has to serve.
+  readonly hosts: readonly string[];
 }
 
 export interface PollOptions {
@@ -63,12 +65,13 @@ async function registryHosts(paths: RegistryPaths, now: number): Promise<Readonl
 // as `failed`, and the view is still read from what is there. The grant goes
 // to core as it is, keyed by host: core offers each token to its own host
 // only, so another host in the registry needs no special case.
-async function runRefresh(dir: string, options: PollOptions): Promise<Pick<RepoResult, 'refresh' | 'token'>> {
-  const use = tokenUse(options.grant, await registryHosts(pathsFor(dir), options.now));
+async function runRefresh(dir: string, options: PollOptions): Promise<Pick<RepoResult, 'refresh' | 'token' | 'hosts'>> {
+  const hosts = await registryHosts(pathsFor(dir), options.now);
+  const named = { token: tokenUse(options.grant, hosts), hosts: [...hosts] };
   try {
-    return { refresh: await refresh({ dir, now: options.now, env: options.env, tokens: options.grant }), token: use };
+    return { refresh: await refresh({ dir, now: options.now, env: options.env, tokens: options.grant }), ...named };
   } catch {
-    return { refresh: { status: 'failed' }, token: use };
+    return { refresh: { status: 'failed' }, ...named };
   }
 }
 
@@ -76,7 +79,7 @@ async function runRefresh(dir: string, options: PollOptions): Promise<Pick<RepoR
 // a lock inside it, which would create `.git/epic-pulse/` in every repository
 // the editor opens, including those that never use epic-pulse.
 export async function pollRepo(repo: RepoTarget, options: PollOptions): Promise<RepoResult> {
-  const skipped = { refresh: { status: 'skipped' }, token: 'none' } as const;
+  const skipped = { refresh: { status: 'skipped' }, token: 'none', hosts: [] } as const;
   const ran = (await isDirectory(repo.dir)) ? await runRefresh(repo.dir, options) : skipped;
   return { repo, ...ran, ...(await inspectRepo(repo.dir, options.now)) };
 }
