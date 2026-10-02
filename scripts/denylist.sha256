@@ -1,0 +1,18 @@
+# Words that must never appear in this repository, as SHA-256 digests of the
+# lowercase word, one per line. scripts/check-denylist.mjs splits every tracked
+# text file, the fixtures and the built bundles into lowercase [a-z0-9]+ words
+# and fails on any word whose digest is listed here; `pnpm test` and CI run it.
+#
+# To add a word, hash it in lowercase with no trailing newline, and put the
+# digest on a line of its own:
+#
+#   printf %s word | shasum -a 256
+#
+# Never write the word itself here, in a commit message or in a pull request:
+# the digests exist so that the list does not publish what it lists. Words are
+# matched whole, so a name written in several words needs a digest for each
+# word that must not appear, and one for the run-together form.
+#
+# The self-test word of packages/cli/test/denylist.test.ts, which plants it to
+# prove the check fails:
+5409dfdc8f2c9b71c34c0085e168cd5978642573a36251e39bc3c1ab2123af77

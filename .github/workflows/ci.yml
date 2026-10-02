@@ -79,6 +79,11 @@ jobs:
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         run: node scripts/check-dist-guard.mjs
 
+      # No word on scripts/denylist.sha256 anywhere in the repository or in
+      # what it builds; the test job runs the same check inside `pnpm test`.
+      - name: no denylisted word in the repository or its bundles
+        run: node scripts/check-denylist.mjs
+
       - name: claude plugin validate
         env:
           DISABLE_AUTOUPDATER: '1'
