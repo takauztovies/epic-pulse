@@ -44,6 +44,28 @@ test('the sub-issue epic builds six children with derived statuses and the 20 pe
   assert.equal(epic.children[0]?.url, 'https://github.com/takauztovies/epic-pulse/issues/2');
 });
 
+// #5 moved into another repository than the epic's (GitHub links sub-issues
+// across repositories), and the ready pull request that closes it, by either
+// route, into `prRepo`.
+function crossRepoFive(prRepo: string): EpicNode {
+  const node = epicNode('phase-b-subissues', 1);
+  const repository = { nameWithOwner: prRepo };
+  const nodes = node.subIssues.nodes.map((sub) => {
+    if (sub?.number !== 5) return sub;
+    const linked = sub.closedByPullRequestsReferences.nodes.map((pr) => (pr ? { ...pr, repository } : pr));
+    const crossed = sub.timelineItems.nodes.map((item) => (item?.source ? { ...item, source: { ...item.source, repository } } : item));
+    const own = { url: 'https://github.com/acme/widgets/issues/5', repository: { nameWithOwner: 'acme/widgets' } };
+    return { ...sub, ...own, closedByPullRequestsReferences: { nodes: linked }, timelineItems: { nodes: crossed } };
+  });
+  return { ...node, subIssues: { ...node.subIssues, nodes } };
+}
+
+test('a sub-issue in another repository is judged by the pull requests of its own repository', () => {
+  const status = (prRepo: string) => buildEpic(crossRepoFive(prRepo), ref(1))?.children.find((child) => child.number === 5)?.status;
+  assert.equal(status('acme/widgets'), 'in_review');
+  assert.equal(status('takauztovies/epic-pulse'), 'todo', "a pull request closing #5 of the epic's repository closes another issue");
+});
+
 test('the checkbox epic builds children from its body', () => {
   const epic = buildEpic(epicNode('phase-b-checklist', 8), ref(8))!;
   assert.equal(epic.kind, 'checklist');

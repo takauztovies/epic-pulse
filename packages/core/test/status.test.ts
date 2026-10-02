@@ -18,8 +18,10 @@ function node(number: number): SubIssueNode {
   return structuredClone(demoNodes().find((n) => n.number === number)!);
 }
 
-// The demo repo's PR bodies say "Fixes #4" / "Fixes #5" but GitHub left
-// closedByPullRequestsReferences empty; only a cross-reference event links them.
+// The demo repo's PR bodies say "Fixes #4" / "Fixes #5". When the fixtures were
+// first recorded GitHub had left closedByPullRequestsReferences empty and only
+// a cross-reference event linked them; it has since filled the field in, so
+// the recording now holds both routes and the tests below isolate each one.
 test('the recorded demo epic derives every status from real GitHub data', () => {
   const statuses = demoNodes().map((n) => [n.number, deriveStatus(n, REPO)]);
   assert.deepEqual(statuses, [
@@ -35,20 +37,15 @@ function prOf(n: SubIssueNode): PrSource {
 }
 
 test('a closing PR reported by closedByPullRequestsReferences counts, without any timeline event', () => {
-  // GitHub has not populated this field for the demo PRs, so this shape is the
-  // recorded cross-reference PR moved into the field, not a separate recording.
   const n = node(5);
-  const linked: SubIssueNode = {
-    ...n,
-    timelineItems: { nodes: [] },
-    closedByPullRequestsReferences: { nodes: [prOf(n)] },
-  };
-  assert.equal(deriveStatus(linked, REPO), 'in_review');
+  assert.equal(n.closedByPullRequestsReferences.nodes.length, 1, 'the recording no longer links the PR this way');
+  assert.equal(deriveStatus({ ...n, timelineItems: { nodes: [] } }, REPO), 'in_review');
 });
 
+// The cross-reference route alone: GitHub's own link is taken away.
 function withBody(number: number, body: string): SubIssueNode {
   const n = node(number);
-  return { ...n, timelineItems: { nodes: [{ source: { ...prOf(n), body } }] } };
+  return { ...n, closedByPullRequestsReferences: { nodes: [] }, timelineItems: { nodes: [{ source: { ...prOf(n), body } }] } };
 }
 
 test('a cross-reference only counts when the PR body has a closing keyword for THIS issue', () => {
@@ -73,7 +70,7 @@ test('a closing keyword aimed at another repository does not link', () => {
 });
 
 test('only OPEN pull requests from the same repository link an issue', () => {
-  const n = node(4);
+  const n = { ...node(4), closedByPullRequestsReferences: { nodes: [] } };
   const source = prOf(n);
   const closed: SubIssueNode = { ...n, timelineItems: { nodes: [{ source: { ...source, state: 'MERGED' } }] } };
   const foreign: SubIssueNode = {

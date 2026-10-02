@@ -1,15 +1,15 @@
 {
-  "recordedAt": "2026-09-30T13:32:28.250Z",
+  "recordedAt": "2026-10-02T05:49:20.016Z",
   "note": "issue that does not exist",
   "status": 200,
-  "remaining": 4880,
+  "remaining": 4985,
   "retryAfter": false,
   "body": {
     "data": {
       "rateLimit": {
         "cost": 3,
-        "remaining": 4880,
-        "resetAt": "2026-09-30T13:45:37Z"
+        "remaining": 4985,
+        "resetAt": "2026-10-02T06:45:06Z"
       },
       "repository": {
         "e9999": null

@@ -1,6 +1,6 @@
 import { checklistChildren } from './checklist.js';
 import { makeRef, refKey } from './ref.js';
-import type { IssueRef } from './schemas/common.js';
+import type { IssueRef, RepoRef } from './schemas/common.js';
 import type { EpicNode, PhaseAIssue, SubIssueNode } from './schemas/graphql.js';
 import { MAX_CHILDREN, type Child, type EpicEntry, type Snapshot } from './schemas/snapshot.js';
 import { deriveStatus } from './status.js';
@@ -19,12 +19,21 @@ export function epicRefFor(ref: IssueRef, node: PhaseAIssue | null): IssueRef | 
   return makeRef({ host: ref.host, owner, repo, number: node.parent.number }) ?? null;
 }
 
+// A sub-issue may live in another repository of the epic's host. Its pull
+// requests are judged against its own repository: a closing keyword without
+// a repository names an issue there, and a pull request elsewhere is not its.
+function ownRepo(node: SubIssueNode, epic: IssueRef): RepoRef {
+  const [owner, repo] = node.repository.nameWithOwner.split('/');
+  const own = owner && repo ? makeRef({ host: epic.host, owner, repo, number: node.number }) : undefined;
+  return own ?? epic;
+}
+
 function subIssueChild(node: SubIssueNode, epic: IssueRef): Child {
   return {
     number: node.number,
     title: node.title.slice(0, 300),
     url: node.url.slice(0, 500),
-    status: deriveStatus(node, epic),
+    status: deriveStatus(node, ownRepo(node, epic)),
   };
 }
 

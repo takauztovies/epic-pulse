@@ -105,8 +105,8 @@ sub-issues or, failing that, a task list.
 | Done | closed as completed, or closed without a reason |
 | Dropped | closed as not planned, or as a duplicate |
 
-A pull request counts when it is open, belongs to the same repository, and either GitHub links it as
-closing the issue or its body closes the issue with a keyword.
+A pull request counts when it is open, belongs to the issue's own repository (which may not be the
+epic's), and either GitHub links it as closing the issue or its body closes the issue with a keyword.
 
 **% = done / (total − dropped)**, rounded down, so 100% always means finished. Dropped work leaves
 the count instead of holding the epic below 100% forever.
