@@ -32,8 +32,10 @@ export const EpicEntrySchema = z
   })
   .readonly();
 
+// `error`: GitHub refused the lookup for good (refresh-batch.ts), so the
+// issue resolves to no epic for as long as any resolution is cached.
 export const ResolutionSchema = z
-  .object({ epic: IssueRefSchema.nullable(), resolvedAt: z.number().int().nonnegative() })
+  .object({ epic: IssueRefSchema.nullable(), resolvedAt: z.number().int().nonnegative(), error: ErrorCodeSchema.optional() })
   .readonly();
 
 export const UsageSchema = z

@@ -242,6 +242,8 @@ epic-pulse doctor
   **`rate_limited`**: GitHub asked to slow down; epic-pulse waits five minutes.
 - **`loading…` that does not end**: run `epic-pulse refresh` in the repository to see what a refresh
   reports, and look at `hook errors` in `doctor`.
+- **`error (forbidden)`** or **`error (not_found)`**: the token can not read that repository's
+  issues, or it does not exist. GitHub's answer is kept for 30 minutes, so a fix shows within that.
 - **`runtime: present, a different build`** after an upgrade: start a new session, or run
   `epic-pulse statusline install` again.
 - **`epic-pulse json`** prints everything epic-pulse knows about the repository as versioned JSON,

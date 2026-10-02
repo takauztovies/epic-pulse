@@ -1,10 +1,10 @@
 import { describeFetchError, postGraphql, type RawResponse } from './github.js';
 import { touchLock, type Lock } from './lock.js';
 import { parsePhaseA, parsePhaseB, phaseADocument, phaseBDocument, type Failure, type RateInfo } from './queries.js';
-import { applyEpics, applyResolutions, chargePoints, chargeRate, markEpicErrors, rateLimited } from './refresh-apply.js';
+import { applyEpics, applyRefusal, applyResolutions, chargePoints, chargeRate, markEpicErrors, rateLimited } from './refresh-apply.js';
 import { backingOff, HOURLY_BUDGET_POINTS, PHASE_A_COST, phaseBCost } from './refresh-plan.js';
 import { fail, ok, type Result } from './result.js';
-import type { IssueRef, RepoRef } from './schemas/common.js';
+import type { ErrorCode, IssueRef, RepoRef } from './schemas/common.js';
 import type { Snapshot } from './schemas/snapshot.js';
 import { recordUsage, reserveUsage, type UsageLedger } from './usage-ledger.js';
 
@@ -93,12 +93,21 @@ async function send(token: string, batch: Batch): Promise<Result<RawResponse, Fa
   }
 }
 
+// The answers asking again would not change: this repository's issues can
+// not be read with this token, or the host has no sub-issues.
+const PERMANENT: ReadonlySet<ErrorCode> = new Set(['not_found', 'forbidden', 'unsupported']);
+
 // A budget stop marks nothing: the data is not wrong, only not refreshed, and
-// ages into "stale" on its own. Every other failure marks the epics it hit.
+// ages into "stale" on its own. Every other Phase B failure marks the epics it
+// hit. A Phase A failure that is permanent is cached as a resolution; any
+// other is simply asked again on the next run.
+function noted(run: Run, batch: Batch, code: ErrorCode): Snapshot {
+  if (batch.phase === 'A') return PERMANENT.has(code) ? applyRefusal(run.snapshot, batch.refs, { code, now: run.now }) : run.snapshot;
+  return code === 'budget' ? run.snapshot : markEpicErrors(run.snapshot, batch.refs, code);
+}
+
 function failed(run: Run, batch: Batch, failure: Failure): Run {
-  const hit = batch.phase === 'B' && failure.code !== 'budget';
-  const snapshot = hit ? markEpicErrors(run.snapshot, batch.refs, failure.code) : run.snapshot;
-  return { ...run, snapshot, failure: run.failure ?? failure };
+  return { ...run, snapshot: noted(run, batch, failure.code), failure: run.failure ?? failure };
 }
 
 // GitHub answered but refused, or the shape was wrong. Whether it billed the
@@ -113,7 +122,7 @@ function charged(run: Run, rate: RateInfo, snapshot: Snapshot): Run {
   return { ...run, snapshot: chargeRate(snapshot, rate), points: run.points + rate.cost };
 }
 
-function answered(run: Run, batch: Batch, res: RawResponse): Run {
+export function answered(run: Run, batch: Batch, res: RawResponse): Run {
   if (batch.phase === 'A') {
     const parsed = parsePhaseA(res);
     if (!parsed.ok) return rejected(run, batch, parsed.error);

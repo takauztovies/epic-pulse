@@ -78,3 +78,15 @@ test('an epic known only through a failed fetch is stale and carries the error',
   const result = view({ snapshot: failing, sessions: [own], scope: { session: own } });
   assert.deepEqual([result.snapshot.state, result.snapshot.error, result.epics[0]?.stale, result.epics[0]?.error], ['stale', 'network', true, 'network']);
 });
+
+// A resolution GitHub refused for good is cached for 30 minutes, so the run
+// that recorded it may be long past and the snapshot's own error clear again.
+test('an issue whose resolution was refused for good shows that code while nothing else is shown', () => {
+  const refused = (code: 'forbidden' | 'unsupported'): SnapshotRead => ({
+    status: 'ok', snapshot: { ...emptySnapshot(T0), issues: { [refKey(demo(6))]: { epic: null, resolvedAt: T0, error: code } } },
+  });
+  const own = session(A, [[6, 'gh']]);
+  const seen = (read: SnapshotRead) => view({ snapshot: read, sessions: [own], scope: { session: own } }).snapshot;
+  assert.deepEqual(seen(refused('forbidden')), { state: 'error', fetchedAt: new Date(T0).toISOString(), error: 'forbidden' });
+  assert.deepEqual([seen(refused('unsupported')).state, seen(refused('unsupported')).error], ['unsupported', 'unsupported']);
+});

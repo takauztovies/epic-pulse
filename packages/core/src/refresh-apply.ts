@@ -18,6 +18,14 @@ export function applyResolutions(
   return { ...snapshot, issues: { ...snapshot.issues, ...Object.fromEntries(resolved) } };
 }
 
+// Phase A refused for good (not found, forbidden, unsupported): each issue
+// resolves to no epic, with the code, so the 30-minute resolution cache keeps
+// the request from being sent, and charged, on every run.
+export function applyRefusal(snapshot: Snapshot, refs: readonly IssueRef[], refusal: { readonly code: ErrorCode; readonly now: number }): Snapshot {
+  const refused = refs.map((ref) => [refKey(ref), { epic: null, resolvedAt: refusal.now, error: refusal.code }] as const);
+  return { ...snapshot, issues: { ...snapshot.issues, ...Object.fromEntries(refused) } };
+}
+
 // A fetched epic replaces its entry. An answer that is not an epic (not found,
 // or an issue with neither sub-issues nor a checklist) removes the entry and
 // re-points every issue that led to it at "no epic", which the 30-minute
