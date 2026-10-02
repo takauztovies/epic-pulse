@@ -16,3 +16,11 @@
 # The self-test word of packages/cli/test/denylist.test.ts, which plants it to
 # prove the check fails:
 5409dfdc8f2c9b71c34c0085e168cd5978642573a36251e39bc3c1ab2123af77
+
+# Private project terms (digests only; the words are never committed).
+2e73b66ef1ec7c9f9a22c6b1260484d3915c9eae9fbb110458a293094b87b644
+67fbab2f8c6e440abb716a66aab0186920127f3c8cf2cf7e6127f739fac714c7
+2c9a319e3bfb3176f82733b9bc96063075215714d80ec500b17c81ff57903ab3
+2e8b568499160fbc54f7604314fdee50f583695424caacd23f40e12ce462ba0f
+2ef54a9fec847363c728c718ee2ee430e850014ffad73f7cd674ca9e85f939bb
+cd2a9fa09cdb1091fa377da7bfc66e344620846ab5ac91b5c6507df6ee7a40de
