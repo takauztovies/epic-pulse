@@ -47,3 +47,10 @@ test('after a refresh that failed nothing is due for a minute; one that succeede
   assert.equal(due({ ...failed, code: null }, NOW + 1), true);
   assert.equal(due({ ...failed, at: NOW + 60 * MINUTE }, NOW), true, 'a clock that moved back must not hold refreshes off');
 });
+
+// The status line shows its own session's bindings whether or not the session
+// is live, so their refresh is due whether or not it is.
+test('a session quiet past the live window still has its bindings and pins due', () => {
+  const quiet = bound([4], NOW - 3 * 60 * MINUTE);
+  assert.equal(refreshDue({ snapshot: { status: 'missing' }, session: quiet, pins: [], now: NOW }), true);
+});

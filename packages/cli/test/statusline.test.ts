@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, type TestContext } from 'node:test';
-import { readSnapshot, sessionFile, writeSnapshot, type RegistryPaths } from '@epic-pulse/core';
-import { bashPayload, demoSnapshot, eventPayload, statusPayload } from './fixtures.js';
-import { cliEnv, demoRepo, registryOf, runCli, sandbox, tempDir, waitFor, type CliRun, type Sandbox } from './helpers.js';
+import { appendRegistryLine, readSnapshot, sessionFile, writeSnapshot, type RegistryPaths } from '@epic-pulse/core';
+import { bashPayload, demo, demoSnapshot, eventPayload, statusPayload } from './fixtures.js';
+import { cliEnv, demoRepo, registryOf, runCli, sandbox, SESSION, tempDir, waitFor, type CliRun, type Sandbox } from './helpers.js';
 
 const OTHER_SESSION = '1a2b3c4d-5e6f-4a1b-9c2d-3e4f5a6b7c8d';
 const CANARY_SESSION = '2b3c4d5e-6f7a-4b1c-8d2e-3f4a5b6c7d8e';
@@ -115,6 +115,19 @@ test('a stale snapshot still shows the epic, marked stale, and a refresh without
   const second = plantCanary(bound.paths);
   assert.equal((await statusLine(bound)).stdout, `${EPIC_LINE} · stale\n`);
   await noRefreshStarts(second);
+});
+
+// The hook writes with the real clock, so the quiet session's line is
+// written directly, as the hook would have three hours ago.
+test('a session quiet for three hours still has its issue refreshed while its status line renders', async (t) => {
+  const repo = demoRepo(t);
+  const paths = registryOf(repo);
+  const binds = [{ ref: demo(4), via: 'gh' as const }];
+  assert.ok((await appendRegistryLine(paths, SESSION, { v: 1, ts: Date.now() - 3 * 60 * 60 * 1000, ev: 'tool', binds })).ok);
+  const canary = plantCanary(paths);
+  assert.equal((await statusLine({ repo, box: sandbox(t) })).stdout, 'epic-pulse: loading…\n');
+  await refreshFinished(paths, canary);
+  assert.equal(await snapshotError(paths), 'no_token', 'the refresh never asked about the quiet session\'s issue');
 });
 
 test('a session the hook never wrote for, or no session at all, is hook-inactive', async (t) => {

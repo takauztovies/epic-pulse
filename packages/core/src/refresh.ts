@@ -1,16 +1,17 @@
 import { resolveToken } from './github.js';
 import { acquireLock, releaseLock, type Lock } from './lock.js';
-import { pathsFor, userCacheDir } from './paths.js';
+import { pathsFor, userCacheDir, type RegistryPaths } from './paths.js';
 import { pinsOf, readPins } from './pins.js';
 import { pruneSnapshot } from './refresh-apply.js';
 import { overBudget, runBatch, type Context, type Run } from './refresh-batch.js';
 import {
   chunk, epicRefsOf, gatherRefs, groupByRepo, needsFetch, needsResolution, PHASE_A_BATCH, PHASE_A_COST,
-  phaseBBatchSize, rollUsage, type RepoGroup,
+  phaseBBatchSize, rollUsage, withSession, type RepoGroup,
 } from './refresh-plan.js';
-import { pruneSessions, readLiveSessions } from './registry.js';
+import { pruneSessions, readLiveSessions, readSession, type SessionState } from './registry.js';
 import { unfetchedEpics, unresolvedRefs } from './resolve.js';
 import type { ErrorCode, IssueRef } from './schemas/common.js';
+import { SessionIdSchema } from './schemas/hook.js';
 import type { Snapshot } from './schemas/snapshot.js';
 import { emptySnapshot, readSnapshot, writeSnapshot, type SnapshotRead } from './snapshot.js';
 import { pacingDelay, readUsage, spentIn, usageLedgerFor, type UsageLedger } from './usage-ledger.js';
@@ -24,6 +25,9 @@ export interface RefreshOptions {
 export type RefreshOutcome =
   | { readonly status: 'busy' }
   | { readonly status: 'done'; readonly requests: number; readonly points: number; readonly error: ErrorCode | null };
+
+// The status line names its own session here when it starts a refresh.
+export const REFRESH_SESSION_ENV = 'EPIC_PULSE_SESSION';
 
 // Each request has a 15 s timeout and the lock is touched after every one, so
 // a live holder is always fresh; a dead one frees the lock within a minute.
@@ -115,6 +119,13 @@ function waitsItsTurn(run: Run, refs: readonly IssueRef[]): boolean {
   return pendingRefs(run.snapshot, refs, run.now).length > 0;
 }
 
+// The session whose status line started this refresh, read whether or not it
+// is live. An id that is not a Claude Code session id names none.
+async function ownSession(paths: RegistryPaths, env: NodeJS.ProcessEnv): Promise<SessionState | undefined> {
+  const id = SessionIdSchema.safeParse(env[REFRESH_SESSION_ENV]);
+  return id.success ? readSession(paths, id.data) : undefined;
+}
+
 // Errors are stored as a code plus a whitelisted detail, never as text.
 function finalSnapshot(run: Run, refs: readonly IssueRef[]): Snapshot {
   const pruned = pruneSnapshot(run.snapshot, refs, run.now);
@@ -134,10 +145,10 @@ function unchanged(before: SnapshotRead, next: Snapshot, refs: readonly IssueRef
 async function refreshLocked(options: RefreshOptions, lock: Lock): Promise<RefreshOutcome> {
   const { now } = options;
   const paths = pathsFor(options.dir);
-  const [sessions, pins, before, usage] = await Promise.all([
-    readLiveSessions(paths, now), readPins(paths), readSnapshot(paths.snapshotFile), openUsage(options),
+  const [sessions, pins, before, usage, own] = await Promise.all([
+    readLiveSessions(paths, now), readPins(paths), readSnapshot(paths.snapshotFile), openUsage(options), ownSession(paths, options.env),
   ]);
-  const refs = gatherRefs(sessions, pinsOf(pins), now);
+  const refs = withSession(gatherRefs(sessions, pinsOf(pins), now), own, now);
   const start = startRun(before, now, usage);
   if (waitsItsTurn(start, refs)) return { status: 'done', requests: 0, points: 0, error: 'budget' };
   const started = performance.now();

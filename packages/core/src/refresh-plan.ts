@@ -42,6 +42,13 @@ export function gatherRefs(sessions: readonly SessionState[], pins: readonly Pin
   return unique([...bound.map((binding) => binding.ref), ...pins.map((pin) => pin.ref)]);
 }
 
+// The status line shows its own session's bindings however long the session
+// has been quiet, so those count whether or not it is live, first.
+export function withSession(refs: readonly IssueRef[], session: SessionState | undefined, now: number): readonly IssueRef[] {
+  if (session === undefined) return refs;
+  return unique([...activeBindings(session, now).map((binding) => binding.ref), ...refs]);
+}
+
 export function groupByRepo(refs: readonly IssueRef[]): readonly RepoGroup[] {
   const groups = new Map<string, RepoGroup>();
   for (const ref of refs) {
