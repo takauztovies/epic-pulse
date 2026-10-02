@@ -65,7 +65,8 @@ nothing and prints the difference instead. A project's settings name the runtime
 each teammate still needs the plugin, or `statusline install`, for that copy to exist.
 
 The status line reads from disk only and never waits on the network. When something is due, it
-starts a background refresh, which asks GitHub and writes what it learned for the next render.
+starts a background refresh, which asks GitHub and writes what it learned for the next render. After
+a refresh that failed, it waits a minute before it starts the next one.
 
 ## How a session finds its epic
 
@@ -180,6 +181,7 @@ While you work, epic-pulse writes these files and no others:
 <git-common-dir>/epic-pulse/hook.log
 <git-common-dir>/epic-pulse/hook.log.1
 <git-common-dir>/epic-pulse/refresh.lock
+<git-common-dir>/epic-pulse/refresh-attempt.json
 <claude-config-dir>/epic-pulse/runtime.mjs
 <user-cache-dir>/epic-pulse/usage.jsonl
 <user-cache-dir>/epic-pulse/usage.lock
@@ -192,6 +194,7 @@ While you work, epic-pulse writes these files and no others:
 | `snapshot.json` | the refresher | what GitHub returned: epic and sub-issue numbers, titles, URLs and statuses, when they were fetched, this repository's points for the hour, the token's rate-limit counters and the code of the last failure |
 | `hook.log`, `hook.log.1` | the hook | an error code and a timestamp per failed call; past 64 KiB it moves to `hook.log.1` |
 | `refresh.lock` | the refresher | a process id and a random token, while a refresh runs |
+| `refresh-attempt.json` | `epic-pulse refresh`, which the status line starts | when the last refresh ended and the code it stopped with; after a failure the status line starts the next one a minute later |
 | `runtime.mjs` | the hook at session start, and `statusline install` | a copy of the program for the status line to run |
 | `usage.jsonl` | the refresher | the last hour's charges, one line each: when, which host, how many points and a hash of the repository's registry path, so that every refresher on the machine shares one budget of 300 points an hour |
 | `usage.lock` | the refresher | a process id and a random token, while the ledger is written |

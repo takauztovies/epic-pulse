@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, utimesSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { test, type TestContext } from 'node:test';
 import { readSnapshot, sessionFile, writeSnapshot, type RegistryPaths } from '@epic-pulse/core';
 import { bashPayload, demoSnapshot, eventPayload, statusPayload } from './fixtures.js';
@@ -66,6 +67,13 @@ test('a fresh snapshot renders the session\'s epic from disk and starts no refre
   assert.equal(existsSync(canary), true);
 });
 
+// The refresh recorded its failure, so a render inside the minute after it
+// starts none: without the record every render started one more.
+async function noRefreshStarts(canary: string): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  assert.equal(existsSync(canary), true, 'a render started a refresh inside the minute after one failed');
+}
+
 test('a missing snapshot shows loading, and the detached refresh records why it could not fetch', async (t) => {
   const bound = await boundSession(t);
   const first = plantCanary(bound.paths);
@@ -74,7 +82,16 @@ test('a missing snapshot shows loading, and the detached refresh records why it 
   assert.equal(await snapshotError(bound.paths), 'no_token');
   const second = plantCanary(bound.paths);
   assert.equal((await statusLine(bound)).stdout, 'epic-pulse: error (no_token)\n');
-  await refreshFinished(bound.paths, second);
+  await noRefreshStarts(second);
+});
+
+test('a minute after a refresh failed, the next render starts another', async (t) => {
+  const bound = await boundSession(t);
+  mkdirSync(bound.paths.dir, { recursive: true });
+  writeFileSync(join(bound.paths.dir, 'refresh-attempt.json'), JSON.stringify({ v: 1, at: Date.now() - 61_000, code: 'no_token' }));
+  const canary = plantCanary(bound.paths);
+  assert.equal((await statusLine(bound)).stdout, 'epic-pulse: loading…\n');
+  await refreshFinished(bound.paths, canary);
 });
 
 test('a corrupt snapshot shows loading and is replaced by the refresh', async (t) => {
@@ -94,7 +111,7 @@ test('a stale snapshot still shows the epic, marked stale, and then why the refr
   await refreshFinished(bound.paths, first);
   const second = plantCanary(bound.paths);
   assert.equal((await statusLine(bound)).stdout, `${EPIC_LINE} · stale (no_token)\n`);
-  await refreshFinished(bound.paths, second);
+  await noRefreshStarts(second);
 });
 
 test('a session the hook never wrote for, or no session at all, is hook-inactive', async (t) => {

@@ -3,6 +3,7 @@ import {
   renderStatusLine, type JsonV1,
 } from '@epic-pulse/core';
 import { printLine, readStdin } from './io.js';
+import { readAttempt } from './refresh-attempt.js';
 import { refreshDue, spawnRefresh } from './refresh-spawn.js';
 
 // The status-line payload is a few hundred bytes.
@@ -46,14 +47,15 @@ async function render(env: NodeJS.ProcessEnv, now: number): Promise<Rendered> {
     return { line: renderStatusLine(buildView({ snapshot: { status: 'missing' }, sessions: [], pins: [], now })), refresh: undefined };
   }
   const paths = pathsFor(registry);
-  const [session, snapshot, read] = await Promise.all([
+  const [session, snapshot, read, attempt] = await Promise.all([
     origin.sessionId === undefined ? undefined : readSession(paths, origin.sessionId),
     readSnapshot(paths.snapshotFile),
     readPins(paths),
+    readAttempt(registry),
   ]);
   const pins = pinsOf(read);
   const view = buildView({ snapshot, sessions: session ? [session] : [], pins, now, scope: { session } });
-  return { line: renderStatusLine(view), refresh: refreshDue({ snapshot, session, pins, now }) ? registry : undefined };
+  return { line: renderStatusLine(view), refresh: refreshDue({ snapshot, session, pins, now, attempt }) ? registry : undefined };
 }
 
 // Never throws and never prints nothing: every outcome is one explicit line.
