@@ -3,6 +3,7 @@ import {
   renderStatusLine, type JsonV1,
 } from '@epic-pulse/core';
 import { printLine, readStdin } from './io.js';
+import { readAttempt } from './refresh-attempt.js';
 import { refreshDue, spawnRefresh } from './refresh-spawn.js';
 
 // The status-line payload is a few hundred bytes.
@@ -10,8 +11,9 @@ const MAX_PAYLOAD_BYTES = 1024 * 1024;
 
 interface Rendered {
   readonly line: string;
-  // The registry to refresh once the line is out, when something is due.
-  readonly refresh: string | undefined;
+  // The registry to refresh once the line is out, when something is due, and
+  // the session the line is for.
+  readonly refresh: { readonly dir: string; readonly session: string } | undefined;
 }
 
 interface Origin {
@@ -46,20 +48,22 @@ async function render(env: NodeJS.ProcessEnv, now: number): Promise<Rendered> {
     return { line: renderStatusLine(buildView({ snapshot: { status: 'missing' }, sessions: [], pins: [], now })), refresh: undefined };
   }
   const paths = pathsFor(registry);
-  const [session, snapshot, read] = await Promise.all([
+  const [session, snapshot, read, attempt] = await Promise.all([
     origin.sessionId === undefined ? undefined : readSession(paths, origin.sessionId),
     readSnapshot(paths.snapshotFile),
     readPins(paths),
+    readAttempt(registry),
   ]);
   const pins = pinsOf(read);
   const view = buildView({ snapshot, sessions: session ? [session] : [], pins, now, scope: { session } });
-  return { line: renderStatusLine(view), refresh: refreshDue({ snapshot, session, pins, now }) ? registry : undefined };
+  const due = session !== undefined && refreshDue({ snapshot, session, pins, now, attempt });
+  return { line: renderStatusLine(view), refresh: due ? { dir: registry, session: session.id } : undefined };
 }
 
 // Never throws and never prints nothing: every outcome is one explicit line.
 export async function runStatusline(env: NodeJS.ProcessEnv): Promise<number> {
   const rendered = await render(env, Date.now()).catch((): Rendered => ({ line: renderStatusLine(BROKEN), refresh: undefined }));
   printLine(rendered.line);
-  if (rendered.refresh !== undefined) spawnRefresh(rendered.refresh, env);
+  if (rendered.refresh !== undefined) spawnRefresh(rendered.refresh.dir, env, rendered.refresh.session);
   return 0;
 }

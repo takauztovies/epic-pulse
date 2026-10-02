@@ -46,16 +46,19 @@ export function phaseADocument(numbers: readonly number[]): string {
 }
 
 // closedByPullRequestsReferences is the documented link, but GitHub does not
-// always populate it for a "Fixes #N" body (the demo repo is such a case), so
-// the same query also reads cross-reference events, whose PR body is checked for
-// a closing keyword in status.ts. The nested connections multiply the rate-limit
-// cost: 1 + 100 x 3 = 301 requests, which GitHub bills as 3 points per epic.
+// always populate it for a "Fixes #N" body (the demo repo was such a case when
+// its fixtures were first recorded), so the same query also reads
+// cross-reference events, whose PR body is checked for a closing keyword in
+// status.ts. Each sub-issue's own repository is read too: it may not be the
+// epic's, and its pull requests are judged against it. The nested connections
+// multiply the rate-limit cost: 1 + 100 x 3 = 301 requests, which GitHub bills
+// as 3 points per epic; the repository is a plain field and costs nothing.
 const EPIC_FRAGMENT = `fragment EpicFields on Issue {
   number title url body
   subIssues(first: 100) {
     totalCount
     nodes {
-      number title url state stateReason
+      number title url state stateReason repository { nameWithOwner }
       assignees(first: 1) { totalCount }
       closedByPullRequestsReferences(first: 5) {
         nodes { number state isDraft url repository { nameWithOwner } }

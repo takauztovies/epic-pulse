@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { foldSession, RegistryLineSchema, type SessionState } from '@epic-pulse/core';
+import type { RefreshAttempt } from '../src/refresh-attempt.js';
 import { refreshDue } from '../src/refresh-spawn.js';
 import { demo, demoSnapshot } from './fixtures.js';
 import { SESSION } from './helpers.js';
@@ -34,4 +35,22 @@ test('with nothing bound or pinned, or no session the hook wrote for, nothing is
   const missing = { status: 'missing' } as const;
   assert.equal(refreshDue({ snapshot: missing, session: bound([]), pins: [], now: NOW }), false);
   assert.equal(refreshDue({ snapshot: missing, session: undefined, pins: [{ ref: demo(6), addedAt: NOW }], now: NOW }), false);
+});
+
+// A refresh that stops before it sends anything (no token, a spent hour)
+// changes nothing that would make the next render's answer different.
+test('after a refresh that failed nothing is due for a minute; one that succeeded, or a future record, holds nothing back', () => {
+  const failed: RefreshAttempt = { v: 1, at: NOW, code: 'no_token' };
+  const due = (attempt: RefreshAttempt, now: number) => refreshDue({ snapshot: { status: 'missing' }, session: bound([4]), pins: [], now, attempt });
+  assert.equal(due(failed, NOW + MINUTE - 1), false);
+  assert.equal(due(failed, NOW + MINUTE), true);
+  assert.equal(due({ ...failed, code: null }, NOW + 1), true);
+  assert.equal(due({ ...failed, at: NOW + 60 * MINUTE }, NOW), true, 'a clock that moved back must not hold refreshes off');
+});
+
+// The status line shows its own session's bindings whether or not the session
+// is live, so their refresh is due whether or not it is.
+test('a session quiet past the live window still has its bindings and pins due', () => {
+  const quiet = bound([4], NOW - 3 * 60 * MINUTE);
+  assert.equal(refreshDue({ snapshot: { status: 'missing' }, session: quiet, pins: [], now: NOW }), true);
 });

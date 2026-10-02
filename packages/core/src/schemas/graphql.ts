@@ -55,13 +55,15 @@ export const PrSourceSchema = PrNodeSchema.extend({ __typename: z.literal('PullR
 const TimelineNodeSchema = z.looseObject({ source: PrSourceSchema.optional().catch(undefined) });
 
 // State and reason stay plain strings: GitHub adds enum values over time and a
-// new one must degrade to "open" or "done", not fail the whole epic.
+// new one must degrade to "open" or "done", not fail the whole epic. The
+// repository is the sub-issue's own, which may not be the epic's.
 export const SubIssueNodeSchema = z.object({
   number: IssueNumberSchema,
   title: z.string(),
   url: z.string(),
   state: z.string(),
   stateReason: z.string().nullable(),
+  repository: RepoNameSchema,
   assignees: z.object({ totalCount: z.number().int().nonnegative() }),
   closedByPullRequestsReferences: z.object({ nodes: z.array(PrNodeSchema.nullable()) }),
   timelineItems: z.object({ nodes: z.array(TimelineNodeSchema.nullable()) }),

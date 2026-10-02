@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import { acquireLock, JsonV1Schema, readSnapshot, releaseLock, writeSnapshot } from '@epic-pulse/core';
 import { bashPayload, demoSnapshot } from './fixtures.js';
@@ -36,6 +38,18 @@ test('refresh without a token records no_token in the snapshot and exits 1', asy
   assert.equal(run.stderr, 'epic-pulse: the refresh stopped early (no_token)\n');
   const read = await readSnapshot(registryOf(repo).snapshotFile);
   assert.equal(read.status === 'ok' ? read.snapshot.error : read.status, 'no_token');
+});
+
+// What the status line reads to hold off its next refresh after a failure.
+test('a refresh records when it ran and the code it stopped with', async (t) => {
+  const repo = demoRepo(t);
+  const env = cliEnv(sandbox(t));
+  await runCli(['hook'], { cwd: repo, env, input: bashPayload('gh issue comment 4 -b hi', repo) });
+  const before = Date.now();
+  assert.equal((await runCli(['refresh'], { cwd: repo, env })).code, 1);
+  const record = JSON.parse(readFileSync(join(registryOf(repo).dir, 'refresh-attempt.json'), 'utf8')) as { v: unknown; at: number; code: unknown };
+  assert.deepEqual([record.v, record.code], [1, 'no_token']);
+  assert.ok(record.at >= before && record.at <= Date.now(), String(record.at));
 });
 
 test('refresh leaves a running refresh alone and says so', async (t) => {

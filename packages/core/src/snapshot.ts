@@ -1,7 +1,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import { atomicWriteFile, errnoOf } from './atomic.js';
 import { parseJson } from './result.js';
-import { SnapshotSchema, type Snapshot } from './schemas/snapshot.js';
+import { EpicEntrySchema, SnapshotSchema, type EpicEntry, type Snapshot } from './schemas/snapshot.js';
 
 const MAX_SNAPSHOT_BYTES = 5 * 1024 * 1024;
 
@@ -36,6 +36,18 @@ export async function readSnapshot(file: string): Promise<SnapshotRead> {
   }
 }
 
+// One epic the schema refuses must not cost the whole snapshot its write, and
+// with it every other epic's refresh, on every run after it. That epic keeps
+// its title and link but not its children, marked invalid_response, so it
+// shows stale with that code; it still counts as fetched, so it is not asked
+// for again before it is due. One that fails even so is left out.
+function storable(entry: EpicEntry): readonly EpicEntry[] {
+  if (EpicEntrySchema.safeParse(entry).success) return [entry];
+  const marked: EpicEntry = { ...entry, children: [], truncated: true, error: 'invalid_response' };
+  return EpicEntrySchema.safeParse(marked).success ? [marked] : [];
+}
+
 export async function writeSnapshot(file: string, snapshot: Snapshot): Promise<void> {
-  await atomicWriteFile(file, `${JSON.stringify(SnapshotSchema.parse(snapshot))}\n`);
+  const epics = Object.entries(snapshot.epics).flatMap(([key, entry]) => storable(entry).map((kept) => [key, kept] as const));
+  await atomicWriteFile(file, `${JSON.stringify(SnapshotSchema.parse({ ...snapshot, epics: Object.fromEntries(epics) }))}\n`);
 }

@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import { parsePhaseA, parsePhaseB } from '../src/queries.js';
 import { refKey } from '../src/ref.js';
 import { applyEpics, applyResolutions, chargeRate, markEpicErrors, pruneSnapshot } from '../src/refresh-apply.js';
 import { RETAIN_MS } from '../src/refresh-plan.js';
-import { emptySnapshot } from '../src/snapshot.js';
+import { emptySnapshot, readSnapshot, writeSnapshot } from '../src/snapshot.js';
 import { countStatuses, percentDone } from '../src/status.js';
 import { loadFixture } from './helpers.js';
+import { tempDir } from './repo-helpers.js';
 import { demo, demoSnapshot } from './snapshot-helpers.js';
 
 const T0 = 1_800_000_000_000;
@@ -67,4 +69,18 @@ test('pruning keeps what is wanted or recent, and only epics a kept issue points
   assert.deepEqual(Object.keys(kept.issues), [key(4)]);
   assert.deepEqual(Object.keys(kept.epics), [key(1)]);
   assert.deepEqual(pruneSnapshot(snapshot, [], T0 + RETAIN_MS), { ...snapshot, issues: {}, epics: {} });
+});
+
+// The snapshot keeps at most 500 children an epic. Before, a longer checklist
+// failed the whole snapshot write, and so every refresh after it.
+test('a checklist epic longer than the snapshot keeps is stored cut at 500 and flagged truncated', async (t) => {
+  const parsed = parsePhaseB(loadFixture('phase-b-checklist'));
+  assert.ok(parsed.ok);
+  const body = Array.from({ length: 600 }, (_, i) => `- [x] step ${i + 1}`).join('\n');
+  const next = applyEpics(demoSnapshot(T0), [[demo(8), { ...parsed.value.epics.get(8)!, body }]], T0 + 5);
+  const file = join(tempDir(t), 'snapshot.json');
+  await writeSnapshot(file, next);
+  const read = await readSnapshot(file);
+  const epic = read.status === 'ok' ? read.snapshot.epics[key(8)] : undefined;
+  assert.deepEqual([epic?.children.length, epic?.truncated, epic?.error, epic?.children.at(-1)?.title], [500, true, null, 'step 500']);
 });

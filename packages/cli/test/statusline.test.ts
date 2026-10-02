@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, utimesSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { test, type TestContext } from 'node:test';
-import { readSnapshot, sessionFile, writeSnapshot, type RegistryPaths } from '@epic-pulse/core';
-import { bashPayload, demoSnapshot, eventPayload, statusPayload } from './fixtures.js';
-import { cliEnv, demoRepo, registryOf, runCli, sandbox, tempDir, waitFor, type CliRun, type Sandbox } from './helpers.js';
+import { appendRegistryLine, readSnapshot, sessionFile, writeSnapshot, type RegistryPaths } from '@epic-pulse/core';
+import { bashPayload, demo, demoSnapshot, eventPayload, statusPayload } from './fixtures.js';
+import { cliEnv, demoRepo, registryOf, runCli, sandbox, SESSION, tempDir, waitFor, type CliRun, type Sandbox } from './helpers.js';
 
 const OTHER_SESSION = '1a2b3c4d-5e6f-4a1b-9c2d-3e4f5a6b7c8d';
 const CANARY_SESSION = '2b3c4d5e-6f7a-4b1c-8d2e-3f4a5b6c7d8e';
@@ -66,6 +67,13 @@ test('a fresh snapshot renders the session\'s epic from disk and starts no refre
   assert.equal(existsSync(canary), true);
 });
 
+// The refresh recorded its failure, so a render inside the minute after it
+// starts none: without the record every render started one more.
+async function noRefreshStarts(canary: string): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  assert.equal(existsSync(canary), true, 'a render started a refresh inside the minute after one failed');
+}
+
 test('a missing snapshot shows loading, and the detached refresh records why it could not fetch', async (t) => {
   const bound = await boundSession(t);
   const first = plantCanary(bound.paths);
@@ -74,7 +82,16 @@ test('a missing snapshot shows loading, and the detached refresh records why it 
   assert.equal(await snapshotError(bound.paths), 'no_token');
   const second = plantCanary(bound.paths);
   assert.equal((await statusLine(bound)).stdout, 'epic-pulse: error (no_token)\n');
-  await refreshFinished(bound.paths, second);
+  await noRefreshStarts(second);
+});
+
+test('a minute after a refresh failed, the next render starts another', async (t) => {
+  const bound = await boundSession(t);
+  mkdirSync(bound.paths.dir, { recursive: true });
+  writeFileSync(join(bound.paths.dir, 'refresh-attempt.json'), JSON.stringify({ v: 1, at: Date.now() - 61_000, code: 'no_token' }));
+  const canary = plantCanary(bound.paths);
+  assert.equal((await statusLine(bound)).stdout, 'epic-pulse: loading…\n');
+  await refreshFinished(bound.paths, canary);
 });
 
 test('a corrupt snapshot shows loading and is replaced by the refresh', async (t) => {
@@ -86,15 +103,31 @@ test('a corrupt snapshot shows loading and is replaced by the refresh', async (t
   assert.equal(await snapshotError(bound.paths), 'no_token');
 });
 
-test('a stale snapshot still shows the epic, marked stale, and then why the refresh failed', async (t) => {
+// A refresh without a token has learned nothing about the epic, so it leaves
+// the epic as it was: stale by age, with no error of its own.
+test('a stale snapshot still shows the epic, marked stale, and a refresh without a token leaves it so', async (t) => {
   const bound = await boundSession(t);
   await writeSnapshot(bound.paths.snapshotFile, demoSnapshot(Date.now() - ELEVEN_MINUTES));
   const first = plantCanary(bound.paths);
   assert.equal((await statusLine(bound)).stdout, `${EPIC_LINE} · stale\n`);
   await refreshFinished(bound.paths, first);
+  assert.equal(await snapshotError(bound.paths), 'no_token');
   const second = plantCanary(bound.paths);
-  assert.equal((await statusLine(bound)).stdout, `${EPIC_LINE} · stale (no_token)\n`);
-  await refreshFinished(bound.paths, second);
+  assert.equal((await statusLine(bound)).stdout, `${EPIC_LINE} · stale\n`);
+  await noRefreshStarts(second);
+});
+
+// The hook writes with the real clock, so the quiet session's line is
+// written directly, as the hook would have three hours ago.
+test('a session quiet for three hours still has its issue refreshed while its status line renders', async (t) => {
+  const repo = demoRepo(t);
+  const paths = registryOf(repo);
+  const binds = [{ ref: demo(4), via: 'gh' as const }];
+  assert.ok((await appendRegistryLine(paths, SESSION, { v: 1, ts: Date.now() - 3 * 60 * 60 * 1000, ev: 'tool', binds })).ok);
+  const canary = plantCanary(paths);
+  assert.equal((await statusLine({ repo, box: sandbox(t) })).stdout, 'epic-pulse: loading…\n');
+  await refreshFinished(paths, canary);
+  assert.equal(await snapshotError(paths), 'no_token', 'the refresh never asked about the quiet session\'s issue');
 });
 
 test('a session the hook never wrote for, or no session at all, is hook-inactive', async (t) => {

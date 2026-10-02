@@ -1,17 +1,18 @@
 import { describeFetchError, postGraphql, type RawResponse } from './github.js';
 import { touchLock, type Lock } from './lock.js';
 import { parsePhaseA, parsePhaseB, phaseADocument, phaseBDocument, type Failure, type RateInfo } from './queries.js';
-import { applyEpics, applyResolutions, chargePoints, chargeRate, markEpicErrors, rateLimited } from './refresh-apply.js';
+import { applyEpics, applyRefusal, applyResolutions, chargePoints, chargeRate, markEpicErrors, rateLimited } from './refresh-apply.js';
 import { backingOff, HOURLY_BUDGET_POINTS, PHASE_A_COST, phaseBCost } from './refresh-plan.js';
 import { fail, ok, type Result } from './result.js';
-import type { IssueRef, RepoRef } from './schemas/common.js';
+import type { ErrorCode, IssueRef, RepoRef } from './schemas/common.js';
 import type { Snapshot } from './schemas/snapshot.js';
 import { recordUsage, reserveUsage, type UsageLedger } from './usage-ledger.js';
 
 // One refresh in progress. `now` is the run's single timestamp: every entry
 // it writes is stamped with it. `spent` is what every refresher of the user
 // spent in the last hour, as the usage ledger last said; absent, only this
-// repository's own budget applies.
+// repository's own budget applies. `paced`: the repository has not paid off
+// its last refresh yet, so only what was never fetched may go out.
 export interface Run {
   readonly now: number;
   readonly snapshot: Snapshot;
@@ -19,6 +20,7 @@ export interface Run {
   readonly points: number;
   readonly failure: Failure | null;
   readonly spent?: number;
+  readonly paced?: boolean;
 }
 
 // Tokens live here, in memory, for one run; nothing in `Run` or the snapshot
@@ -91,12 +93,25 @@ async function send(token: string, batch: Batch): Promise<Result<RawResponse, Fa
   }
 }
 
-// A budget stop marks nothing: the data is not wrong, only not refreshed, and
-// ages into "stale" on its own. Every other failure marks the epics it hit.
+// The answers asking again would not change: this repository's issues can
+// not be read with this token, or the host has no sub-issues.
+const PERMANENT: ReadonlySet<ErrorCode> = new Set(['not_found', 'forbidden', 'unsupported']);
+// Stops that say nothing about the epics. The snapshot is shared, so a
+// refresher without a token must leave alone what one with a token (a VS Code
+// sign-in) fetched; the snapshot's own error still says why it got nothing.
+const UNMARKED: ReadonlySet<ErrorCode> = new Set(['budget', 'no_token']);
+
+// A budget stop or a missing token marks nothing: the data is not wrong, only
+// not refreshed, and ages into "stale" on its own. Every other Phase B failure
+// marks the epics it hit. A Phase A failure that is permanent is cached as a
+// resolution; any other is simply asked again on the next run.
+function noted(run: Run, batch: Batch, code: ErrorCode): Snapshot {
+  if (batch.phase === 'A') return PERMANENT.has(code) ? applyRefusal(run.snapshot, batch.refs, { code, now: run.now }) : run.snapshot;
+  return UNMARKED.has(code) ? run.snapshot : markEpicErrors(run.snapshot, batch.refs, code);
+}
+
 function failed(run: Run, batch: Batch, failure: Failure): Run {
-  const hit = batch.phase === 'B' && failure.code !== 'budget';
-  const snapshot = hit ? markEpicErrors(run.snapshot, batch.refs, failure.code) : run.snapshot;
-  return { ...run, snapshot, failure: run.failure ?? failure };
+  return { ...run, snapshot: noted(run, batch, failure.code), failure: run.failure ?? failure };
 }
 
 // GitHub answered but refused, or the shape was wrong. Whether it billed the
@@ -111,7 +126,7 @@ function charged(run: Run, rate: RateInfo, snapshot: Snapshot): Run {
   return { ...run, snapshot: chargeRate(snapshot, rate), points: run.points + rate.cost };
 }
 
-function answered(run: Run, batch: Batch, res: RawResponse): Run {
+export function answered(run: Run, batch: Batch, res: RawResponse): Run {
   if (batch.phase === 'A') {
     const parsed = parsePhaseA(res);
     if (!parsed.ok) return rejected(run, batch, parsed.error);

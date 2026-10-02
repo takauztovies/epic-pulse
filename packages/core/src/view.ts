@@ -1,6 +1,6 @@
 import { makeRef, parseIssueTarget, refKey } from './ref.js';
 import { activeBindings, isHookInactive, isLive, type Binding, type SessionState } from './registry.js';
-import type { IssueRef, StateKind } from './schemas/common.js';
+import type { ErrorCode, IssueRef, StateKind } from './schemas/common.js';
 import type { JsonEpic, JsonV1 } from './schemas/json-v1.js';
 import type { Pin } from './schemas/registry.js';
 import type { Child, EpicEntry, Snapshot } from './schemas/snapshot.js';
@@ -61,16 +61,31 @@ function isPending(ref: IssueRef, snapshot: Snapshot | undefined): boolean {
   return resolution.epic !== null && snapshot?.epics[refKey(resolution.epic)] === undefined;
 }
 
+// The code of a resolution GitHub refused for good. It is cached for 30
+// minutes, so the refresh that recorded it, and its error, may be long past.
+function refusal(refs: readonly IssueRef[], snapshot: Snapshot | undefined): ErrorCode | undefined {
+  return refs.map((ref) => snapshot?.issues[refKey(ref)]?.error).find((code) => code !== undefined);
+}
+
+// The code behind the state: the last refresh's, or with nothing to show, a
+// refused resolution's.
+function errorOf({ refs, entries, snapshot }: Scoped): ErrorCode | null {
+  return snapshot?.error ?? (entries.length === 0 ? refusal(refs, snapshot) : undefined) ?? null;
+}
+
 // Data wins over errors: anything already fetched is shown (stale if old or
 // failed). Without data, a pending ref is loading unless the last refresh
-// failed; with nothing pending, the refs simply have no epic.
-function stateOf({ input, refs, entries, snapshot }: Scoped): StateKind {
+// failed, and a refused one shows its code; otherwise the refs simply have
+// no epic.
+function stateOf(scoped: Scoped): StateKind {
+  const { input, refs, entries, snapshot } = scoped;
   if (input.scope && isHookInactive(input.scope.session)) return 'hook-inactive';
   if (refs.length === 0) return 'none';
   if (entries.length > 0) return entries.some((entry) => isStale(entry, input.now)) ? 'stale' : 'ok';
-  if (!refs.some((ref) => isPending(ref, snapshot))) return 'none';
-  if (snapshot?.error === 'unsupported') return 'unsupported';
-  return snapshot?.error ? 'error' : 'loading';
+  if (!refs.some((ref) => isPending(ref, snapshot)) && refusal(refs, snapshot) === undefined) return 'none';
+  const error = errorOf(scoped);
+  if (error === 'unsupported') return 'unsupported';
+  return error ? 'error' : 'loading';
 }
 
 // A child's own URL names its repository (sub-issues may live elsewhere); a
@@ -101,12 +116,12 @@ export function buildView(input: ViewInput): JsonV1 {
   const refs = scopeRefs(input, live);
   const entries = epicEntries(refs, snapshot);
   const bound = live.map((session) => new Set(activeBindings(session, input.now).map((binding) => refKey(binding.ref))));
-  const state = stateOf({ input, refs, entries, snapshot });
+  const scoped = { input, refs, entries, snapshot };
   return {
     version: 1,
     generatedAt: iso(input.now),
     liveSessions: live.length,
-    snapshot: { state, fetchedAt: snapshot ? iso(snapshot.updatedAt) : null, error: snapshot?.error ?? null },
+    snapshot: { state: stateOf(scoped), fetchedAt: snapshot ? iso(snapshot.updatedAt) : null, error: errorOf(scoped) },
     epics: entries.map((entry) => jsonEpic(entry, bound, input.now)),
   };
 }

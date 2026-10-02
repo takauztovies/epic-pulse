@@ -40,6 +40,7 @@ test('signed out with data from before keeps the epic on screen, and its click s
   assert.deepEqual([result.view.snapshot.state, result.view.snapshot.error], ['stale', 'no_token']);
   const model = buildModel({ results: [result], now });
   assert.deepEqual(surface(model), ['signed-out', 'notice', 'Sign in to GitHub', 'no_token', '$(pulse) #1 20% · 1/5 $(warning)']);
-  assert.equal(treeOf(model)[1]?.description, '20% · 1/5 · stale (no_token)');
+  // Stale by age only: a refresh without a token leaves the epic's own error alone.
+  assert.equal(treeOf(model)[1]?.description, '20% · 1/5 · stale');
   assert.equal(statusBarOf(model).command, 'epicPulse.signIn');
 });

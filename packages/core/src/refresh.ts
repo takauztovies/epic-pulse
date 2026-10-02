@@ -1,15 +1,17 @@
 import { resolveToken } from './github.js';
 import { acquireLock, releaseLock, type Lock } from './lock.js';
-import { pathsFor, userCacheDir } from './paths.js';
+import { pathsFor, userCacheDir, type RegistryPaths } from './paths.js';
 import { pinsOf, readPins } from './pins.js';
 import { pruneSnapshot } from './refresh-apply.js';
 import { overBudget, runBatch, type Context, type Run } from './refresh-batch.js';
 import {
   chunk, epicRefsOf, gatherRefs, groupByRepo, needsFetch, needsResolution, PHASE_A_BATCH, PHASE_A_COST,
-  phaseBBatchSize, rollUsage, type RepoGroup,
+  phaseBBatchSize, rollUsage, withSession, type RepoGroup,
 } from './refresh-plan.js';
-import { pruneSessions, readLiveSessions } from './registry.js';
+import { pruneSessions, readLiveSessions, readSession, type SessionState } from './registry.js';
+import { unfetchedEpics, unresolvedRefs } from './resolve.js';
 import type { ErrorCode, IssueRef } from './schemas/common.js';
+import { SessionIdSchema } from './schemas/hook.js';
 import type { Snapshot } from './schemas/snapshot.js';
 import { emptySnapshot, readSnapshot, writeSnapshot, type SnapshotRead } from './snapshot.js';
 import { pacingDelay, readUsage, spentIn, usageLedgerFor, type UsageLedger } from './usage-ledger.js';
@@ -28,6 +30,9 @@ export type RefreshOutcome =
   | { readonly status: 'busy' }
   | { readonly status: 'done'; readonly requests: number; readonly points: number; readonly error: ErrorCode | null };
 
+// The status line names its own session here when it starts a refresh.
+export const REFRESH_SESSION_ENV = 'EPIC_PULSE_SESSION';
+
 // Each request has a 15 s timeout and the lock is touched after every one, so
 // a live holder is always fresh; a dead one frees the lock within a minute.
 const LOCK_STALE_MS = 60_000;
@@ -40,9 +45,22 @@ interface UsageView {
   readonly paced: boolean;
 }
 
+// A paced run still asks for what nothing has shown yet, a ref never resolved
+// or an epic never fetched: on screen those are "loading", and a new binding
+// must not sit out its repository's turn (lastCost x 3600 / 300 seconds, per
+// repository) before it shows. Refreshing cached data is what waits.
+function toResolve(run: Run, refs: readonly IssueRef[]): readonly IssueRef[] {
+  return run.paced ? unresolvedRefs(refs, run.snapshot) : needsResolution(run.snapshot, refs, run.now);
+}
+
+function toFetch(run: Run, refs: readonly IssueRef[]): readonly IssueRef[] {
+  const epics = epicRefsOf(run.snapshot, refs);
+  return run.paced ? unfetchedEpics(epics, run.snapshot) : needsFetch(run.snapshot, epics, run.now);
+}
+
 async function runPhaseA(run: Run, refs: readonly IssueRef[], ctx: Context): Promise<Run> {
   let current = run;
-  for (const group of groupByRepo(needsResolution(run.snapshot, refs, run.now))) {
+  for (const group of groupByRepo(toResolve(run, refs))) {
     for (const part of chunk(group.refs, PHASE_A_BATCH)) current = await runBatch(current, { phase: 'A', repo: group.repo, refs: part }, ctx);
   }
   return current;
@@ -63,7 +81,7 @@ async function fetchGroup(run: Run, group: RepoGroup, ctx: Context): Promise<Run
 
 async function runPhaseB(run: Run, refs: readonly IssueRef[], ctx: Context): Promise<Run> {
   let current = run;
-  for (const group of groupByRepo(needsFetch(run.snapshot, epicRefsOf(run.snapshot, refs), run.now))) {
+  for (const group of groupByRepo(toFetch(run, refs))) {
     current = await fetchGroup(current, group, ctx);
   }
   return current;
@@ -99,7 +117,20 @@ async function openUsage(options: RefreshOptions): Promise<UsageView> {
 function startRun(before: SnapshotRead, now: number, usage: UsageView): Run {
   const snapshot = before.status === 'ok' ? before.snapshot : emptySnapshot(now);
   const rolled = { ...snapshot, usage: rollUsage(snapshot.usage, now) };
-  return { now, snapshot: rolled, requests: 0, points: 0, failure: null, spent: usage.spent };
+  return { now, snapshot: rolled, requests: 0, points: 0, failure: null, spent: usage.spent, paced: usage.paced };
+}
+
+// Work is due, and all of it is cached data that has to wait its turn.
+function waitsItsTurn(run: Run, refs: readonly IssueRef[]): boolean {
+  if (!run.paced || toResolve(run, refs).length > 0 || toFetch(run, refs).length > 0) return false;
+  return pendingRefs(run.snapshot, refs, run.now).length > 0;
+}
+
+// The session whose status line started this refresh, read whether or not it
+// is live. An id that is not a Claude Code session id names none.
+async function ownSession(paths: RegistryPaths, env: NodeJS.ProcessEnv): Promise<SessionState | undefined> {
+  const id = SessionIdSchema.safeParse(env[REFRESH_SESSION_ENV]);
+  return id.success ? readSession(paths, id.data) : undefined;
 }
 
 // Errors are stored as a code plus a whitelisted detail, never as text.
@@ -115,18 +146,18 @@ function unchanged(before: SnapshotRead, next: Snapshot, refs: readonly IssueRef
   return before.status === 'ok' && JSON.stringify({ ...before.snapshot, updatedAt: 0 }) === JSON.stringify({ ...next, updatedAt: 0 });
 }
 
-// A paced run with work waiting says `budget` to its caller but leaves the
-// snapshot alone: waiting a turn is not a failure to show, and the data ages
-// into "stale" on its own if the turn is long.
+// A paced run whose only work is cached data says `budget` to its caller but
+// leaves the snapshot alone: waiting a turn is not a failure to show, and the
+// data ages into "stale" on its own if the turn is long.
 async function refreshLocked(options: RefreshOptions, lock: Lock): Promise<RefreshOutcome> {
   const { now } = options;
   const paths = pathsFor(options.dir);
-  const [sessions, pins, before, usage] = await Promise.all([
-    readLiveSessions(paths, now), readPins(paths), readSnapshot(paths.snapshotFile), openUsage(options),
+  const [sessions, pins, before, usage, own] = await Promise.all([
+    readLiveSessions(paths, now), readPins(paths), readSnapshot(paths.snapshotFile), openUsage(options), ownSession(paths, options.env),
   ]);
-  const refs = gatherRefs(sessions, pinsOf(pins), now);
+  const refs = withSession(gatherRefs(sessions, pinsOf(pins), now), own, now);
   const start = startRun(before, now, usage);
-  if (usage.paced && pendingRefs(start.snapshot, refs, now).length > 0) return { status: 'done', requests: 0, points: 0, error: 'budget' };
+  if (waitsItsTurn(start, refs)) return { status: 'done', requests: 0, points: 0, error: 'budget' };
   const started = performance.now();
   const clock = () => now + Math.round(performance.now() - started);
   const ctx: Context = { tokens: await tokensFor(start, refs, options), lock, clock, ledger: usage.ledger };

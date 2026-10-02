@@ -65,7 +65,8 @@ nothing and prints the difference instead. A project's settings name the runtime
 each teammate still needs the plugin, or `statusline install`, for that copy to exist.
 
 The status line reads from disk only and never waits on the network. When something is due, it
-starts a background refresh, which asks GitHub and writes what it learned for the next render.
+starts a background refresh, which asks GitHub and writes what it learned for the next render. After
+a refresh that failed, it waits a minute before it starts the next one.
 
 ## How a session finds its epic
 
@@ -86,7 +87,7 @@ issues the call worked on. It binds an issue when the call:
 `gh issue view`, `list`, `search`, `status` and `create` never bind, and neither do reads. A call that
 names more than three issues binds none of them. A binding lapses six hours after the last call that
 saw it; a pin lasts until it is untracked or the session ends. A session counts as live for two hours
-after its last hook call.
+after its last hook call; its own status line keeps its issues current after that too.
 
 `epic-pulse track <issue> --repo`, or `epic-pulse track <issue>` run in a terminal rather than in a
 session, pins the issue for every session of the repository instead, in `pins.json`.
@@ -124,8 +125,8 @@ only limit is a 1.5-second tripwire that catches a render waiting on the network
 | Done | closed as completed, or closed without a reason |
 | Dropped | closed as not planned, or as a duplicate |
 
-A pull request counts when it is open, belongs to the same repository, and either GitHub links it as
-closing the issue or its body closes the issue with a keyword.
+A pull request counts when it is open, belongs to the issue's own repository (which may not be the
+epic's), and either GitHub links it as closing the issue or its body closes the issue with a keyword.
 
 **% = done / (total − dropped)**, rounded down, so 100% always means finished. Dropped work leaves
 the count instead of holding the epic below 100% forever.
@@ -146,8 +147,8 @@ Every state of the status line says what it is:
 | `epic-pulse: hook inactive` | the hook has recorded nothing for this session |
 | `epic-pulse: unsupported host (no sub-issues)` | a GitHub Enterprise Server without sub-issues |
 
-A `+` after the count means the epic has more than 100 sub-issues and only the first 100 are
-counted.
+A `+` after the count means the epic has more than 100 sub-issues, or a task list of more than 500
+boxes, and only the first 100 sub-issues or 500 boxes are counted.
 
 ## Configuration: `.epic-pulse.json`
 
@@ -209,6 +210,7 @@ While you work, epic-pulse writes these files and no others:
 <git-common-dir>/epic-pulse/hook.log
 <git-common-dir>/epic-pulse/hook.log.1
 <git-common-dir>/epic-pulse/refresh.lock
+<git-common-dir>/epic-pulse/refresh-attempt.json
 <claude-config-dir>/epic-pulse/runtime.mjs
 <user-cache-dir>/epic-pulse/usage.jsonl
 <user-cache-dir>/epic-pulse/usage.lock
@@ -221,6 +223,7 @@ While you work, epic-pulse writes these files and no others:
 | `snapshot.json` | the refresher | what GitHub returned: epic and sub-issue numbers, titles, URLs and statuses, when they were fetched, this repository's points for the hour, the token's rate-limit counters and the code of the last failure |
 | `hook.log`, `hook.log.1` | the hook | an error code and a timestamp per failed call; past 64 KiB it moves to `hook.log.1` |
 | `refresh.lock` | the refresher | a process id and a random token, while a refresh runs |
+| `refresh-attempt.json` | `epic-pulse refresh`, which the status line starts | when the last refresh ended and the code it stopped with; after a failure the status line starts the next one a minute later |
 | `runtime.mjs` | the hook at session start, and `statusline install` | a copy of the program for the status line to run |
 | `usage.jsonl` | the refresher | the last hour's charges, one line each: when, which host, how many points and a hash of the repository's registry path, so that every refresher on the machine shares one budget of 300 points an hour |
 | `usage.lock` | the refresher | a process id and a random token, while the ledger is written |
@@ -270,6 +273,8 @@ epic-pulse doctor
   **`rate_limited`**: GitHub asked to slow down; epic-pulse waits five minutes.
 - **`loading…` that does not end**: run `epic-pulse refresh` in the repository to see what a refresh
   reports, and look at `hook errors` in `doctor`.
+- **`error (forbidden)`** or **`error (not_found)`**: the token can not read that repository's
+  issues, or it does not exist. GitHub's answer is kept for 30 minutes, so a fix shows within that.
 - **`runtime: present, a different build`** after an upgrade: start a new session, or run
   `epic-pulse statusline install` again.
 - **`epic-pulse json`** prints everything epic-pulse knows about the repository as versioned JSON,
@@ -280,7 +285,8 @@ epic-pulse doctor
 - The VS Code **Claude panel** may not show the status line. Use the VS Code extension there.
 - On Windows the tests run in CI, but the hooks and the status line in a real Claude Code session are
   checked by hand only.
-- An epic's first 100 sub-issues are counted; a larger epic is marked with `+`, not paged through.
+- An epic's first 100 sub-issues, or the first 500 boxes of its task list, are counted; a larger epic
+  is marked with `+`, not paged through.
 - Statuses come from issues, pull requests and assignees; GitHub Projects fields are not read yet.
 - `statusline install` does not chain with a status line you already have; it refuses instead.
 - Only the direct parent of an issue is its epic.

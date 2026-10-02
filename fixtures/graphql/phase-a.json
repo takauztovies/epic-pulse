@@ -1,15 +1,15 @@
 {
-  "recordedAt": "2026-09-30T13:32:26.651Z",
+  "recordedAt": "2026-10-02T05:49:18.797Z",
   "note": "sub-issue, epic, checklist epic and a missing issue",
   "status": 200,
-  "remaining": 4890,
+  "remaining": 4994,
   "retryAfter": false,
   "body": {
     "data": {
       "rateLimit": {
         "cost": 1,
-        "remaining": 4890,
-        "resetAt": "2026-09-30T13:45:37Z"
+        "remaining": 4994,
+        "resetAt": "2026-10-02T06:45:06Z"
       },
       "repository": {
         "i1": {
