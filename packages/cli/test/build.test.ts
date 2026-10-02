@@ -23,7 +23,7 @@ test('the bundle is an unminified Node ESM script that loads nothing but Node bu
   assert.ok(Buffer.from(text, 'utf8').equals(readFileSync(BUNDLE)), 'the runtime copy relies on an exact UTF-8 round trip');
 });
 
-test('the npm package declares no runtime dependency and ships only the bundle', () => {
+test('the npm package declares no runtime dependency and ships only dist: the bundle and its notices', () => {
   const cli = z.looseObject({ name: z.string(), bin: z.record(z.string(), z.string()), files: z.array(z.string()) })
     .parse(JSON.parse(readFileSync(join(ROOT, 'packages', 'cli', 'package.json'), 'utf8')));
   assert.deepEqual([cli.name, cli.bin, cli.files], ['epic-pulse', { 'epic-pulse': 'dist/epic-pulse.mjs' }, ['dist']]);

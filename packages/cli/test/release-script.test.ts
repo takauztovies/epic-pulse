@@ -8,6 +8,7 @@ import { assertRefused, cliVersion, manifestsIn, nextMinor, release, releaseRepo
 // scripts/release.mjs, run for real in a throwaway repository.
 
 const PLUGIN_BUNDLE = 'plugin/dist/epic-pulse.mjs';
+const PLUGIN_NOTICES = 'plugin/dist/THIRD_PARTY_NOTICES.md';
 
 function blob(repo: string, spec: string): string {
   return git(repo, ['rev-parse', spec]).trim();
@@ -30,7 +31,7 @@ test('a release bumps only the version of every manifest and commits them with t
   assert.equal(git(repo, ['rev-parse', '--abbrev-ref', 'HEAD']).trim(), `release/v${next}`);
   assert.equal(git(repo, ['log', '-1', '--format=%s']).trim(), `chore: release v${next}`);
   const committed = git(repo, ['show', '--name-only', '--format=', 'HEAD']).split('\n').filter(Boolean).sort();
-  assert.deepEqual(committed, [...before.keys(), PLUGIN_BUNDLE].sort());
+  assert.deepEqual(committed, [...before.keys(), PLUGIN_BUNDLE, PLUGIN_NOTICES].sort());
   for (const [path, text] of before) {
     assert.equal(readFileSync(join(repo, path), 'utf8'), text.replace(/"version": "[^"]*"/, `"version": "${next}"`), path);
   }

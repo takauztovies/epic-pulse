@@ -1,6 +1,6 @@
-# Only the bundle, the icon and the listing files go into the .vsix. Sources,
-# tests and the scripts stay in the repository; core and zod are inside the
-# bundle.
+# Only the bundle with its notices, the icon and the listing files go into
+# the .vsix. Sources, tests and the scripts stay in the repository; core and
+# zod are inside the bundle.
 .gitignore
 src/**
 test/**
