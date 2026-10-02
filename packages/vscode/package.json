@@ -4,6 +4,7 @@
   "description": "GitHub epic progress for Claude Code sessions",
   "version": "0.1.0",
   "publisher": "takauztovies",
+  "icon": "images/icon.png",
   "license": "MIT",
   "private": true,
   "type": "module",
