@@ -8,5 +8,8 @@
   epic, loading, refresh failed (with its code), hook inactive, unsupported host and signed out.
 - Commands: Refresh, Sign in to GitHub, Show status details.
 - Sign-in through VS Code's GitHub and GitHub Enterprise accounts, falling back to `GH_TOKEN` and
-  `gh auth token` like the epic-pulse CLI.
+  `gh auth token` like the epic-pulse CLI. Each sign-in's token goes only to the host it belongs to,
+  and for a repository on a host no sign-in serves, Sign in to GitHub opens `github-enterprise.uri`
+  instead of signing in to github.com.
+- An icon, and `THIRD_PARTY_NOTICES.md` beside the bundle for the zod code inside it.
 - Multi-root workspaces: every folder's repository in one view.

@@ -94,6 +94,26 @@ session, pins the issue for every session of the repository instead, in `pins.js
 An issue's epic is its parent issue. An issue without a parent is an epic itself when it has
 sub-issues or, failing that, a task list.
 
+## What it costs a session
+
+The hook after a tool call runs asynchronously: Claude Code starts it and carries on, so no tool call
+waits for epic-pulse. The hooks at session start and end run once each, and Claude Code waits for
+them, within their five-second timeout. The status line renders from disk and, when a refresh is
+due, starts one in the background; it never waits on the network.
+
+Each hook call and each status-line render is one short Node process, so most of its cost is Node
+starting up. epic-pulse sets no fixed target for it. Measured on an Apple M4 Pro with Node 22, on a
+busy machine, in three runs of 20 calls each:
+
+| | Median | p95 |
+| --- | --- | --- |
+| A hook call | 85–90 ms | 101–123 ms |
+| A status-line render | 87–90 ms | 92–104 ms |
+| `node -e ''`, for comparison | 46 ms | 47 ms |
+
+`pnpm test` measures both on your machine and prints them (`packages/cli/test/perf.test.ts`). Its
+only limit is a 1.5-second tripwire that catches a render waiting on the network.
+
 ## Statuses and the percentage
 
 | Status | A sub-issue that is |

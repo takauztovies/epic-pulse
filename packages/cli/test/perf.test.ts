@@ -5,9 +5,9 @@ import { bashPayload, demoSnapshot, eventPayload, statusPayload } from './fixtur
 import { cliEnv, demoRepo, registryOf, runCli, sandbox } from './helpers.js';
 
 const RUNS = 20;
-// A tripwire, not the target: it catches a render that waits on the network
-// or on the refresh, without failing on a busy machine. The targets (status
-// line under 100 ms, hook under 50 ms) are reported below and checked by hand.
+// A tripwire, not a target: it catches a render that waits on the network or
+// on the refresh, without failing on a busy machine. epic-pulse sets no fixed
+// target; the cost is reported below, and the README quotes a measured run.
 const TRIPWIRE_MS = 1500;
 
 function percentile(samples: readonly number[], p: number): number {
