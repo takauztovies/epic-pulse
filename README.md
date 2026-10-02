@@ -126,8 +126,8 @@ Every state of the status line says what it is:
 | `epic-pulse: hook inactive` | the hook has recorded nothing for this session |
 | `epic-pulse: unsupported host (no sub-issues)` | a GitHub Enterprise Server without sub-issues |
 
-A `+` after the count means the epic has more than 100 sub-issues and only the first 100 are
-counted.
+A `+` after the count means the epic has more than 100 sub-issues, or a task list of more than 500
+boxes, and only the first 100 sub-issues or 500 boxes are counted.
 
 ## Configuration: `.epic-pulse.json`
 
@@ -249,7 +249,8 @@ epic-pulse doctor
 - The VS Code **Claude panel** may not show the status line. Use the VS Code extension there.
 - On Windows the tests run in CI, but the hooks and the status line in a real Claude Code session are
   checked by hand only.
-- An epic's first 100 sub-issues are counted; a larger epic is marked with `+`, not paged through.
+- An epic's first 100 sub-issues, or the first 500 boxes of its task list, are counted; a larger epic
+  is marked with `+`, not paged through.
 - Statuses come from issues, pull requests and assignees; GitHub Projects fields are not read yet.
 - `statusline install` does not chain with a status line you already have; it refuses instead.
 - Only the direct parent of an issue is its epic.

@@ -2,7 +2,7 @@ import { checklistChildren } from './checklist.js';
 import { makeRef, refKey } from './ref.js';
 import type { IssueRef } from './schemas/common.js';
 import type { EpicNode, PhaseAIssue, SubIssueNode } from './schemas/graphql.js';
-import type { Child, EpicEntry, Snapshot } from './schemas/snapshot.js';
+import { MAX_CHILDREN, type Child, type EpicEntry, type Snapshot } from './schemas/snapshot.js';
 import { deriveStatus } from './status.js';
 
 // An epic as fetched, before the refresher stamps it with fetchedAt and error.
@@ -31,7 +31,8 @@ function subIssueChild(node: SubIssueNode, epic: IssueRef): Child {
 // Phase B. Sub-issues win over a checklist; a checklist is the fallback for
 // epics that are only a list of boxes. Returns null when the issue is neither,
 // i.e. it is not an epic at all. GitHub caps a page at 100 sub-issues and we do
-// not paginate, so a larger epic is flagged `truncated` instead of shown as if
+// not paginate, and the snapshot keeps at most MAX_CHILDREN of a checklist's
+// boxes, so a larger epic is flagged `truncated` instead of shown as if
 // complete.
 export function buildEpic(node: EpicNode, ref: IssueRef): EpicData | null {
   const subs = node.subIssues.nodes.filter((n): n is SubIssueNode => n !== null);
@@ -43,8 +44,8 @@ export function buildEpic(node: EpicNode, ref: IssueRef): EpicData | null {
     title: node.title.slice(0, 300),
     url: node.url.slice(0, 500),
     kind,
-    children,
-    truncated: node.subIssues.totalCount > subs.length,
+    children: children.slice(0, MAX_CHILDREN),
+    truncated: node.subIssues.totalCount > subs.length || children.length > MAX_CHILDREN,
   };
 }
 

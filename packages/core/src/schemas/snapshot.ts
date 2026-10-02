@@ -15,13 +15,17 @@ export const ChildSchema = z
   })
   .readonly();
 
+// The most children an epic keeps. resolve.ts cuts a longer epic here and
+// flags it `truncated`, so a long checklist can not fail the snapshot.
+export const MAX_CHILDREN = 500;
+
 export const EpicEntrySchema = z
   .object({
     ref: IssueRefSchema,
     title: z.string().max(300),
     url: z.string().max(500),
     kind: EpicKindSchema,
-    children: z.array(ChildSchema).max(500).readonly(),
+    children: z.array(ChildSchema).max(MAX_CHILDREN).readonly(),
     truncated: z.boolean(),
     fetchedAt: z.number().int().nonnegative(),
     error: ErrorCodeSchema.nullable(),

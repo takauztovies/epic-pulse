@@ -56,3 +56,17 @@ test('concurrent writers never expose a torn snapshot to readers', async (t) => 
   assert.equal(seen.length, 60);
   assert.ok(seen.every((read) => read.status === 'ok'));
 });
+
+// One child more than the schema keeps. A single epic like that must not cost
+// every other epic its write, on every run after it.
+test('an epic the schema refuses is written without its children, marked invalid_response, and the rest as it was', async (t) => {
+  const file = join(tempDir(t), 'snapshot.json');
+  const good = sample(1000).epics[refKey(EPIC)]!;
+  const other = makeRef({ ...EPIC, number: 2 })!;
+  const bad = { ...sample(1000, 500).epics[refKey(EPIC)]!, ref: other };
+  await writeSnapshot(file, { ...sample(1000), epics: { [refKey(EPIC)]: good, [refKey(other)]: bad } });
+  const read = await readSnapshot(file);
+  assert.ok(read.status === 'ok');
+  assert.deepEqual(read.snapshot.epics[refKey(EPIC)], good);
+  assert.deepEqual(read.snapshot.epics[refKey(other)], { ...bad, children: [], truncated: true, error: 'invalid_response' });
+});
