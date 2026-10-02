@@ -11,6 +11,7 @@ import { DEFAULT_REFRESH_SECONDS, MAX_REFRESH_SECONDS, MIN_REFRESH_SECONDS } fro
 const ManifestSchema = z.object({
   name: z.string(),
   publisher: z.string(),
+  icon: z.string(),
   main: z.string(),
   engines: z.object({ vscode: z.string() }),
   activationEvents: z.array(z.string()),
@@ -28,6 +29,13 @@ test('the extension is takauztovies.epic-pulse, loaded from the bundle the build
   assert.deepEqual([manifest.publisher, manifest.name, manifest.main], ['takauztovies', 'epic-pulse', './dist/extension.cjs']);
   assert.equal(manifest.engines.vscode, '^1.90.0');
   assert.deepEqual(manifest.activationEvents, ['onStartupFinished']);
+});
+
+// The Marketplace wants a PNG of at least 128 x 128. scripts/icon.sh draws it.
+test('the icon is the 128 x 128 PNG that scripts/icon.sh draws', () => {
+  assert.equal(manifest.icon, 'images/icon.png');
+  const png = readFileSync(new URL(`../${manifest.icon}`, import.meta.url));
+  assert.deepEqual([png.subarray(0, 8).toString('hex'), png.readUInt32BE(16), png.readUInt32BE(20)], ['89504e470d0a1a0a', 128, 128]);
 });
 
 test('every command the code runs is contributed, and every menu entry names one', () => {

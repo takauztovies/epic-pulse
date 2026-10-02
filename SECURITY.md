@@ -21,17 +21,19 @@ newest version before reporting.
 These are the properties a report would most usefully break:
 
 - **The token stays in memory.** It is never written to a file, a log or an error message.
-- **A github.com token stays with github.com.** `GH_TOKEN`, `GITHUB_TOKEN` and `gh`'s github.com
-  login are sent to `api.github.com` only, whatever a repository's remote or a command names. The
-  Enterprise variables `GH_ENTERPRISE_TOKEN` and `GITHUB_ENTERPRISE_TOKEN` are, as in `gh`, not tied
-  to one host: epic-pulse offers them to any host other than github.com that an issue names.
+- **A token goes only to a host you trust.** `GH_TOKEN`, `GITHUB_TOKEN` and `gh`'s github.com login
+  are sent to `api.github.com` only, whatever a repository's remote or a command names. The
+  Enterprise variables `GH_ENTERPRISE_TOKEN` and `GITHUB_ENTERPRISE_TOKEN`, which `gh` ties to no
+  host, go only to the host `GH_HOST` names or one listed in `EPIC_PULSE_HOSTS`. Any other host gets
+  nothing but the login made for it with `gh auth login --hostname`, or no token at all.
 - **Read-only.** epic-pulse sends nothing but GraphQL queries, and only to the GraphQL endpoint of the
   host an issue lives on. It never sends a mutation.
 - **An offline hook.** The Claude Code hook makes no network call and stores only issue references
   and timestamps: no command text, no file paths, no file contents.
 - **A hostile repository stays contained.** A repository's `.epic-pulse.json`, its git remotes and its
   branch names are untrusted input. They can not make epic-pulse run code, write outside its own
-  directories, hang a hook with a slow regular expression, or send a github.com token anywhere else.
+  directories, hang a hook with a slow regular expression, or send a token to a host you did not name
+  or log in to.
 - **Session ids can not name a path.** Only a UUID-shaped session id becomes a file name.
 - **Your settings are not overwritten.** `epic-pulse statusline install` changes only `statusLine`,
   backs the file up first, and refuses to replace a status line that is not its own.

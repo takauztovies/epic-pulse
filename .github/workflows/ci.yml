@@ -63,40 +63,26 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build
 
       # plugin/dist is what every plugin user runs as soon as it reaches main,
       # release or not, so only a release branch of this repository may change
-      # it. A fork can name its branch release/anything, hence the repo check.
-      - name: plugin/dist changes only on a release branch
+      # it, and a release branch must commit exactly what its sources build.
+      # The script, and its test, hold both rules; it runs after the build,
+      # which the release check compares against.
+      - name: plugin/dist changes only on a release branch, as its sources build it
         if: github.event_name == 'pull_request'
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           HEAD_REF: ${{ github.head_ref }}
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-        run: |
-          changed="$(git diff --name-only "$BASE_SHA...$HEAD_SHA" -- plugin/dist)"
-          if [ -z "$changed" ]; then
-            echo "plugin/dist is unchanged."
-            exit 0
-          fi
-          if [[ "$HEAD_REF" == release/* && "$HEAD_REPO" == "$GITHUB_REPOSITORY" ]]; then
-            echo "plugin/dist changes on $HEAD_REF, a release branch of this repository."
-            exit 0
-          fi
-          echo "::error::plugin/dist is release-owned: only a release/* branch of $GITHUB_REPOSITORY may change it (node scripts/release.mjs <version>)."
-          echo "$changed"
-          exit 1
+        run: node scripts/check-dist-guard.mjs
 
-      - run: pnpm build
-
-      # Merging a release branch ships its plugin/dist at once, before any tag,
-      # so the bundle it commits must be the one its sources build.
-      - name: a release branch commits the bundle its sources build
-        if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release/')
-        run: |
-          git ls-files --error-unmatch plugin/dist/epic-pulse.mjs
-          git diff --exit-code -- plugin/dist
+      # No word on scripts/denylist.sha256 anywhere in the repository or in
+      # what it builds; the test job runs the same check inside `pnpm test`.
+      - name: no denylisted word in the repository or its bundles
+        run: node scripts/check-denylist.mjs
 
       - name: claude plugin validate
         env:

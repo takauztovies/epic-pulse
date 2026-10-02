@@ -47,6 +47,12 @@ function isSignedOut(result: RepoResult): boolean {
   return result.token === 'none' && (state === 'error' || state === 'stale') && error !== null && TOKEN_ERRORS.has(error);
 }
 
+// The hosts of the repositories a sign-in would cure: what the Sign in action
+// has to serve.
+export function signedOutHosts(results: readonly RepoResult[]): ReadonlySet<string> {
+  return new Set(results.filter(isSignedOut).flatMap((result) => result.hosts));
+}
+
 // Data wins over errors, as in core's own view: anything fetched is shown,
 // stale if any of it is.
 function baseState(results: readonly RepoResult[], epics: readonly JsonEpic[]): StateKind {

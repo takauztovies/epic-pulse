@@ -78,7 +78,8 @@ test('the bin shims start the plugin bundle', { skip: NO_SH }, (t) => {
 });
 
 test('the track skill runs the one command line the hook turns into a session pin', async (t) => {
-  const skill = readFileSync(join(PLUGIN, 'skills', 'track', 'SKILL.md'), 'utf8');
+  // A Windows checkout may have turned the line ends into CRLF.
+  const skill = readFileSync(join(PLUGIN, 'skills', 'track', 'SKILL.md'), 'utf8').replace(/\r\n/g, '\n');
   assert.match(skill, /^---\nname: track\ndescription: .+\n/);
   const command = /```sh\n(.+)\n```/.exec(skill)?.[1];
   assert.equal(command, 'epic-pulse track $ARGUMENTS');

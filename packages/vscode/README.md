@@ -48,8 +48,13 @@ Epic Pulse uses VS Code's GitHub sign-in, and the GitHub Enterprise one when `gi
 is set. It asks for the `repo` scope because GitHub has no read-only scope that reaches private
 repositories. Epic Pulse only ever sends GraphQL queries; it never changes anything on GitHub.
 
-You do not have to sign in. Without a VS Code sign-in it uses `GH_TOKEN` or `GITHUB_TOKEN`
-(`GH_ENTERPRISE_TOKEN` for an Enterprise host), then `gh auth token`, exactly like the epic-pulse CLI.
+VS Code signs in to one GitHub Enterprise server only, the one `github-enterprise.uri` names. For a
+repository on any other host, **Sign in to GitHub** says so and opens that setting instead of
+signing you in to github.com, which would leave the repository signed out.
+
+You do not have to sign in. Without a VS Code sign-in it uses `GH_TOKEN` or `GITHUB_TOKEN`, then
+`gh auth token`, exactly like the epic-pulse CLI. An Enterprise host takes `GH_ENTERPRISE_TOKEN` only
+when `GH_HOST` or `EPIC_PULSE_HOSTS` names it, and otherwise only your `gh auth login` for that host.
 Only when none of these yields a token GitHub accepts does the view offer **Sign in to GitHub**.
 
 ## Privacy
@@ -57,9 +62,9 @@ Only when none of these yields a token GitHub accepts does the view offer **Sign
 - **Network.** Only the GitHub GraphQL API of the host your issues live on: `api.github.com`, or
   your Enterprise server. No telemetry and no other service.
 - **Your token** is held in memory for one refresh. It is never written to disk, logged or put in an
-  error. A token from VS Code is used only when every host named in the repository's registry is
-  a host you signed in to in VS Code; otherwise it is withheld, and the environment or `gh` is used
-  instead.
+  error. A token from VS Code goes only to the host it belongs to: the GitHub sign-in's to
+  github.com, the GitHub Enterprise one's to the server `github-enterprise.uri` names. Any other host
+  the repository names gets a token the way the CLI finds one, never one from VS Code.
 - **Stored in the repository**, in `epic-pulse/` inside its git directory (created owner-only on
   macOS and Linux):
   - `sessions/*.jsonl`, written by the plugin's hook: issue references and timestamps for each

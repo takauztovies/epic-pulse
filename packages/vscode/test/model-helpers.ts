@@ -9,7 +9,7 @@ const DONE = { status: 'done', requests: 0, points: 0, error: null } as const;
 // The model of real registry files, read through the production path. How the
 // last refresh went and where its token came from are the scenario's inputs.
 export async function modelOf(repos: readonly RepoTarget[], now: number, token: RepoResult['token'] = 'session'): Promise<Model> {
-  const results = await Promise.all(repos.map(async (repo) => ({ repo, refresh: DONE, token, ...(await inspectRepo(repo.dir, now)) })));
+  const results = await Promise.all(repos.map(async (repo) => ({ repo, refresh: DONE, token, hosts: [], ...(await inspectRepo(repo.dir, now)) })));
   return buildModel({ results, now });
 }
 

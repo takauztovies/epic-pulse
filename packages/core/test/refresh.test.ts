@@ -19,10 +19,11 @@ const invalid = (number: number) => makeRef({ host: 'epic-pulse.invalid', owner:
 // A line another repository's refresher left in the user's usage ledger.
 const otherRepo = (ts: number, points: number) => `${JSON.stringify({ ts, host: 'github.com', repo: 'f'.repeat(16), points })}\n`;
 
-// With a token for the `.invalid` host every admitted request really goes out
-// and really fails, offline (see the token test at the end).
+// With a token for the `.invalid` host, which EPIC_PULSE_HOSTS names, every
+// admitted request really goes out and really fails, offline (see the token
+// test at the end).
 function sendingEnv(t: TestContext, cache: string): NodeJS.ProcessEnv {
-  return noGhEnv(t, { GH_ENTERPRISE_TOKEN: 'x', EPIC_PULSE_CACHE_DIR: cache });
+  return noGhEnv(t, { GH_ENTERPRISE_TOKEN: 'x', EPIC_PULSE_HOSTS: 'epic-pulse.invalid', EPIC_PULSE_CACHE_DIR: cache });
 }
 
 async function boundRegistry(t: TestContext, refs: readonly IssueRef[]): Promise<RegistryPaths> {
@@ -143,11 +144,48 @@ test('a token never reaches any file the refresher writes, whatever the failure'
   for (const [token, code] of cases) {
     const paths = await boundRegistry(t, [invalid(4)]);
     const cache = tempDir(t);
-    const outcome = await refresh({ dir: paths.dir, now: Date.now(), env: noGhEnv(t, { GH_ENTERPRISE_TOKEN: token, EPIC_PULSE_CACHE_DIR: cache }) });
+    const env = noGhEnv(t, { GH_ENTERPRISE_TOKEN: token, EPIC_PULSE_HOSTS: 'epic-pulse.invalid', EPIC_PULSE_CACHE_DIR: cache });
+    const outcome = await refresh({ dir: paths.dir, now: Date.now(), env });
     assert.deepEqual(outcome, { status: 'done', requests: 1, points: 0, error: code });
     const files = [...filesUnder(paths.dir), ...filesUnder(cache)];
     assert.ok(files.some((file) => file === paths.snapshotFile), 'the failure was written to disk');
     assert.ok(files.some((file) => file === join(cache, 'usage.jsonl')), 'the charge was written to the ledger');
     for (const file of files) assert.equal(readFileSync(file, 'utf8').includes('SENTINEL'), false, file);
   }
+});
+
+// Every request is charged to the ledger, under its host, before it is sent:
+// these are the hosts a refresh sent something to.
+function chargedHosts(cache: string): readonly string[] {
+  const file = join(cache, 'usage.jsonl');
+  if (!existsSync(file)) return [];
+  return readFileSync(file, 'utf8').split('\n').filter(Boolean).map((raw) => String((JSON.parse(raw) as Record<string, unknown>)['host']));
+}
+
+test('a token the caller hands over is used for its own host and for no other', async (t) => {
+  const cache = tempDir(t);
+  const elsewhere = makeRef({ host: 'elsewhere.invalid', owner: 'acme', repo: 'widgets', number: 5 })!;
+  const paths = await boundRegistry(t, [invalid(4), elsewhere]);
+  const env = noGhEnv(t, { EPIC_PULSE_CACHE_DIR: cache });
+  const outcome = await refresh({ dir: paths.dir, now: Date.now(), env, tokens: { 'epic-pulse.invalid': SENTINEL } });
+  assert.equal(outcome.status === 'done' ? outcome.requests : outcome.status, 1);
+  assert.deepEqual(chargedHosts(cache), ['epic-pulse.invalid']);
+  for (const file of [...filesUnder(paths.dir), ...filesUnder(cache)]) assert.equal(readFileSync(file, 'utf8').includes('SENTINEL'), false, file);
+});
+
+// The code tells the two apart: the handed-over token, with a NUL in it, fails
+// as invalid_token; the environment's would fail as network.
+test('a token the caller hands over comes before the environment and gh', async (t) => {
+  const cache = tempDir(t);
+  const paths = await boundRegistry(t, [invalid(4)]);
+  const env = noGhEnv(t, { GH_ENTERPRISE_TOKEN: 'from-env', EPIC_PULSE_HOSTS: 'epic-pulse.invalid', EPIC_PULSE_CACHE_DIR: cache });
+  const outcome = await refresh({ dir: paths.dir, now: Date.now(), env, tokens: { 'epic-pulse.invalid': `${SENTINEL}\u0000x` } });
+  assert.deepEqual(outcome, { status: 'done', requests: 1, points: 0, error: 'invalid_token' });
+});
+
+// `constructor` is a valid host name and a key every object inherits.
+test('only the entries the caller put in the map count, not what every object inherits', async (t) => {
+  const paths = await boundRegistry(t, [makeRef({ host: 'constructor', owner: 'acme', repo: 'widgets', number: 4 })!]);
+  const outcome = await refresh({ dir: paths.dir, now: Date.now(), env: noGhEnv(t), tokens: {} });
+  assert.deepEqual(outcome, { status: 'done', requests: 0, points: 0, error: 'no_token' });
 });
