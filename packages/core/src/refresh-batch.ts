@@ -96,14 +96,18 @@ async function send(token: string, batch: Batch): Promise<Result<RawResponse, Fa
 // The answers asking again would not change: this repository's issues can
 // not be read with this token, or the host has no sub-issues.
 const PERMANENT: ReadonlySet<ErrorCode> = new Set(['not_found', 'forbidden', 'unsupported']);
+// Stops that say nothing about the epics. The snapshot is shared, so a
+// refresher without a token must leave alone what one with a token (a VS Code
+// sign-in) fetched; the snapshot's own error still says why it got nothing.
+const UNMARKED: ReadonlySet<ErrorCode> = new Set(['budget', 'no_token']);
 
-// A budget stop marks nothing: the data is not wrong, only not refreshed, and
-// ages into "stale" on its own. Every other Phase B failure marks the epics it
-// hit. A Phase A failure that is permanent is cached as a resolution; any
-// other is simply asked again on the next run.
+// A budget stop or a missing token marks nothing: the data is not wrong, only
+// not refreshed, and ages into "stale" on its own. Every other Phase B failure
+// marks the epics it hit. A Phase A failure that is permanent is cached as a
+// resolution; any other is simply asked again on the next run.
 function noted(run: Run, batch: Batch, code: ErrorCode): Snapshot {
   if (batch.phase === 'A') return PERMANENT.has(code) ? applyRefusal(run.snapshot, batch.refs, { code, now: run.now }) : run.snapshot;
-  return code === 'budget' ? run.snapshot : markEpicErrors(run.snapshot, batch.refs, code);
+  return UNMARKED.has(code) ? run.snapshot : markEpicErrors(run.snapshot, batch.refs, code);
 }
 
 function failed(run: Run, batch: Batch, failure: Failure): Run {

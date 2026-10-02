@@ -103,14 +103,17 @@ test('a corrupt snapshot shows loading and is replaced by the refresh', async (t
   assert.equal(await snapshotError(bound.paths), 'no_token');
 });
 
-test('a stale snapshot still shows the epic, marked stale, and then why the refresh failed', async (t) => {
+// A refresh without a token has learned nothing about the epic, so it leaves
+// the epic as it was: stale by age, with no error of its own.
+test('a stale snapshot still shows the epic, marked stale, and a refresh without a token leaves it so', async (t) => {
   const bound = await boundSession(t);
   await writeSnapshot(bound.paths.snapshotFile, demoSnapshot(Date.now() - ELEVEN_MINUTES));
   const first = plantCanary(bound.paths);
   assert.equal((await statusLine(bound)).stdout, `${EPIC_LINE} · stale\n`);
   await refreshFinished(bound.paths, first);
+  assert.equal(await snapshotError(bound.paths), 'no_token');
   const second = plantCanary(bound.paths);
-  assert.equal((await statusLine(bound)).stdout, `${EPIC_LINE} · stale (no_token)\n`);
+  assert.equal((await statusLine(bound)).stdout, `${EPIC_LINE} · stale\n`);
   await noRefreshStarts(second);
 });
 
