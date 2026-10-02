@@ -11,7 +11,8 @@ import { recordUsage, reserveUsage, type UsageLedger } from './usage-ledger.js';
 // One refresh in progress. `now` is the run's single timestamp: every entry
 // it writes is stamped with it. `spent` is what every refresher of the user
 // spent in the last hour, as the usage ledger last said; absent, only this
-// repository's own budget applies.
+// repository's own budget applies. `paced`: the repository has not paid off
+// its last refresh yet, so only what was never fetched may go out.
 export interface Run {
   readonly now: number;
   readonly snapshot: Snapshot;
@@ -19,6 +20,7 @@ export interface Run {
   readonly points: number;
   readonly failure: Failure | null;
   readonly spent?: number;
+  readonly paced?: boolean;
 }
 
 // Tokens live here, in memory, for one run; nothing in `Run` or the snapshot

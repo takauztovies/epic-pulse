@@ -61,3 +61,8 @@ export function epicKeysFor(refs: readonly IssueRef[], snapshot: Snapshot): read
 export function unresolvedRefs(refs: readonly IssueRef[], snapshot: Snapshot): readonly IssueRef[] {
   return refs.filter((ref) => snapshot.issues[refKey(ref)] === undefined);
 }
+
+// Epics the snapshot has never fetched. They show as "loading" until Phase B runs.
+export function unfetchedEpics(epics: readonly IssueRef[], snapshot: Snapshot): readonly IssueRef[] {
+  return epics.filter((epic) => snapshot.epics[refKey(epic)] === undefined);
+}

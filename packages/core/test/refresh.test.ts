@@ -5,8 +5,9 @@ import { test, type TestContext } from 'node:test';
 import { acquireLock, releaseLock } from '../src/lock.js';
 import { pathsFor, type RegistryPaths } from '../src/paths.js';
 import { addPin } from '../src/pins.js';
-import { makeRef } from '../src/ref.js';
+import { makeRef, refKey } from '../src/ref.js';
 import { refresh } from '../src/refresh.js';
+import { RESOLUTION_TTL_MS } from '../src/refresh-plan.js';
 import { appendRegistryLine } from '../src/registry.js';
 import type { IssueRef } from '../src/schemas/common.js';
 import { emptySnapshot, readSnapshot, writeSnapshot } from '../src/snapshot.js';
@@ -108,11 +109,13 @@ test('each request is charged to the user ledger before it is sent, under a hash
   assert.equal(text.includes(paths.dir), false);
 });
 
-test('a repository refreshes again only once its last cost is paid off at its share of the hour', async (t) => {
+// Pacing holds back refreshing cached data: #4 has a resolution, due again.
+test('a repository refreshes cached data again only once its last cost is paid off at its share of the hour', async (t) => {
   const now = Date.now();
   const cache = tempDir(t);
   writeFileSync(join(cache, 'usage.jsonl'), otherRepo(now - 60_000, 3)); // so two repositories share the hour
   const paths = await boundRegistry(t, [invalid(4)]);
+  await writeSnapshot(paths.snapshotFile, { ...emptySnapshot(now), issues: { [refKey(invalid(4))]: { epic: null, resolvedAt: now - RESOLUTION_TTL_MS } } });
   const env = sendingEnv(t, cache);
   const at = (ms: number) => refresh({ dir: paths.dir, now: now + ms, env });
   const sent = { status: 'done', requests: 1, points: 0, error: 'network' };
