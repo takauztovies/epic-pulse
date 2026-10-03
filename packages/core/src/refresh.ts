@@ -5,8 +5,8 @@ import { pinsOf, readPins } from './pins.js';
 import { pruneSnapshot } from './refresh-apply.js';
 import { overBudget, runBatch, type Context, type Run } from './refresh-batch.js';
 import {
-  chunk, epicRefsOf, gatherRefs, groupByRepo, needsFetch, needsResolution, PHASE_A_BATCH, PHASE_A_COST,
-  phaseBBatchSize, rollUsage, withSession, type RepoGroup,
+  chunk, epicRefsOf, epicsToWatch, gatherRefs, groupByRepo, needsFetch, needsResolution, PHASE_A_BATCH, PHASE_A_COST,
+  phaseBBatchSize, pinnedRefs, rollUsage, withSession, type RepoGroup,
 } from './refresh-plan.js';
 import { pruneSessions, readLiveSessions, readSession, type SessionState } from './registry.js';
 import { unfetchedEpics, unresolvedRefs } from './resolve.js';
@@ -53,9 +53,11 @@ function toResolve(run: Run, refs: readonly IssueRef[]): readonly IssueRef[] {
   return run.paced ? unresolvedRefs(refs, run.snapshot) : needsResolution(run.snapshot, refs, run.now);
 }
 
+// A pinned issue that may be an epic itself is asked about like any cached
+// data: it waits its turn, since the pin shows its parent's epic meanwhile.
 function toFetch(run: Run, refs: readonly IssueRef[]): readonly IssueRef[] {
-  const epics = epicRefsOf(run.snapshot, refs);
-  return run.paced ? unfetchedEpics(epics, run.snapshot) : needsFetch(run.snapshot, epics, run.now);
+  if (run.paced) return unfetchedEpics(epicRefsOf(run.snapshot, refs), run.snapshot);
+  return needsFetch(run.snapshot, epicsToWatch(run.snapshot, refs, run.pinned ?? []), run.now);
 }
 
 async function runPhaseA(run: Run, refs: readonly IssueRef[], ctx: Context): Promise<Run> {
@@ -87,8 +89,9 @@ async function runPhaseB(run: Run, refs: readonly IssueRef[], ctx: Context): Pro
   return current;
 }
 
-function pendingRefs(snapshot: Snapshot, refs: readonly IssueRef[], now: number): readonly IssueRef[] {
-  return [...needsResolution(snapshot, refs, now), ...needsFetch(snapshot, epicRefsOf(snapshot, refs), now)];
+function pendingRefs(run: Run, refs: readonly IssueRef[]): readonly IssueRef[] {
+  const { snapshot, now } = run;
+  return [...needsResolution(snapshot, refs, now), ...needsFetch(snapshot, epicsToWatch(snapshot, refs, run.pinned ?? []), now)];
 }
 
 // Tokens are looked up only for hosts with work to do and only when even the
@@ -99,7 +102,7 @@ function pendingRefs(snapshot: Snapshot, refs: readonly IssueRef[], now: number)
 async function tokensFor(run: Run, refs: readonly IssueRef[], options: RefreshOptions): Promise<ReadonlyMap<string, string>> {
   if (overBudget(run, PHASE_A_COST)) return new Map();
   const given = new Map(Object.entries(options.tokens ?? {}));
-  const hosts = [...new Set(pendingRefs(run.snapshot, refs, run.now).map((ref) => ref.host))];
+  const hosts = [...new Set(pendingRefs(run, refs).map((ref) => ref.host))];
   const found = await Promise.all(hosts.map(async (host) => [host, given.get(host) ?? (await resolveToken(host, options.env))?.token] as const));
   return new Map(found.flatMap(([host, token]) => (token === undefined ? [] : [[host, token] as const])));
 }
@@ -123,7 +126,7 @@ function startRun(before: SnapshotRead, now: number, usage: UsageView): Run {
 // Work is due, and all of it is cached data that has to wait its turn.
 function waitsItsTurn(run: Run, refs: readonly IssueRef[]): boolean {
   if (!run.paced || toResolve(run, refs).length > 0 || toFetch(run, refs).length > 0) return false;
-  return pendingRefs(run.snapshot, refs, run.now).length > 0;
+  return pendingRefs(run, refs).length > 0;
 }
 
 // The session whose status line started this refresh, read whether or not it
@@ -156,7 +159,7 @@ async function refreshLocked(options: RefreshOptions, lock: Lock): Promise<Refre
     readLiveSessions(paths, now), readPins(paths), readSnapshot(paths.snapshotFile), openUsage(options), ownSession(paths, options.env),
   ]);
   const refs = withSession(gatherRefs(sessions, pinsOf(pins), now), own, now);
-  const start = startRun(before, now, usage);
+  const start = { ...startRun(before, now, usage), pinned: pinnedRefs(own ? [...sessions, own] : sessions, pinsOf(pins), now) };
   if (waitsItsTurn(start, refs)) return { status: 'done', requests: 0, points: 0, error: 'budget' };
   const started = performance.now();
   const clock = () => now + Math.round(performance.now() - started);

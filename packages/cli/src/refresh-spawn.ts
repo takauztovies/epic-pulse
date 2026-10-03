@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import {
-  emptySnapshot, epicRefsOf, gatherRefs, homeDirectory, needsFetch, needsResolution, REFRESH_SESSION_ENV, withSession,
+  emptySnapshot, epicsToWatch, gatherRefs, homeDirectory, needsFetch, needsResolution, pinnedRefs, REFRESH_SESSION_ENV, withSession,
   type Pin, type SessionState, type SnapshotRead,
 } from '@epic-pulse/core';
 import { retryingLater, type RefreshAttempt } from './refresh-attempt.js';
@@ -20,7 +20,8 @@ export interface DueInput {
 // Due exactly when the refresher would ask GitHub something about this
 // session's issues, live or not, or the repository's pins: an issue not
 // resolved yet, a resolution past its 30-minute cache or an epic past its
-// 2-minute one. A missing or corrupt snapshot caches nothing, so every ref is
+// 2-minute one, a pinned issue not yet asked about as an epic of its own. A
+// missing or corrupt snapshot caches nothing, so every ref is
 // due. A session the hook never wrote for shows "hook inactive" and asks for
 // nothing. For a minute after a refresh that failed nothing is due: what it
 // lacked, a token or budget, is no likelier to be there on the next render.
@@ -29,7 +30,8 @@ export function refreshDue(input: DueInput): boolean {
   const refs = withSession(gatherRefs([], input.pins, input.now), input.session, input.now);
   const snapshot = input.snapshot.status === 'ok' ? input.snapshot.snapshot : emptySnapshot(input.now);
   if (needsResolution(snapshot, refs, input.now).length > 0) return true;
-  return needsFetch(snapshot, epicRefsOf(snapshot, refs), input.now).length > 0;
+  const pinned = pinnedRefs([input.session], input.pins, input.now);
+  return needsFetch(snapshot, epicsToWatch(snapshot, refs, pinned), input.now).length > 0;
 }
 
 function isDirectory(path: string): boolean {

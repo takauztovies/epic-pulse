@@ -2,12 +2,12 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { refKey } from '../src/ref.js';
 import {
-  backingOff, BUDGET_WINDOW_MS, EPIC_TTL_MS, epicRefsOf, gatherRefs, groupByRepo, needsFetch, needsResolution,
-  phaseBBatchSize, phaseBCost, RESOLUTION_TTL_MS, rollUsage,
+  backingOff, BUDGET_WINDOW_MS, EPIC_TTL_MS, epicRefsOf, epicsToWatch, gatherRefs, groupByRepo, needsFetch, needsResolution,
+  phaseBBatchSize, phaseBCost, pinnedRefs, probeTargets, RESOLUTION_TTL_MS, rollUsage,
 } from '../src/refresh-plan.js';
 import { foldSession } from '../src/registry.js';
 import { RegistryLineSchema } from '../src/schemas/registry.js';
-import { demo, demoSnapshot } from './snapshot-helpers.js';
+import { demo, demoSnapshot, subEpicSnapshot } from './snapshot-helpers.js';
 
 const T0 = 1_800_000_000_000;
 const session = (id: string, lines: readonly unknown[]) => foldSession(id, lines.map((l) => RegistryLineSchema.parse(l)))!;
@@ -54,4 +54,37 @@ test('below 1000 remaining points the refresher backs off until GitHub resets', 
   assert.equal(backingOff({ remaining: 999, resetAt: T0 + 1 }, T0), true);
   assert.equal(backingOff({ remaining: 999, resetAt: T0 }, T0), false);
   assert.equal(backingOff({ remaining: 1000, resetAt: T0 + 1 }, T0), false);
+});
+
+const numbers = (refs: readonly { readonly number: number }[]) => refs.map((ref) => ref.number);
+
+test('the pinned issues are the sessions\' pins, which never lapse, and the repository\'s pins, once each', () => {
+  const lines = [{ v: 1, ts: T0, ev: 'tool', binds: [{ ref: demo(4), via: 'pin' }, { ref: demo(5), via: 'gh' }] }];
+  const pinning = session('0f8e7c1a-2b3d-4e5f-8a9b-0c1d2e3f4a5b', lines);
+  const pins = [{ ref: demo(8), addedAt: T0 }, { ref: demo(4), addedAt: T0 }];
+  assert.deepEqual(numbers(pinnedRefs([pinning], pins, T0 + 10)), [4, 8]);
+  assert.deepEqual(numbers(pinnedRefs([pinning], [], T0 + 7 * 3_600_000)), [4]);
+  assert.deepEqual(pinnedRefs([], [], T0), []);
+});
+
+// An issue with a parent resolves to the parent, and a pin names the issue
+// itself, so the refresher has to ask whether it is an epic: once, and again
+// only when its resolution is asked again.
+test('a pinned issue with a parent is asked about as an epic of its own, until it has been found not to be one', () => {
+  const snapshot = demoSnapshot(T0);
+  const pinned = [demo(4), demo(1), demo(8), demo(6)];
+  assert.deepEqual(numbers(probeTargets(snapshot, pinned)), [4]);
+  const flagged = (isEpic: boolean) => ({ ...snapshot, issues: { ...snapshot.issues, [refKey(demo(4))]: { ...snapshot.issues[refKey(demo(4))]!, isEpic } } });
+  assert.deepEqual(probeTargets(flagged(false), pinned), []);
+  assert.deepEqual(numbers(probeTargets(flagged(true), pinned)), [4]);
+  const refused = { ...snapshot, issues: { ...snapshot.issues, [refKey(demo(4))]: { epic: null, resolvedAt: T0, error: 'forbidden' as const } } };
+  assert.deepEqual(probeTargets(refused, pinned), []);
+  assert.deepEqual(probeTargets(snapshot, [demo(4), demo(4)]).length, 1);
+});
+
+test('the epics to watch are those the refs resolved to, then the pinned issues that may be epics themselves, once each', () => {
+  const snapshot = subEpicSnapshot(T0);
+  assert.deepEqual(numbers(epicsToWatch(snapshot, [demo(4), demo(8)], [demo(4)])), [1, 8, 4]);
+  assert.deepEqual(numbers(epicsToWatch(snapshot, [demo(4)], [])), [1]);
+  assert.deepEqual(numbers(epicsToWatch(snapshot, [demo(1)], [demo(4), demo(1)])), [1, 4]);
 });

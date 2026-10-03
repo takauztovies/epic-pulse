@@ -28,6 +28,8 @@ The first release.
   `CLAUDE_CONFIG_DIR`.
 - Statuses derived from GitHub: todo, in progress, in review, done and dropped. Progress is
   done / (total − dropped). Epics made of a task list count their boxes.
+- A pin on an issue that is itself an epic (sub-issues or a task list) shows that issue's own
+  progress, not its parent's, whether it was pinned to a session or to the repository.
 - One shared refresher per repository with a 300-points-an-hour budget across every repository on the
   machine, and backing off when GitHub rate-limits.
 - A VS Code extension, Epic Pulse, on the Visual Studio Marketplace and Open VSX, with its own icon.

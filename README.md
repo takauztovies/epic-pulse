@@ -96,7 +96,10 @@ after its last hook call; its own status line keeps its issues current after tha
 session, pins the issue for every session of the repository instead, in `pins.json`.
 
 An issue's epic is its parent issue. An issue without a parent is an epic itself when it has
-sub-issues or, failing that, a task list.
+sub-issues or, failing that, a task list. A pin names its issue, so a pinned issue that is itself an
+epic (it has sub-issues, or a task list) shows its own progress even when it has a parent; any other
+pinned issue shows its parent's epic, as work on it does. The refresher asks GitHub about it once
+(3 points) and again only after the 30-minute cache of its resolution.
 
 ## What it costs a session
 

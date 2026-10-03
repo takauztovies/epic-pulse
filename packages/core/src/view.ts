@@ -45,12 +45,24 @@ function scopeRefs(input: ViewInput, live: readonly SessionState[]): readonly Is
   return [...new Map([...own, ...pinned].map((ref) => [refKey(ref), ref] as const)).values()];
 }
 
-function epicEntries(refs: readonly IssueRef[], snapshot: Snapshot | undefined): readonly EpicEntry[] {
-  const entries = refs.flatMap((ref) => {
-    const epic = snapshot?.issues[refKey(ref)]?.epic;
-    const entry = epic ? snapshot?.epics[refKey(epic)] : undefined;
-    return entry ? [entry] : [];
-  });
+// What a session or the repository pinned on purpose, by key.
+function pinnedKeys(input: ViewInput, live: readonly SessionState[]): ReadonlySet<string> {
+  const bound = ownBindings(input, live).filter((binding) => binding.via === 'pin').map((binding) => binding.ref);
+  return new Set([...bound, ...input.pins.map((pin) => pin.ref)].map(refKey));
+}
+
+// An issue belongs to the epic it resolved to, its parent when it has one. A
+// pin names its issue, so one that is an epic itself shows as that, whatever its
+// parent: an entry exists only for a real epic.
+function entryFor(ref: IssueRef, snapshot: Snapshot | undefined, pinned: ReadonlySet<string>): EpicEntry | undefined {
+  const own = pinned.has(refKey(ref)) ? snapshot?.epics[refKey(ref)] : undefined;
+  if (own) return own;
+  const epic = snapshot?.issues[refKey(ref)]?.epic;
+  return epic ? snapshot?.epics[refKey(epic)] : undefined;
+}
+
+function epicEntries(refs: readonly IssueRef[], snapshot: Snapshot | undefined, pinned: ReadonlySet<string>): readonly EpicEntry[] {
+  const entries = refs.flatMap((ref) => entryFor(ref, snapshot, pinned) ?? []);
   return [...new Map(entries.map((entry) => [refKey(entry.ref), entry] as const)).values()];
 }
 
@@ -120,7 +132,7 @@ export function buildView(input: ViewInput): JsonV1 {
   const snapshot = input.snapshot.status === 'ok' ? input.snapshot.snapshot : undefined;
   const live = input.sessions.filter((session) => isLive(session, input.now));
   const refs = scopeRefs(input, live);
-  const entries = epicEntries(refs, snapshot);
+  const entries = epicEntries(refs, snapshot, pinnedKeys(input, live));
   const bound = live.map((session) => new Set(activeBindings(session, input.now).map((binding) => refKey(binding.ref))));
   const scoped = { input, refs, entries, snapshot };
   return {
