@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { resolve, type PlatformPath } from 'node:path';
 import { promisify } from 'node:util';
 
 const run = promisify(execFile);
@@ -13,14 +14,17 @@ export interface PorcelainWorktree {
 
 // `git worktree list --porcelain`: blocks separated by a blank line, the first
 // block being the main worktree. Keys: worktree, HEAD, branch, detached, bare,
-// locked, prunable.
-export function parseWorktreePorcelain(text: string): readonly PorcelainWorktree[] {
+// locked, prunable. Git for Windows writes C:/Users/x/repo where every other
+// path here, findWorktree's included, is C:\Users\x\repo, so each path is
+// resolved the way the platform spells it. `paths` is only there for a test to
+// read the Windows output on another platform.
+export function parseWorktreePorcelain(text: string, paths: Pick<PlatformPath, 'resolve'> = { resolve }): readonly PorcelainWorktree[] {
   return text
     .split(/\r?\n\r?\n/)
     .map((block) => block.split(/\r?\n/).filter(Boolean))
     .filter((lines) => lines.some((line) => line.startsWith('worktree ')))
     .map((lines, index) => ({
-      path: lines.find((l) => l.startsWith('worktree '))!.slice('worktree '.length),
+      path: paths.resolve(lines.find((l) => l.startsWith('worktree '))!.slice('worktree '.length)),
       branch: /^branch refs\/heads\/(.+)$/.exec(lines.find((l) => l.startsWith('branch ')) ?? '')?.[1],
       detached: lines.includes('detached'),
       bare: lines.includes('bare'),

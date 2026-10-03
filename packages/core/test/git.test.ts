@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, posix, win32 } from 'node:path';
 import { test } from 'node:test';
 import { findWorktree, parseRemoteUrl, readBranch, readRemote } from '../src/git.js';
 import { listWorktrees, parseWorktreePorcelain } from '../src/git-cli.js';
@@ -81,11 +81,18 @@ test('remote URLs that are not a hosted owner/repo are rejected', () => {
 
 test('the porcelain parser reads path, branch, detached and the main flag', () => {
   const text = 'worktree /r/main\nHEAD abc\nbranch refs/heads/main\n\nworktree /r/wt\nHEAD def\ndetached\n\nworktree /r/bare\nbare\n';
-  assert.deepEqual(parseWorktreePorcelain(text), [
+  assert.deepEqual(parseWorktreePorcelain(text, posix), [
     { path: '/r/main', branch: 'main', detached: false, bare: false, isMain: true },
     { path: '/r/wt', branch: undefined, detached: true, bare: false, isMain: false },
     { path: '/r/bare', branch: undefined, detached: false, bare: true, isMain: false },
   ]);
+});
+
+// Git for Windows prints C:/Users/x/repo; Node, and so findWorktree, says
+// C:\Users\x\repo. Read with the Windows rules wherever the test runs.
+test('the porcelain parser spells a Windows path as Node does, where git writes forward slashes', () => {
+  const text = 'worktree C:/Users/dev/repo/main\nHEAD abc\nbranch refs/heads/main\n\nworktree C:/Users/dev/repo/wt\nHEAD def\ndetached\n';
+  assert.deepEqual(parseWorktreePorcelain(text, win32).map((entry) => entry.path), ['C:\\Users\\dev\\repo\\main', 'C:\\Users\\dev\\repo\\wt']);
 });
 
 test('file-based discovery agrees with `git worktree list` for every worktree', async (t) => {
