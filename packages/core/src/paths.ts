@@ -1,5 +1,6 @@
 import { homedir } from 'node:os';
 import { join, posix, resolve, win32 } from 'node:path';
+import { canonicalPath } from './canonical-path.js';
 import { findWorktree } from './git.js';
 
 export const REGISTRY_DIR_NAME = 'epic-pulse';
@@ -25,10 +26,12 @@ export function pathsFor(dir: string): RegistryPaths {
 
 // The registry lives inside `.git`, so it is shared by every worktree of a
 // repository and never shows up in `git status`. EPIC_PULSE_DIR overrides that
-// for tests and for people who want the data elsewhere.
+// for tests and for people who want the data elsewhere. The directory is named
+// in its canonical spelling, so that every way of reaching one repository leads
+// to one registry rather than one per spelling.
 export async function registryDirFor(cwd: string, env: NodeJS.ProcessEnv): Promise<string | undefined> {
   const override = env['EPIC_PULSE_DIR'];
-  if (override) return resolve(override);
+  if (override) return canonicalPath(override);
   const worktree = await findWorktree(cwd);
   return worktree ? join(worktree.commonDir, REGISTRY_DIR_NAME) : undefined;
 }

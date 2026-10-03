@@ -7,7 +7,7 @@ import { refKey } from '../src/ref.js';
 import { appendRegistryLine, readSession } from '../src/registry.js';
 import type { HookPayload } from '../src/schemas/hook.js';
 import { bash, fileTool, quoted, SESSION, signals, widgetsRepo, writeConfig } from './extract-helpers.js';
-import { addWorktree, git, makeRepo, tempDir } from './repo-helpers.js';
+import { addWorktree, git, linkTo, makeRepo, tempDir } from './repo-helpers.js';
 
 const W12 = 'branch:github.com/acme/widgets#12';
 
@@ -43,6 +43,17 @@ test('ignorePaths from the worktree config skip matching files only', async (t) 
   assert.deepEqual(await signals(fileTool('Write', join(wt, 'docs', 'a.md'))), []);
   assert.deepEqual(await signals(fileTool('Write', join(wt, 'docs-site', 'a.md'))), [W12]);
   assert.deepEqual(await signals(fileTool('Write', join(wt, 'src', 'a.ts'))), [W12]);
+});
+
+// The worktree root is compared with the path the tool named, so it keeps the
+// spelling it was asked for: a root made canonical on its own would match no
+// path that goes through a link, and every ignored file would bind again.
+test('ignorePaths still skip a file whose path goes through a link to the worktree', async (t) => {
+  const { wt } = widgetsRepo(t);
+  writeConfig(wt, { ignorePaths: ['docs/'] });
+  const link = linkTo(t, wt);
+  assert.deepEqual(await signals(fileTool('Write', join(link, 'docs', 'a.md'))), []);
+  assert.deepEqual(await signals(fileTool('Write', join(link, 'src', 'a.ts'))), [W12]);
 });
 
 test('the worktree config can replace the branch pattern', async (t) => {

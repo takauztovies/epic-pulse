@@ -14,8 +14,11 @@ export const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 export const SESSION = '0f8e7c1a-2b3d-4e5f-8a9b-0c1d2e3f4a5b';
 export const DEMO_REMOTE = 'https://github.com/takauztovies/epic-pulse.git';
 
+// The canonical spelling, the one the product reduces every path to: `native`
+// expands the 8.3 short names (C:\Users\RUNNER~1) that os.tmpdir() hands out
+// on a Windows runner and git never writes, which the JS realpath leaves alone.
 export function tempDir(t: TestContext, prefix = 'ep-cli-'): string {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), prefix)));
+  const dir = realpathSync.native(mkdtempSync(join(tmpdir(), prefix)));
   t.after(() => rmSync(dir, { recursive: true, force: true, maxRetries: 5 }));
   return dir;
 }

@@ -21,8 +21,11 @@ const RecordingSchema = z.object({ status: z.number(), remaining: z.number().nul
 export const SESSION_A = '0f8e7c1a-2b3d-4e5f-8a9b-0c1d2e3f4a5b';
 export const SESSION_B = '1a2b3c4d-5e6f-4a1b-9c2d-3e4f5a6b7c8d';
 
+// The canonical spelling, the one the product reduces every path to: `native`
+// expands the 8.3 short names (C:\Users\RUNNER~1) that os.tmpdir() hands out
+// on a Windows runner and git never writes, which the JS realpath leaves alone.
 export function tempDir(t: TestContext, prefix = 'ep-vscode-'): string {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), prefix)));
+  const dir = realpathSync.native(mkdtempSync(join(tmpdir(), prefix)));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   return dir;
 }

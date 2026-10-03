@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test, type TestContext } from 'node:test';
@@ -47,6 +47,16 @@ test('the folders of one repository, its worktrees included, lead to one registr
   mkdirSync(nested);
   const repos = await discoverRepos([worktree, root, nested], {});
   assert.deepEqual(repos, [{ dir: join(root, '.git', 'epic-pulse'), label: 'app-feature' }]);
+});
+
+// A folder reached through a link (on a Windows runner the short 8.3 spelling of
+// the temp dir, on macOS /var for /private/var) is the same repository: its
+// registry is listed once, not once per spelling.
+test('a folder reached through a link is the same repository, listed once under the first name', async (t) => {
+  const root = makeRepo(t, 'app');
+  const shortcut = join(tempDir(t), 'shortcut');
+  symlinkSync(root, shortcut, 'junction');
+  assert.deepEqual(await discoverRepos([shortcut, root], {}), [{ dir: join(root, '.git', 'epic-pulse'), label: 'shortcut' }]);
 });
 
 test('separate repositories each get their registry, in folder order, and folders outside git none', async (t) => {

@@ -1,7 +1,12 @@
 import { lstat, readFile, stat } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
+import { canonicalPath } from './canonical-path.js';
 import { RepoRefSchema, type RepoRef } from './schemas/common.js';
 
+// `gitDir` and `commonDir` are canonical (see canonicalPath): they are what
+// tells one repository from another, whichever way it was reached. `root` stays
+// as it was asked for, because callers compare it with the paths they hold
+// (isIgnoredPath), and a root spelled differently from those would match none.
 export interface WorktreeInfo {
   readonly root: string;
   readonly gitDir: string;
@@ -22,10 +27,10 @@ async function readSmall(path: string): Promise<string | undefined> {
 
 // A worktree's private git dir points at the shared one through `commondir`.
 // Without that file (a normal checkout, a submodule) the git dir is its own
-// common dir.
+// common dir. `gitDir` is canonical already, and so is what comes back.
 async function commonDirOf(gitDir: string): Promise<string> {
   const pointer = (await readSmall(join(gitDir, 'commondir')))?.trim();
-  return pointer ? resolve(gitDir, pointer) : gitDir;
+  return pointer ? canonicalPath(resolve(gitDir, pointer)) : gitDir;
 }
 
 async function inspect(dir: string): Promise<WorktreeInfo | undefined> {
@@ -38,8 +43,9 @@ async function inspect(dir: string): Promise<WorktreeInfo | undefined> {
     if (!target) return undefined;
     gitDir = resolve(dir, target);
   }
-  const commonDir = await commonDirOf(gitDir);
-  return { root: dir, gitDir, commonDir, isMain: resolve(gitDir) === resolve(commonDir) };
+  const canonicalGitDir = await canonicalPath(gitDir);
+  const commonDir = await commonDirOf(canonicalGitDir);
+  return { root: dir, gitDir: canonicalGitDir, commonDir, isMain: canonicalGitDir === commonDir };
 }
 
 // The directory to start the upward search from: the path itself when it is a

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { TestContext } from 'node:test';
@@ -26,10 +26,22 @@ function gitEnv(): NodeJS.ProcessEnv {
   return { ...clean, HOME: tmpdir(), XDG_CONFIG_HOME: tmpdir(), GIT_CONFIG_GLOBAL: GIT_CONFIG, GIT_CONFIG_NOSYSTEM: '1' };
 }
 
+// The canonical spelling, the one the product reduces every path to: `native`
+// expands the 8.3 short names (C:\Users\RUNNER~1) that os.tmpdir() hands out
+// on a Windows runner and git never writes, which the JS realpath leaves alone.
 export function tempDir(t: TestContext, prefix = 'ep-'): string {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), prefix)));
+  const dir = realpathSync.native(mkdtempSync(join(tmpdir(), prefix)));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   return dir;
+}
+
+// A second spelling of a directory: a symlink, or on Windows a junction, which
+// needs no privilege. os.tmpdir() is one on macOS (/var is /private/var), and
+// so is a project folder reached through a link.
+export function linkTo(t: TestContext, target: string): string {
+  const link = join(tempDir(t, 'ep-link-'), 'alias');
+  symlinkSync(target, link, 'junction');
+  return link;
 }
 
 export function git(cwd: string, args: readonly string[]): string {

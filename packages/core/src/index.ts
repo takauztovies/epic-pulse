@@ -1,5 +1,6 @@
 export * from './atomic.js';
 export * from './branch-pattern.js';
+export * from './canonical-path.js';
 export * from './checklist.js';
 export * from './config.js';
 export * from './extract.js';
