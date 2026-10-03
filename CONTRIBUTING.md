@@ -61,9 +61,10 @@ refuses to write anything shaped like a token. Review the diff before you commit
 
 ## plugin/dist is release-owned
 
-Claude Code runs the plugin's `plugin/dist/epic-pulse.mjs` straight from `main`, so only a release
-branch may change it, and CI fails any other pull request that does. Once a release has committed
-it, every local build rewrites the tracked copy; leave that change out of your commits
+Claude Code runs the plugin's `plugin/dist/epic-pulse.mjs` as the release tag holds it (the marketplace
+installs the plugin from the tag `v<version>`, never from `main`), and a tag is cut from `main`, so only
+a release branch may change it, and CI fails any other pull request that does. Once a release has
+committed it, every local build rewrites the tracked copy; leave that change out of your commits
 (`git restore plugin/dist`).
 
 ## Releasing
@@ -74,14 +75,17 @@ Maintainers cut a release in four steps:
    version, and merge that to `main`.
 2. On an up-to-date `main`, run `node scripts/release.mjs <major.minor.patch>`. It sets every
    manifest to the version (the npm package, the plugin manifest, its marketplace entry and the VS Code
-   extension), rebuilds, commits the manifests and `plugin/dist` on `release/v<version>`, and prints
-   the commands that follow. It pushes and tags nothing.
+   extension), points the marketplace entry's plugin source at the tag `v<version>`, rebuilds, commits
+   the manifests and `plugin/dist` on `release/v<version>`, and prints the commands that follow. It
+   pushes and tags nothing.
 3. Push that branch and open a pull request into `main`. CI checks that the committed bundle is the one
-   its sources build. Merging it ships the plugin at once: plugin users get `main`'s `plugin/dist`.
+   its sources build. Merging it ships nothing yet, and until step 4 the marketplace on `main` names a
+   tag that does not exist, so a new plugin install fails: do step 4 straight away.
 4. Tag the merge commit and push the tag: `git tag -a v<version> -m v<version> && git push origin
-   v<version>`. The **Release** workflow checks the tag against every manifest and that the tag is on
-   `main`, runs the gates, packs the npm package and the extension, and then waits for a maintainer to
-   approve the `release` environment. After approval it publishes to npm, the VS Code Marketplace,
+   v<version>`. From then on plugin users get that tag's `plugin/dist`. The **Release** workflow checks
+   the tag against every manifest, against the tag the marketplace installs the plugin from, and that
+   the tag is on `main`, runs the gates, packs the npm package and the extension, and then waits for a
+   maintainer to approve the `release` environment. After approval it publishes to npm, the VS Code Marketplace,
    Open VSX and a GitHub Release, with provenance for each artifact.
 
 The workflow needs these, set as secrets of the `release` environment:

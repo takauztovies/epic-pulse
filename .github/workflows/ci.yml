@@ -66,9 +66,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
 
-      # plugin/dist is what every plugin user runs as soon as it reaches main,
-      # release or not, so only a release branch of this repository may change
-      # it, and a release branch must commit exactly what its sources build.
+      # plugin/dist is what every plugin user runs once a release tag holds it,
+      # and a tag is cut from main, so only a release branch of this repository
+      # may change it, and a release branch must commit exactly what its sources
+      # build.
       # The script, and its test, hold both rules; it runs after the build,
       # which the release check compares against.
       - name: plugin/dist changes only on a release branch, as its sources build it

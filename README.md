@@ -27,7 +27,8 @@ There are three channels. They share one program and the same data, so use any o
 
 The plugin's hooks run `node`, so Node 22 or newer must be on the `PATH` Claude Code sees. It also
 puts the `epic-pulse` command on the Bash tool's `PATH` inside sessions, and adds the
-`/epic-pulse:track` skill.
+`/epic-pulse:track` skill. The marketplace installs the plugin from the latest release tag, not from
+`main`, so an update reaches you only with a release.
 
 **npm.** The same bundle as a command for every terminal:
 

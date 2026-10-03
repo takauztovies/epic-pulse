@@ -22,7 +22,9 @@ function literal(text: string): string {
   return text.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
 }
 
-test('a release bumps only the version of every manifest and commits them with the rebuilt plugin bundle', (t) => {
+// Besides the version, the marketplace entry names the tag the plugin is
+// installed from; that moves with it, and nothing else does.
+test('a release bumps only the version of every manifest, and the tag the marketplace installs from, and commits them with the rebuilt plugin bundle', (t) => {
   const repo = releaseRepo(t);
   const next = nextMinor(repo);
   const before = new Map(manifestsIn(repo).map((path) => [path, readFileSync(join(repo, path), 'utf8')]));
@@ -33,7 +35,8 @@ test('a release bumps only the version of every manifest and commits them with t
   const committed = git(repo, ['show', '--name-only', '--format=', 'HEAD']).split('\n').filter(Boolean).sort();
   assert.deepEqual(committed, [...before.keys(), PLUGIN_BUNDLE, PLUGIN_NOTICES].sort());
   for (const [path, text] of before) {
-    assert.equal(readFileSync(join(repo, path), 'utf8'), text.replace(/"version": "[^"]*"/, `"version": "${next}"`), path);
+    const bumped = text.replace(/"version": "[^"]*"/, `"version": "${next}"`).replace(/"ref": "[^"]*"/, `"ref": "v${next}"`);
+    assert.equal(readFileSync(join(repo, path), 'utf8'), bumped, path);
   }
   assert.equal(blob(repo, `HEAD:${PLUGIN_BUNDLE}`), fileBlob(repo, 'packages/cli/dist/epic-pulse.mjs'));
   assert.equal(git(repo, ['status', '--porcelain', '--untracked-files=all']), '');
@@ -49,6 +52,28 @@ test('--check passes only while every manifest carries the version, with or with
   const plugin = join(repo, 'plugin', '.claude-plugin', 'plugin.json');
   writeFileSync(plugin, readFileSync(plugin, 'utf8').replace(`"version": "${current}"`, '"version": "9.9.9"'));
   assertRefused(release(repo, ['--check', current]), 1, /^epic-pulse: plugin\/\.claude-plugin\/plugin\.json says 9\.9\.9, not /);
+});
+
+// release.yml runs --check against the tag it was started by. A marketplace
+// that installs the plugin from any other tag, or from none (which Claude Code
+// reads as main), would ship what the tag does not hold.
+test('--check refuses a marketplace that installs the plugin from any tag but this one, or from none', (t) => {
+  const repo = releaseRepo(t);
+  const current = cliVersion(repo);
+  const marketplace = join(repo, '.claude-plugin', 'marketplace.json');
+  const original = readFileSync(marketplace, 'utf8');
+  const variants: readonly (readonly [string, RegExp])[] = [
+    [original.replace(`"ref": "v${current}"`, '"ref": "main"'), new RegExp(`^epic-pulse: \\.claude-plugin/marketplace\\.json installs the plugin from main, not from v${literal(current)}`)],
+    [original.replace(`"ref": "v${current}"`, `"ref": "${current}"`), new RegExp(`installs the plugin from ${literal(current)}, not from v${literal(current)}`)],
+    [original.replace(`"ref": "v${current}"`, `"reff": "v${current}"`), /\.claude-plugin\/marketplace\.json pins no tag, so it installs the plugin from main/],
+  ];
+  for (const [text, reason] of variants) {
+    assert.notEqual(text, original, 'the edit did not apply, so this would test the untouched file');
+    writeFileSync(marketplace, text);
+    assertRefused(release(repo, ['--check', current]), 1, reason);
+  }
+  writeFileSync(marketplace, original);
+  assert.equal(release(repo, ['--check', current]).status, 0);
 });
 
 test('anything but a plain major.minor.patch is a usage error that changes nothing', (t) => {
@@ -91,7 +116,7 @@ test('uncommitted work, an existing branch or tag, or a branch other than main i
 
 // A hand-edited manifest can grow a second "version" or rename the plugin
 // entry; the script refuses rather than bump the wrong field.
-test('a manifest with a second version field, or none where its version is read, is refused before anything changes', (t) => {
+test('a manifest with a second version or ref field, or none where it is read, is refused before anything changes', (t) => {
   const repo = releaseRepo(t);
   const marketplace = join(repo, '.claude-plugin', 'marketplace.json');
   const original = readFileSync(marketplace, 'utf8');
@@ -100,6 +125,9 @@ test('a manifest with a second version field, or none where its version is read,
   const variants: readonly (readonly [string, RegExp])[] = [
     [original.replace('"metadata": {', `"metadata": {${eol}    "version": "1.0.0",`), /marketplace\.json has 2 "version" fields, expected exactly one/],
     [original.replace(`"name": "epic-pulse",${eol}      "source"`, `"name": "renamed",${eol}      "source"`), /marketplace\.json: the "version" field is not where its version is read/],
+    [original.replace('"path": "plugin",', '"path": "plugin", "ref": "main",'), /marketplace\.json has 2 "ref" fields, expected exactly one/],
+    [original.replace(/"ref": "[^"]*"/, '"reff": "x"').replace('"metadata": {', '"metadata": { "ref": "x",'), /marketplace\.json: the "ref" field is not where its tag is read/],
+    [original.replace(/"source": \{[^}]*\}/, '"source": "./plugin"'), /marketplace\.json has 0 "ref" fields, expected exactly one/],
   ];
   for (const [text, reason] of variants) {
     assert.notEqual(text, original, 'the edit did not apply, so this would test the untouched file');

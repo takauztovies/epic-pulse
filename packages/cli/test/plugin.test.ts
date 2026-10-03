@@ -14,7 +14,10 @@ const NO_SH = process.platform === 'win32' && 'needs a POSIX sh; Windows is chec
 const HookSchema = z.object({ type: z.literal('command'), command: z.string(), async: z.boolean().optional(), timeout: z.number() });
 const HooksFileSchema = z.object({ hooks: z.record(z.string(), z.array(z.object({ matcher: z.string().optional(), hooks: z.array(HookSchema) }))) });
 const NamedSchema = z.object({ name: z.string(), version: z.string() });
-const MarketplaceSchema = z.object({ name: z.string(), plugins: z.array(NamedSchema.extend({ source: z.string() })) });
+// Strict: `claude plugin validate` lets a misspelt key through here (a `reff`
+// passes), and a plugin source without its `ref` installs from main.
+const SourceSchema = z.strictObject({ source: z.literal('git-subdir'), url: z.string(), path: z.string(), ref: z.string() });
+const MarketplaceSchema = z.object({ name: z.string(), plugins: z.array(NamedSchema.extend({ source: SourceSchema })) });
 
 const json = (path: string): unknown => JSON.parse(readFileSync(join(ROOT, path), 'utf8'));
 const hooks = HooksFileSchema.parse(json('plugin/hooks/hooks.json')).hooks;
@@ -33,14 +36,18 @@ function shellEnv(box: Sandbox): NodeJS.ProcessEnv {
   return { ...cliEnv(box), CLAUDE_PLUGIN_ROOT: PLUGIN };
 }
 
-test('the plugin, its marketplace entry and the npm package agree on name and version', () => {
+// The marketplace installs the plugin from this repository's release tag, not
+// from main: a plugin user gets a release or nothing. scripts/release.mjs moves
+// the tag with the version, and release.yml checks that it did.
+test('the plugin, its marketplace entry and the npm package agree on name and version, and the entry installs the release tag', () => {
   const cli = NamedSchema.parse(json('packages/cli/package.json'));
-  const plugin = NamedSchema.parse(json('plugin/.claude-plugin/plugin.json'));
+  const plugin = NamedSchema.extend({ repository: z.string() }).parse(json('plugin/.claude-plugin/plugin.json'));
   const [entry, ...others] = MarketplaceSchema.parse(json('.claude-plugin/marketplace.json')).plugins;
   assert.ok(entry, 'the marketplace lists no plugin');
   assert.deepEqual([plugin.name, plugin.version, others.length], ['epic-pulse', cli.version, 0]);
-  assert.deepEqual([entry.name, entry.version, entry.source], ['epic-pulse', cli.version, './plugin']);
-  assert.equal(NamedSchema.parse(json(join(entry.source, '.claude-plugin', 'plugin.json'))).name, entry.name);
+  assert.deepEqual([entry.name, entry.version], ['epic-pulse', cli.version]);
+  assert.deepEqual(entry.source, { source: 'git-subdir', url: `${plugin.repository}.git`, path: 'plugin', ref: `v${cli.version}` });
+  assert.equal(NamedSchema.parse(json(join(entry.source.path, '.claude-plugin', 'plugin.json'))).name, entry.name);
 });
 
 test('PostToolUse fires, asynchronously, on the tools that change things and on no others', () => {

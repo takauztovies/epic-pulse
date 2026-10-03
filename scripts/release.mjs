@@ -4,10 +4,11 @@
 //
 //   node scripts/release.mjs 0.2.0            cut release/v0.2.0 from main
 //   node scripts/release.mjs --check v0.2.0   exit 1 unless every manifest says 0.2.0
+//                                             and the marketplace installs v0.2.0
 //
 // plugin/dist is ignored everywhere but on release branches, so it is added
-// with -f: Claude Code clones a GitHub-sourced plugin as it is, and this is
-// the copy it runs. release.yml runs --check against the tag.
+// with -f: Claude Code fetches the plugin's directory from the release tag as
+// it is, and this is the copy it runs. release.yml runs --check against the tag.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -19,13 +20,22 @@ const PLUGIN_DIST = 'plugin/dist';
 // Stable versions only: the VS Code Marketplace refuses a pre-release suffix.
 const VERSION = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 const VERSION_FIELD = /"version"(\s*):(\s*)"[^"]*"/g;
+const REF_FIELD = /"ref"(\s*):(\s*)"[^"]*"/g;
+
+const pluginEntry = (json) => json.plugins?.find((plugin) => plugin.name === 'epic-pulse');
+const tagOf = (version) => `v${version}`;
 
 // Each manifest that carries the version, and where in it the version is.
-// The extension's is there only once packages/vscode exists.
+// The marketplace entry also names the tag the plugin is installed from, the
+// `ref` of its git-subdir source, which is always the release tag: a plugin
+// user gets a release, never main. `claude plugin validate` lets a misspelt key
+// there through, and a source without a `ref` installs from main, so this
+// script is what holds it. The extension's manifest is there only once
+// packages/vscode exists.
 const MANIFESTS = [
   { path: 'packages/cli/package.json', read: (json) => json.version },
   { path: 'plugin/.claude-plugin/plugin.json', read: (json) => json.version },
-  { path: '.claude-plugin/marketplace.json', read: (json) => json.plugins?.find((plugin) => plugin.name === 'epic-pulse')?.version },
+  { path: '.claude-plugin/marketplace.json', read: (json) => pluginEntry(json)?.version, readRef: (json) => pluginEntry(json)?.source?.ref },
   { path: 'packages/vscode/package.json', read: (json) => json.version, optional: true },
 ];
 
@@ -64,15 +74,21 @@ function manifestVersion(manifest) {
   return manifest.read(JSON.parse(readFileSync(join(ROOT, manifest.path), 'utf8')));
 }
 
-// Only the version's value changes, so every file keeps its own layout. The
+// Only the field's value changes, so every file keeps its own layout. The
 // result is read back to prove that the edited field is the one that counts.
+function withField(text, field, value) {
+  const found = text.match(field.pattern) ?? [];
+  if (found.length !== 1) throw new ReleaseError(`${field.path} has ${found.length} "${field.name}" fields, expected exactly one`);
+  const next = text.replace(field.pattern, `"${field.name}"$1:$2"${value}"`);
+  if (field.read(JSON.parse(next)) !== value) throw new ReleaseError(`${field.path}: the "${field.name}" field is not where its ${field.what} is read`);
+  return next;
+}
+
 function bumpedText(manifest, version) {
   const text = readFileSync(join(ROOT, manifest.path), 'utf8');
-  const fields = text.match(VERSION_FIELD) ?? [];
-  if (fields.length !== 1) throw new ReleaseError(`${manifest.path} has ${fields.length} "version" fields, expected exactly one`);
-  const next = text.replace(VERSION_FIELD, `"version"$1:$2"${version}"`);
-  if (manifest.read(JSON.parse(next)) !== version) throw new ReleaseError(`${manifest.path}: the "version" field is not where its version is read`);
-  return next;
+  const bumped = withField(text, { path: manifest.path, name: 'version', what: 'version', pattern: VERSION_FIELD, read: manifest.read }, version);
+  if (!manifest.readRef) return bumped;
+  return withField(bumped, { path: manifest.path, name: 'ref', what: 'tag', pattern: REF_FIELD, read: manifest.readRef }, tagOf(version));
 }
 
 // The tree must hold nothing but what is committed. plugin/dist is the one
@@ -120,10 +136,25 @@ function nextSteps(version, branch) {
   ].join('\n');
 }
 
+function refComplaint(path, ref, tag) {
+  return ref === undefined ? `${path} pins no tag, so it installs the plugin from main` : `${path} installs the plugin from ${ref}, not from ${tag}`;
+}
+
+// What a manifest gets wrong about this version: the version it says and, for
+// the marketplace entry, the tag it installs the plugin from.
+function mismatches(manifest, version) {
+  const json = JSON.parse(readFileSync(join(ROOT, manifest.path), 'utf8'));
+  const [found, ref, tag] = [manifest.read(json), manifest.readRef?.(json), tagOf(version)];
+  return [
+    ...(found === version ? [] : [`${manifest.path} says ${found}, not ${version}`]),
+    ...(manifest.readRef === undefined || ref === tag ? [] : [refComplaint(manifest.path, ref, tag)]),
+  ];
+}
+
 function check(version) {
-  const wrong = presentManifests().filter((manifest) => manifestVersion(manifest) !== version.text);
-  if (wrong.length > 0) throw new ReleaseError(wrong.map((m) => `${m.path} says ${manifestVersion(m)}, not ${version.text}`).join('\n'));
-  return `epic-pulse: every manifest says ${version.text}: ${presentManifests().map((m) => m.path).join(', ')}`;
+  const wrong = presentManifests().flatMap((manifest) => mismatches(manifest, version.text));
+  if (wrong.length > 0) throw new ReleaseError(wrong.join('\n'));
+  return `epic-pulse: every manifest says ${version.text} and the marketplace installs ${tagOf(version.text)}: ${presentManifests().map((m) => m.path).join(', ')}`;
 }
 
 function release(args) {

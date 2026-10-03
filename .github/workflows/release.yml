@@ -39,7 +39,10 @@ jobs:
           package-manager-cache: false
       - run: pnpm install --frozen-lockfile
 
-      - name: the tag is the version of every manifest
+      # --check also holds the marketplace to this tag: a plugin user installs
+      # the plugin from the release tag, so a marketplace that names another
+      # would publish a release whose plugin is not in it.
+      - name: the tag is the version of every manifest and the tag the marketplace installs
         id: version
         env:
           TAG: ${{ github.ref_name }}

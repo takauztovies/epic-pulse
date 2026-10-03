@@ -1,7 +1,7 @@
 // The plugin/dist guard CI runs on every pull request. plugin/dist is what
-// every plugin user runs as soon as it reaches main, release or not, so only a
-// release branch of this repository may change it, and a release branch must
-// commit exactly what its sources build.
+// every plugin user runs once a release tag holds it, and a tag is cut from
+// main, so only a release branch of this repository may change it, and a
+// release branch must commit exactly what its sources build.
 //
 //   BASE_SHA=<base> HEAD_SHA=<head> HEAD_REF=<branch> HEAD_REPO=<owner/repo> \
 //   GITHUB_REPOSITORY=<owner/repo> node scripts/check-dist-guard.mjs
@@ -43,10 +43,10 @@ function distChange(pull) {
   return { ok: false, out: [error, ...changed] };
 }
 
-// Merging a release branch ships its plugin/dist at once, before any tag. So
-// the build may change no file the branch commits, and must write none it
-// leaves out: `git diff` alone misses a built file nobody committed, which
-// plugin/dist being ignored would otherwise hide.
+// Merging a release branch puts its plugin/dist on main, and the tag cut from
+// there ships it. So the build may change no file the branch commits, and must
+// write none it leaves out: `git diff` alone misses a built file nobody
+// committed, which plugin/dist being ignored would otherwise hide.
 function releaseBuild(pull) {
   if (!tracked(BUNDLE)) return { ok: false, out: [`::error::${BUNDLE} is not committed on ${pull.HEAD_REF}.`] };
   const wrong = [...lines(['diff', '--name-only', '--', DIST]), ...lines(['ls-files', '--others', '--', DIST])];

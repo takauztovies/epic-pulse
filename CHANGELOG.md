@@ -11,7 +11,8 @@ The first release.
 
 ### Added
 
-- A Claude Code plugin, listed by this repository's own marketplace. Its hooks record, offline,
+- A Claude Code plugin, listed by this repository's own marketplace, which installs it from the release
+  tag and never from `main`. Its hooks record, offline,
   which issues a session works on: mutating `gh issue` commands, closing keywords in `gh pr create`
   bodies and commit messages, edits in a worktree whose branch name carries an issue number, and
   `epic-pulse track` pins. The hook after each tool call runs asynchronously, so no tool call waits
