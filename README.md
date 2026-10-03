@@ -294,6 +294,11 @@ about it.
   **`rate_limited`**: GitHub asked to slow down; epic-pulse waits five minutes.
 - **`loading…` that does not end**: run `epic-pulse refresh` in the repository to see what a refresh
   reports, and look at `hook errors` in `doctor`.
+- **`epic-pulse refresh` says it is waiting for its turn in the shared hourly budget**: nothing is
+  wrong. To spread the 300 points over the hour, a repository refreshes data it already has again only
+  once its last refresh is paid off at its share of the hour (50 points on its own take 10 minutes).
+  The command prints when that is and exits 0. What nothing has shown yet, a new binding or an epic
+  not fetched, is never made to wait.
 - **`error (forbidden)`** or **`error (not_found)`**: the token can not read that repository's
   issues, or it does not exist. GitHub's answer is kept for 30 minutes, so a fix shows within that.
 - **`runtime: present, a different build`** after an upgrade: start a new session, or run

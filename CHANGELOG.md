@@ -31,7 +31,8 @@ The first release.
 - A pin on an issue that is itself an epic (sub-issues or a task list) shows that issue's own
   progress, not its parent's, whether it was pinned to a session or to the repository.
 - One shared refresher per repository with a 300-points-an-hour budget across every repository on the
-  machine, and backing off when GitHub rate-limits.
+  machine, and backing off when GitHub rate-limits. `epic-pulse refresh` held back only by that
+  pacing says when it can run and exits 0, instead of reporting a budget failure.
 - A VS Code extension, Epic Pulse, on the Visual Studio Marketplace and Open VSX, with its own icon.
   Each VS Code sign-in's token goes only to the host it belongs to.
 - `.epic-pulse.json` with `branchIssuePattern`, `ignorePaths` and `ignoreMainCheckout`.

@@ -28,6 +28,10 @@ export interface RefreshOptions {
 
 export type RefreshOutcome =
   | { readonly status: 'busy' }
+  // Held back only by pacing: nothing is wrong, cached data waits for this
+  // repository's turn in the hour every refresher shares. `until` is when that
+  // is, in milliseconds since the epoch.
+  | { readonly status: 'paced'; readonly until: number }
   | { readonly status: 'done'; readonly requests: number; readonly points: number; readonly error: ErrorCode | null };
 
 // The status line names its own session here when it starts a refresh.
@@ -37,12 +41,12 @@ export const REFRESH_SESSION_ENV = 'EPIC_PULSE_SESSION';
 // a live holder is always fresh; a dead one frees the lock within a minute.
 const LOCK_STALE_MS = 60_000;
 
-// The user's hour as a run starts: the ledger, what it says was spent, and
-// whether this repository still has to wait its turn.
+// The user's hour as a run starts: the ledger, what it says was spent, and how
+// long this repository still has to wait its turn (0: it does not).
 interface UsageView {
   readonly ledger: UsageLedger | undefined;
   readonly spent: number;
-  readonly paced: boolean;
+  readonly waitMs: number;
 }
 
 // A paced run still asks for what nothing has shown yet, a ref never resolved
@@ -111,16 +115,16 @@ async function tokensFor(run: Run, refs: readonly IssueRef[], options: RefreshOp
 // refreshers, so it counts as spent rather than as empty.
 async function openUsage(options: RefreshOptions): Promise<UsageView> {
   const cacheDir = userCacheDir(options.env);
-  if (cacheDir === undefined) return { ledger: undefined, spent: Number.POSITIVE_INFINITY, paced: false };
+  if (cacheDir === undefined) return { ledger: undefined, spent: Number.POSITIVE_INFINITY, waitMs: 0 };
   const ledger = usageLedgerFor(cacheDir, options.dir);
   const lines = await readUsage(ledger.file);
-  return { ledger, spent: spentIn(lines, options.now), paced: pacingDelay(lines, ledger.repo, options.now) > 0 };
+  return { ledger, spent: spentIn(lines, options.now), waitMs: pacingDelay(lines, ledger.repo, options.now) };
 }
 
 function startRun(before: SnapshotRead, now: number, usage: UsageView): Run {
   const snapshot = before.status === 'ok' ? before.snapshot : emptySnapshot(now);
   const rolled = { ...snapshot, usage: rollUsage(snapshot.usage, now) };
-  return { now, snapshot: rolled, requests: 0, points: 0, failure: null, spent: usage.spent, paced: usage.paced };
+  return { now, snapshot: rolled, requests: 0, points: 0, failure: null, spent: usage.spent, paced: usage.waitMs > 0 };
 }
 
 // Work is due, and all of it is cached data that has to wait its turn.
@@ -149,9 +153,9 @@ function unchanged(before: SnapshotRead, next: Snapshot, refs: readonly IssueRef
   return before.status === 'ok' && JSON.stringify({ ...before.snapshot, updatedAt: 0 }) === JSON.stringify({ ...next, updatedAt: 0 });
 }
 
-// A paced run whose only work is cached data says `budget` to its caller but
-// leaves the snapshot alone: waiting a turn is not a failure to show, and the
-// data ages into "stale" on its own if the turn is long.
+// A paced run whose only work is cached data says `paced`, and when its turn
+// comes, to its caller and leaves the snapshot alone: waiting a turn is not a
+// failure to show, and the data ages into "stale" on its own if the turn is long.
 async function refreshLocked(options: RefreshOptions, lock: Lock): Promise<RefreshOutcome> {
   const { now } = options;
   const paths = pathsFor(options.dir);
@@ -160,7 +164,7 @@ async function refreshLocked(options: RefreshOptions, lock: Lock): Promise<Refre
   ]);
   const refs = withSession(gatherRefs(sessions, pinsOf(pins), now), own, now);
   const start = { ...startRun(before, now, usage), pinned: pinnedRefs(own ? [...sessions, own] : sessions, pinsOf(pins), now) };
-  if (waitsItsTurn(start, refs)) return { status: 'done', requests: 0, points: 0, error: 'budget' };
+  if (waitsItsTurn(start, refs)) return { status: 'paced', until: now + usage.waitMs };
   const started = performance.now();
   const clock = () => now + Math.round(performance.now() - started);
   const ctx: Context = { tokens: await tokensFor(start, refs, options), lock, clock, ledger: usage.ledger };

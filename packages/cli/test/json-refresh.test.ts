@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { acquireLock, JsonV1Schema, readSnapshot, releaseLock, writeSnapshot } from '@epic-pulse/core';
+import { acquireLock, JsonV1Schema, readSnapshot, releaseLock, usageLedgerFor, writeSnapshot } from '@epic-pulse/core';
 import { bashPayload, demoSnapshot } from './fixtures.js';
 import { cliEnv, demoRepo, registryOf, runCli, sandbox, tempDir } from './helpers.js';
 
@@ -59,4 +59,24 @@ test('refresh leaves a running refresh alone and says so', async (t) => {
   t.after(() => releaseLock(lock));
   const run = await runCli(['refresh'], { cwd: repo, env: cliEnv(sandbox(t)) });
   assert.deepEqual([run.code, run.stdout], [0, 'epic-pulse: another refresh is running; leaving it to finish.\n']);
+});
+
+// A repository may refresh again once its last refresh is paid off at its share
+// of the hour, which for 50 points on its own is 10 minutes. A refresh held back
+// only by that has nothing wrong: cached data waits its turn.
+test('a refresh held back only by pacing says when it can run and exits 0, still holding the status line off for a minute', async (t) => {
+  const repo = demoRepo(t);
+  const cache = tempDir(t);
+  const env = cliEnv(sandbox(t), { EPIC_PULSE_CACHE_DIR: cache });
+  await runCli(['hook'], { cwd: repo, env, input: bashPayload('gh issue comment 4 -b hi', repo) });
+  const paths = registryOf(repo);
+  await writeSnapshot(paths.snapshotFile, demoSnapshot(Date.now() - 11 * 60_000));
+  const spent = Date.now();
+  writeFileSync(join(cache, 'usage.jsonl'), `${JSON.stringify({ ts: spent, host: 'github.com', repo: usageLedgerFor(cache, paths.dir).repo, points: 50 })}\n`);
+  const run = await runCli(['refresh'], { cwd: repo, env });
+  const until = new Date(spent + 600_000).toISOString();
+  assert.deepEqual([run.code, run.stderr], [0, '']);
+  assert.equal(run.stdout, `epic-pulse: this repository's refresh is waiting for its turn in the shared hourly budget; the next one can run at ${until} (in about 10 minutes).\n`);
+  const record = JSON.parse(readFileSync(join(paths.dir, 'refresh-attempt.json'), 'utf8')) as { code: unknown };
+  assert.equal(record.code, 'budget', 'the status line still waits a minute before it starts another');
 });

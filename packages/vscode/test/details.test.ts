@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { parseHostList } from '@epic-pulse/core';
-import { detailsText } from '../src/details.js';
+import { detailsText, refreshText } from '../src/details.js';
 
 // An entry of EPIC_PULSE_HOSTS that is not a host used to be dropped without a
 // word, so a mistyped host looked like a token problem. The details view, which
@@ -26,4 +26,9 @@ test('the status details never show an ignored entry that looks like a token', (
   const [line, ...others] = hostLines(text);
   assert.ok(line?.startsWith('EPIC_PULSE_HOSTS: ignored "(not shown: it looks like a token)": '), line);
   assert.equal(others.length, 0);
+});
+
+test('a refresh held back only by pacing is named, with when it can run', () => {
+  const until = Date.UTC(2026, 9, 4, 14, 32);
+  assert.equal(refreshText({ status: 'paced', until }), 'waiting for its turn in the hourly budget, until 2026-10-04T14:32:00.000Z');
 });

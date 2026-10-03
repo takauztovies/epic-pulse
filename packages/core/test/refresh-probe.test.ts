@@ -114,5 +114,5 @@ test('a paced repository leaves the question for its turn', async (t) => {
   const cache = tempDir(t);
   writeLedger(cache, [{ ts: now - 60_000, points: 3 }, { ts: now - 1000, points: 1, mine: paths.dir }]);
   const outcome = await refresh({ dir: paths.dir, now, env: sendingEnv(t, cache) });
-  assert.deepEqual(outcome, { status: 'done', requests: 0, points: 0, error: 'budget' });
+  assert.deepEqual(outcome, { status: 'paced', until: now - 1000 + 24_000 });
 });
