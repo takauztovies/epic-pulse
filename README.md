@@ -97,6 +97,12 @@ after the end, does not bring it back, and resuming it, which starts it again, d
 `epic-pulse track <issue> --repo`, or `epic-pulse track <issue>` run in a terminal rather than in a
 session, pins the issue for every session of the repository instead, in `pins.json`.
 
+In a session the hook finds the pin by the command's name, so run it as `epic-pulse track …`, by name
+or by the path of the command. Behind a launcher (`npx`, `pnpm exec`, `sudo`, `env`, or `node` and a
+script) the hook sees a command with another name and pins nothing. `track` says so when it can tell,
+which it can for `npx` and `pnpm exec` (they set `npm_command=exec`), and then writes nothing; it can
+not tell for the others. `--repo` needs no hook, so it works behind any launcher.
+
 An issue's epic is its parent issue. An issue without a parent is an epic itself when it has
 sub-issues or, failing that, a task list. A pin names its issue, so a pinned issue that is itself an
 epic (it has sub-issues, or a task list) shows its own progress even when it has a parent; any other

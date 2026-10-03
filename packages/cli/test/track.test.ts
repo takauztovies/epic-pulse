@@ -25,6 +25,36 @@ test('inside Claude Code, track writes nothing: the hook pins the issue to the s
   assert.equal(existsSync(registryOf(repo).pinsFile), false);
 });
 
+// The hook finds its pin by the command's name, and a launcher word in front of
+// it (npx, pnpm exec) hides the name, so the command would pin nothing. npx and
+// pnpm exec both set npm_command=exec for what they start.
+test('inside Claude Code, a command started through npx or pnpm exec is warned about, claims no pin and writes nothing', async (t) => {
+  const repo = demoRepo(t);
+  const env = cliEnv(sandbox(t), { CLAUDECODE: '1', npm_command: 'exec' });
+  for (const verb of ['track', 'untrack'] as const) {
+    const run = await runCli([verb, '8'], { cwd: repo, env });
+    const [pin, from] = verb === 'track' ? ['pin', 'to'] : ['unpin', 'from'];
+    assert.deepEqual([run.code, run.stdout], [0, ''], verb);
+    assert.equal(
+      run.stderr,
+      `epic-pulse: this looks like it was started through npx or pnpm exec, which the hook can not read, so it will not ${pin} 8 ${from} this session.\n` +
+        `epic-pulse: nothing was written. Run it as \`epic-pulse ${verb} 8\`, or add --repo to change the pin for the whole repository.\n`,
+    );
+  }
+  assert.equal(existsSync(registryOf(repo).dir), false);
+});
+
+test('a launcher costs nothing where the hook is not involved: --repo, outside Claude Code, and an npm script that is not a launcher', async (t) => {
+  const repo = demoRepo(t);
+  const key = refKey(demo(8));
+  const viaRepo = await runCli(['track', '8', '--repo'], { cwd: repo, env: cliEnv(sandbox(t), { CLAUDECODE: '1', npm_command: 'exec' }) });
+  assert.deepEqual([viaRepo.code, viaRepo.stdout, viaRepo.stderr], [0, `epic-pulse: pinned ${key} for this repository.\n`, '']);
+  const outside = await runCli(['untrack', '8'], { cwd: repo, env: cliEnv(sandbox(t), { npm_command: 'exec' }) });
+  assert.deepEqual([outside.code, outside.stdout, outside.stderr], [0, `epic-pulse: unpinned ${key}.\n`, '']);
+  const script = await runCli(['track', '8'], { cwd: repo, env: cliEnv(sandbox(t), { CLAUDECODE: '1', npm_command: 'run-script' }) });
+  assert.equal(script.stdout.split('\n')[0], 'epic-pulse: the hook pins 8 to this session.');
+});
+
 test('inside Claude Code with the hook active there is no warning, and --repo writes the repository pin', async (t) => {
   const repo = demoRepo(t);
   const env = cliEnv(sandbox(t), { CLAUDECODE: '1' });

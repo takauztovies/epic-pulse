@@ -46,8 +46,10 @@ export function sandbox(t: TestContext): Sandbox {
 }
 
 // The real HOME, Claude config, tokens and git variables never reach a child:
-// the host running these tests may itself be a Claude Code session.
-const SCRUBBED = /^(?:GIT_|GH_|GITHUB_|CLAUDE|EPIC_PULSE_)/;
+// the host running these tests may itself be a Claude Code session. So does
+// npm_command, which `pnpm exec` and `npx` set to "exec": track reads it as
+// "started through a launcher", and a test run through either would say so.
+const SCRUBBED = /^(?:GIT_|GH_|GITHUB_|CLAUDE|EPIC_PULSE_|npm_command$)/;
 
 export function cliEnv(box: Sandbox, extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   const kept = Object.fromEntries(Object.entries(process.env).filter(([key]) => !SCRUBBED.test(key)));
