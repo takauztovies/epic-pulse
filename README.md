@@ -266,6 +266,12 @@ epic-pulse doctor
   runtime:              present, the same build as this one: ~/.claude/epic-pulse/runtime.mjs
 ```
 
+An entry of `EPIC_PULSE_HOSTS` that is not a host (`https://ghe.example.com`, `ghe.example.com/api`, a
+name with a space or an underscore in it) is ignored, and `doctor` says so with one line per entry:
+`EPIC_PULSE_HOSTS: ignored "https://ghe.example.com": that is a URL; name the host alone, without
+https:// or a path`. An entry that looks like a pasted token is not printed. The status line stays quiet
+about it.
+
 - **`hook inactive`** means no hook has run for this session. Enable the plugin, start a new session,
   and check that `node` 22 or newer is on Claude Code's `PATH`: a native Claude Code install without
   Node can not run the hooks.

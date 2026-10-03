@@ -33,7 +33,7 @@ test('a VS Code token reaches no file a refresh writes, and nothing the extensio
     assert.ok(files.includes(join(repo.dir, 'snapshot.json')) && files.includes(join(cache, 'usage.jsonl')), 'nothing was written');
     for (const file of files) assert.equal(readFileSync(file, 'utf8').includes('SENTINEL'), false, file);
     const model = buildModel({ results, now });
-    const details = detailsText({ results, accounts: { github: false, enterprise: HOST }, now });
+    const details = detailsText({ results, accounts: { github: false, enterprise: HOST }, hostProblems: [], now });
     const shown = [JSON.stringify(results), JSON.stringify(treeOf(model)), JSON.stringify(statusBarOf(model)), details, ...results.map(outcomeLine)];
     for (const text of shown) assert.equal(text.includes('SENTINEL'), false, text.slice(0, 300));
   }

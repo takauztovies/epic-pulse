@@ -10,6 +10,7 @@ export * from './git.js';
 export * from './git-cli.js';
 export * from './github.js';
 export * from './gql-errors.js';
+export * from './hosts.js';
 export * from './lock.js';
 export * from './paths.js';
 export * from './pins.js';

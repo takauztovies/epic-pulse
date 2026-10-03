@@ -1,3 +1,4 @@
+import { describeHostProblem, type HostProblem } from '@epic-pulse/core';
 import type { TokenUse } from './grant.js';
 import { progressText } from './labels.js';
 import { repoState } from './model.js';
@@ -16,6 +17,9 @@ export interface Accounts {
 export interface DetailsInput {
   readonly results: readonly RepoResult[];
   readonly accounts: Accounts;
+  // The EPIC_PULSE_HOSTS entries that are not hosts, as core shows them: an
+  // entry that could be a secret is already hidden there.
+  readonly hostProblems: readonly HostProblem[];
   readonly now: number;
 }
 
@@ -59,6 +63,7 @@ export function detailsText(input: DetailsInput): string {
   return [
     `Epic Pulse status at ${new Date(input.now).toISOString()}`,
     `VS Code sign-in: github.com ${github ? 'yes' : 'no'}, GitHub Enterprise ${enterprise ?? 'no'}`,
+    ...input.hostProblems.map((problem) => `EPIC_PULSE_HOSTS: ${describeHostProblem(problem)}`),
     repos === 0 ? 'No workspace folder is inside a git repository.' : `${repos} ${repos === 1 ? 'repository' : 'repositories'}`,
     ...input.results.flatMap(repoLines),
   ].join('\n');

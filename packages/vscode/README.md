@@ -40,7 +40,8 @@ it and it never shows up in `git status`. Without the plugin the view says **Hoo
 | Sign in to GitHub | No working token was found. Click it to sign in. |
 
 **Epic Pulse: Show status details** prints, for each repository, where its registry is, whether the
-hook has written there, how the last refresh went and where its token came from.
+hook has written there, how the last refresh went and where its token came from. It also lists each
+entry of `EPIC_PULSE_HOSTS` that is not a host and is therefore ignored, with the reason.
 
 ## Signing in
 

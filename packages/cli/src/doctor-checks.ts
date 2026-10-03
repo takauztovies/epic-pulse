@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import {
-  DEFAULT_HOST, errnoOf, findWorktree, LIVE_WINDOW_MS, mergeStatusLine, pathsFor, readRemote, registryDirFor, repoKey, resolveToken,
-  type MergeResult, type RepoRef,
+  DEFAULT_HOST, describeHostProblem, errnoOf, findWorktree, LIVE_WINDOW_MS, mergeStatusLine, parseHostList, pathsFor, readRemote, registryDirFor,
+  repoKey, resolveToken, type MergeResult, type RepoRef,
 } from '@epic-pulse/core';
 import { lastHookActivity } from './activity.js';
 import { desiredStatusLine, runtimeFile, settingsFile, type SettingsScope } from './claude-home.js';
@@ -57,6 +57,12 @@ export async function tokenCheck(host: string, env: NodeJS.ProcessEnv): Promise<
 function hookState(last: number | undefined, now: number): string {
   if (last === undefined) return 'inactive: no hook has written here. Is the epic-pulse plugin enabled, and is Node on the PATH?';
   return now - last > LIVE_WINDOW_MS ? `inactive: last ran ${iso(last)}` : `active: last ran ${iso(last)}`;
+}
+
+// One line for each EPIC_PULSE_HOSTS entry that is ignored, and none when every
+// entry is a host: a mistyped host would otherwise look like a token problem.
+export function hostChecks(env: NodeJS.ProcessEnv): readonly Check[] {
+  return parseHostList(env['EPIC_PULSE_HOSTS']).problems.map((problem): Check => ['EPIC_PULSE_HOSTS', describeHostProblem(problem)]);
 }
 
 export async function registryChecks(cwd: string, env: NodeJS.ProcessEnv, now: number): Promise<readonly Check[]> {

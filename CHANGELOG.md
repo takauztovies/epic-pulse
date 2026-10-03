@@ -32,7 +32,9 @@ The first release.
 - A VS Code extension, Epic Pulse, on the Visual Studio Marketplace and Open VSX, with its own icon.
   Each VS Code sign-in's token goes only to the host it belongs to.
 - `.epic-pulse.json` with `branchIssuePattern`, `ignorePaths` and `ignoreMainCheckout`.
-- GitHub Enterprise Server and GitHub Enterprise Cloud (data residency) hosts. A token goes only to
+- GitHub Enterprise Server and GitHub Enterprise Cloud (data residency) hosts. `doctor` and the VS Code
+  status details name any `EPIC_PULSE_HOSTS` entry that is not a host, and why, instead of dropping it
+  in silence; the status line stays quiet. A token goes only to
   a host you trust: `GH_TOKEN` and `GITHUB_TOKEN` to github.com alone, `GH_ENTERPRISE_TOKEN` and
   `GITHUB_ENTERPRISE_TOKEN` only to the host `GH_HOST` names or one listed in `EPIC_PULSE_HOSTS`,
   and any other host gets only the login you made for it with `gh auth login --hostname`. Not yet

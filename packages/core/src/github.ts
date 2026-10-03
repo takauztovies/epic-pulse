@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { parseHostList } from './hosts.js';
 import { DEFAULT_HOST } from './ref.js';
 import { parseJson } from './result.js';
 import { HostSchema, type ErrorCode } from './schemas/common.js';
@@ -33,11 +34,11 @@ export interface FetchFailure {
 const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
 
 // The hosts the user named: GH_HOST, as gh reads it, and the comma-separated
-// EPIC_PULSE_HOSTS. Each is trimmed, lowercased as refs are, and kept only if
-// it is a plain host.
+// EPIC_PULSE_HOSTS (parseHostList, which also says which entries it dropped).
+// Each is trimmed, lowercased as refs are, and kept only if it is a plain host.
 function namedHosts(env: NodeJS.ProcessEnv): ReadonlySet<string> {
-  const named = [env['GH_HOST'] ?? '', ...(env['EPIC_PULSE_HOSTS'] ?? '').split(',')].map((host) => host.trim().toLowerCase());
-  return new Set(named.filter((host) => HostSchema.safeParse(host).success));
+  const ghHost = (env['GH_HOST'] ?? '').trim().toLowerCase();
+  return new Set([...(HostSchema.safeParse(ghHost).success ? [ghHost] : []), ...parseHostList(env['EPIC_PULSE_HOSTS']).hosts]);
 }
 
 // github.com and every other host use different env vars, like `gh` itself.

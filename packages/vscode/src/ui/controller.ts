@@ -1,3 +1,4 @@
+import { parseHostList } from '@epic-pulse/core';
 import * as vscode from 'vscode';
 import { errorLabel, outcomeLine, type DetailsInput } from '../details.js';
 import { CONFIG_SECTION, VIEW_ID } from '../ids.js';
@@ -62,7 +63,7 @@ export class Controller {
     const repos = await discoverRepos(folderPaths(), process.env);
     const results = await pollAll(repos, { now, env: process.env, grant: auth.grant });
     const model = buildModel({ results, now });
-    this.#latest = { results, accounts: auth.accounts, now };
+    this.#latest = { results, accounts: auth.accounts, hostProblems: parseHostList(process.env['EPIC_PULSE_HOSTS']).problems, now };
     this.#tree.update(treeOf(model));
     this.#statusBar.show(statusBarOf(model));
     this.#logChanges(results);

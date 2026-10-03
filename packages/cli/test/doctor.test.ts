@@ -58,3 +58,27 @@ test('doctor outside a repository says so instead of failing', async (t) => {
   const report = await doctor(dir, sandbox(t));
   assert.deepEqual([report.get('repository'), report.get('registry')], ['not inside a git repository', 'none outside a git repository']);
 });
+
+// An entry of EPIC_PULSE_HOSTS that is not a host used to be dropped without a
+// word, so a mistyped host looked like a token problem.
+test('doctor names every EPIC_PULSE_HOSTS entry it ignores and why, and is silent when every entry is a host', async (t) => {
+  const repo = demoRepo(t);
+  const box = sandbox(t);
+  const listed = async (hosts: string) => {
+    const run = await runCli(['doctor'], { cwd: repo, env: cliEnv(box, { EPIC_PULSE_HOSTS: hosts }) });
+    assert.deepEqual([run.code, run.stderr], [0, '']);
+    return [...run.stdout.matchAll(/^ {2}EPIC_PULSE_HOSTS: +(.*)$/gm)].map((match) => match[1]);
+  };
+  assert.deepEqual(await listed('ghe.example.com, other.example:8443,'), []);
+  assert.deepEqual(await listed('https://ghe.example.com, ok.example.com ,bad_host'), [
+    'ignored "https://ghe.example.com": that is a URL; name the host alone, without the scheme or a path',
+    'ignored "bad_host": a host name has only letters, digits, dots and hyphens, then an optional :port',
+  ]);
+});
+
+test('doctor does not print an ignored entry that looks like a token', async (t) => {
+  const secret = 'ghp_0123456789abcdefghijklmnopqrstuvwxyz';
+  const run = await runCli(['doctor'], { cwd: demoRepo(t), env: cliEnv(sandbox(t), { EPIC_PULSE_HOSTS: secret }) });
+  assert.equal(run.stdout.includes(secret) || run.stderr.includes(secret), false);
+  assert.match(run.stdout, /^ {2}EPIC_PULSE_HOSTS: +ignored "\(not shown: it looks like a token\)": a host name has only /m);
+});

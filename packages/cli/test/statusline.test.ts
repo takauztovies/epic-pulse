@@ -142,3 +142,14 @@ test('outside a repository there is no epic to show', async (t) => {
   const dir = tempDir(t);
   assert.equal((await statusLine({ repo: dir, box: sandbox(t) })).stdout, 'epic-pulse: no epic\n');
 });
+
+// A mistyped host is for doctor and the VS Code details to say. The status line
+// is redrawn every thirty seconds, from disk, and stays as quiet as it was.
+test('the status line says nothing about an ignored EPIC_PULSE_HOSTS entry', async (t) => {
+  const bound = await boundSession(t);
+  const plain = await statusLine(bound);
+  const env = cliEnv(bound.box, { EPIC_PULSE_HOSTS: 'https://ghe.example.com,bad_host' });
+  const run = await runCli(['statusline'], { cwd: bound.repo, env, input: statusPayload(bound.repo) });
+  assert.deepEqual([run.code, run.stdout, run.stderr], [0, plain.stdout, '']);
+  assert.doesNotMatch(run.stdout, /EPIC_PULSE_HOSTS|ignored/);
+});
