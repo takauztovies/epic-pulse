@@ -99,11 +99,20 @@ async function whyNoToken(env: NodeJS.ProcessEnv): Promise<string> {
   }
 }
 
+// A first gh on a fresh Windows runner can take over 20 s (the binary is
+// scanned on first launch), past resolveToken's own limit. What this test pins
+// is which variables gh gets, not how fast a cold runner starts it, so gh is
+// started once, unlimited, before the call under test.
+async function warmUpGh(env: NodeJS.ProcessEnv): Promise<void> {
+  await promisify(execFile)('gh', ['--version'], { env, timeout: 120_000, windowsHide: true });
+}
+
 // gh prefers these variables to its own logins: GH_ENTERPRISE_TOKEN for any
 // host, GH_TOKEN for *.ghe.com. Left in its environment, gh would hand one to
 // a host resolveToken has just refused it.
 test('gh is asked without the token variables, so it answers only with its own logins', { skip: GH_DIR === undefined && 'needs gh on the PATH' }, async () => {
   await withGhLogin(async (env) => {
+    await warmUpGh(env);
     const secret = 'env-secret';
     const leaked = { ...env, GH_TOKEN: secret, GITHUB_TOKEN: secret, GH_ENTERPRISE_TOKEN: secret, GITHUB_ENTERPRISE_TOKEN: secret };
     const login = await resolveToken('ghe.example.com', leaked);
