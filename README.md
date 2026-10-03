@@ -111,6 +111,9 @@ pinned issue shows its parent's epic, as work on it does. The refresher asks Git
 
 ## What it costs a session
 
+epic-pulse makes one promise about speed: the hook that follows a tool call runs in the background and
+never blocks it, and its startup cost is measured and published here, not promised as a number.
+
 The hook after a tool call runs asynchronously: Claude Code starts it and carries on, so no tool call
 waits for epic-pulse. The hooks at session start and end run once each, and Claude Code waits for
 them, within their five-second timeout. The status line renders from disk and, when a refresh is
@@ -138,6 +141,9 @@ only limit is a 1.5-second tripwire that catches a render waiting on the network
 | In review | open, with a ready pull request that will close it |
 | Done | closed as completed, or closed without a reason |
 | Dropped | closed as not planned, or as a duplicate |
+
+A close with no recorded reason (older closes have none) counts as Done: only "not planned" and
+"duplicate" take a sub-issue out of the count.
 
 A pull request counts when it is open, belongs to the issue's own repository (which may not be the
 epic's), and either GitHub links it as closing the issue or its body closes the issue with a keyword.
