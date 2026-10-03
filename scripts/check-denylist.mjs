@@ -33,13 +33,33 @@ const DIGEST = /^[0-9a-f]{64}$/;
 // Git's own test for binary content: a NUL in the first 8000 bytes.
 const SNIFF_BYTES = 8000;
 
-// One digest per line; `#` starts a comment. A line that is neither is a typo
-// that would never match anything, so it is refused, not skipped.
+// A public word whose digest under the key is stored as the list's `key-check`
+// line. A wrong key hashes every word to something unlisted and would pass
+// silently; recomputing this one digest tells a wrong key from a clean tree.
+const KEY_CHECK_WORD = 'epic-pulse-denylist-key-check';
+const KEY_CHECK = /^key-check\s+([0-9a-f]{64})$/;
+
+// One digest per line, plus one `key-check <digest>` line; `#` starts a comment.
+// A line that is neither is a typo that would never match anything, so it is
+// refused, not skipped.
 function readDenylist() {
   const rows = readFileSync(DENYLIST, 'utf8').split(/\r?\n/).map((line, i) => [i + 1, line.replace(/#.*/, '').trim().toLowerCase()]);
-  const bad = rows.filter(([, entry]) => entry !== '' && !DIGEST.test(entry)).map(([n]) => n);
+  const bad = rows.filter(([, entry]) => entry !== '' && !DIGEST.test(entry) && !KEY_CHECK.test(entry)).map(([n]) => n);
   if (bad.length > 0) return { error: `scripts/denylist.hmac line ${bad.join(', ')}: not an HMAC-SHA256 hex digest` };
-  return { digests: new Set(rows.map(([, entry]) => entry).filter(Boolean)) };
+  const keyCheck = rows.map(([, entry]) => KEY_CHECK.exec(entry)?.[1]).find(Boolean);
+  return { digests: new Set(rows.map(([, entry]) => entry).filter((entry) => DIGEST.test(entry))), keyCheck };
+}
+
+// A list with entries but no key-check line could be checked under any key, so
+// it is refused; a key whose key-check digest differs is the wrong key.
+function keyMismatch(list, digestOf) {
+  if (list.digests.size > 0 && list.keyCheck === undefined) {
+    return 'scripts/denylist.hmac has digests but no `key-check` line, so a wrong key would pass unnoticed';
+  }
+  if (list.keyCheck !== undefined && digestOf(KEY_CHECK_WORD) !== list.keyCheck) {
+    return 'the key does not match the one scripts/denylist.hmac was made with, so this check would find nothing';
+  }
+  return undefined;
 }
 
 function keyFile() {
@@ -123,8 +143,10 @@ function check(env) {
   const found = readKey(env);
   if (found.error) return { code: 2, out: [`epic-pulse: ${found.error}`] };
   if (found.key === '') return withoutKey(env);
-  const files = filesToRead();
   const digestOf = digester(found.key);
+  const mismatch = keyMismatch(list, digestOf);
+  if (mismatch) return { code: 2, out: [`epic-pulse: ${mismatch}`] };
+  const files = filesToRead();
   const hits = files.flatMap((file) => hitsIn(file, list.digests, digestOf));
   if (hits.length > 0) return { code: 1, out: hits.map((hit) => `epic-pulse: ${hit}`) };
   return { code: 0, out: [`epic-pulse: no denylisted word in ${files.length} files.`] };

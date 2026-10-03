@@ -28,6 +28,12 @@
 # made under another key matches nothing, and the check still passes: when the
 # key changes, every digest here changes with it.
 
+# The key-check line: the HMAC of the public word epic-pulse-denylist-key-check
+# under the key. The check recomputes it, so a wrong key fails instead of
+# silently matching nothing:
+#   printf %s epic-pulse-denylist-key-check | openssl dgst -sha256 -hmac "$KEY"
+key-check b8398ee89e9f09a7140ffde769578fd719a054a32db5c025377e90376436f3a5
+
 # Private project terms (keyed digests; the words are never committed).
 56b5147c3834fd071f4351900e735772ea4a0d7dd8b61c921a8623975b05442d
 981ada606cd87ee9d148c87d99d6385c608022f03d5189750582cfcc608ec10b

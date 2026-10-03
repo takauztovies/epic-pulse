@@ -12,7 +12,10 @@ import { git, ROOT, tempDir } from './helpers.js';
 export const WORD = ['zqxplor', 'vantumbek'].join('');
 export const KEY = 'a-key-for-tests-only';
 export const DIGEST = 'ad69026f9b95983a0ed9fb768f8d035ed58b21fd1e5993c3776d7bca487f08e3';
-export const LIST = `# a test list\n\n${DIGEST}\n`;
+// The key-check line for KEY, by the same recipe:
+//   printf %s epic-pulse-denylist-key-check | openssl dgst -sha256 -hmac a-key-for-tests-only
+export const KEY_CHECK = 'key-check 10ea6a651575b21b6b651ed93466f293f6b6b01c250242d5af0103838a6e605a';
+export const LIST = `# a test list\n\n${KEY_CHECK}\n${DIGEST}\n`;
 
 export const SCRIPT = join(ROOT, 'scripts', 'check-denylist.mjs');
 
@@ -29,14 +32,27 @@ export interface RunOptions {
   readonly env?: NodeJS.ProcessEnv;
   // The home directory the script finds its key file in; an empty one by default.
   readonly home?: string;
+  // The script to run, which reads the list beside it; the repo's own copy by default.
+  readonly script?: string;
 }
 
 export function run(t: TestContext, repo: string, options: RunOptions = {}): Run {
   const home = options.home ?? tempDir(t, 'ep-home-');
   const kept = Object.fromEntries(Object.entries(process.env).filter(([key]) => !SCRUBBED.test(key)));
   const env = { ...kept, HOME: home, USERPROFILE: home, ...options.env };
-  const result = spawnSync(process.execPath, [join(repo, 'scripts', 'check-denylist.mjs')], { cwd: repo, env, encoding: 'utf8' });
+  const script = options.script ?? join(repo, 'scripts', 'check-denylist.mjs');
+  const result = spawnSync(process.execPath, [script], { cwd: repo, env, encoding: 'utf8' });
   return { status: result.status, out: `${result.stdout}${result.stderr}` };
+}
+
+// A copy of the script beside a list of our own, to run against a repository
+// whose real list was made under a key the tests do not have.
+export function scriptWithList(t: TestContext, list = LIST): string {
+  const dir = join(tempDir(t), 'scripts');
+  mkdirSync(dir);
+  copyFileSync(SCRIPT, join(dir, 'check-denylist.mjs'));
+  writeFileSync(join(dir, 'denylist.hmac'), list);
+  return join(dir, 'check-denylist.mjs');
 }
 
 // A home directory holding the key file, with exactly this content.
