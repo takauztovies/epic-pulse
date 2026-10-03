@@ -11,5 +11,7 @@
   `gh auth token` like the epic-pulse CLI. Each sign-in's token goes only to the host it belongs to,
   and for a repository on a host no sign-in serves, Sign in to GitHub opens `github-enterprise.uri`
   instead of signing in to github.com.
+- A window without focus makes no request to GitHub but keeps reading the files on the refresh interval,
+  so what it shows ages honestly and picks up what a hook or another refresher wrote.
 - An icon, and `THIRD_PARTY_NOTICES.md` beside the bundle for the zod code inside it.
 - Multi-root workspaces: every folder's repository in one view.

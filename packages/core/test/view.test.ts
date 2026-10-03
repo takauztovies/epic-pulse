@@ -8,7 +8,7 @@ import { RegistryLineSchema } from '../src/schemas/registry.js';
 import { emptySnapshot, type SnapshotRead } from '../src/snapshot.js';
 import { STALE_AFTER_MS } from '../src/status.js';
 import { buildView, type ViewInput } from '../src/view.js';
-import { demo, demoSnapshot } from './snapshot-helpers.js';
+import { demo, demoSnapshot, subEpicSnapshot } from './snapshot-helpers.js';
 
 const T0 = 1_800_000_000_000;
 const A = '0f8e7c1a-2b3d-4e5f-8a9b-0c1d2e3f4a5b';
@@ -113,4 +113,32 @@ test('an epic not fetched yet is pending, and nothing is pending once the refres
   const failed: SnapshotRead = { status: 'ok', snapshot: { ...snapshot, epics: {}, error: 'network' } };
   assert.equal(view({ snapshot: failed, sessions: [own], scope: { session: own } }).pending, 0);
   assert.equal(view({ snapshot: { status: 'missing' }, sessions: [own], scope: { session: own } }).pending, 1);
+});
+
+// A pin names its issue. An issue with a parent resolves to that parent, which
+// is right for work bound to it and wrong for a pin on a sub-epic: the pin shows
+// the sub-epic itself, once the refresher has found it to be one.
+test('a pinned issue that is itself an epic shows as that, for a session pin and a repository pin alike', () => {
+  const read: SnapshotRead = { status: 'ok', snapshot: subEpicSnapshot(T0) };
+  const sessionPin = session(A, [[4, 'pin']]);
+  const bySession = view({ snapshot: read, sessions: [sessionPin], scope: { session: sessionPin } }).epics;
+  assert.deepEqual(bySession.map((epic) => [epic.number, epic.children.length]), [[4, 6]]);
+  const idle = session(A, []);
+  const byRepository = view({ snapshot: read, sessions: [idle], pins: [{ ref: demo(4), addedAt: T0 }], scope: { session: idle } }).epics;
+  assert.deepEqual(byRepository.map((epic) => epic.number), [4]);
+  assert.deepEqual(view({ snapshot: read, sessions: [sessionPin] }).epics.map((epic) => epic.number), [4]);
+});
+
+test('work bound to that issue, and a pin on an issue that is no epic, still show the parent epic', () => {
+  const bound = session(A, [[4, 'gh']]);
+  const subEpic: SnapshotRead = { status: 'ok', snapshot: subEpicSnapshot(T0) };
+  assert.deepEqual(view({ snapshot: subEpic, sessions: [bound], scope: { session: bound } }).epics.map((epic) => epic.number), [1]);
+  const pinned = session(A, [[4, 'pin']]);
+  assert.deepEqual(view({ snapshot: fresh, sessions: [pinned], scope: { session: pinned } }).epics.map((epic) => epic.number), [1]);
+});
+
+test('a sub-epic pin and work on its parent epic show the two epics, the work first', () => {
+  const own = session(A, [[1, 'gh'], [4, 'pin']]);
+  const read: SnapshotRead = { status: 'ok', snapshot: subEpicSnapshot(T0) };
+  assert.deepEqual(view({ snapshot: read, sessions: [own], scope: { session: own } }).epics.map((epic) => epic.number), [1, 4]);
 });

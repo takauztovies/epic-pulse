@@ -12,7 +12,9 @@ import { recordUsage, reserveUsage, type UsageLedger } from './usage-ledger.js';
 // it writes is stamped with it. `spent` is what every refresher of the user
 // spent in the last hour, as the usage ledger last said; absent, only this
 // repository's own budget applies. `paced`: the repository has not paid off
-// its last refresh yet, so only what was never fetched may go out.
+// its last refresh yet, so only what was never fetched may go out. `pinned`: the
+// issues the user pinned, which Phase B also asks about as epics of their own
+// (probeTargets).
 export interface Run {
   readonly now: number;
   readonly snapshot: Snapshot;
@@ -21,6 +23,7 @@ export interface Run {
   readonly failure: Failure | null;
   readonly spent?: number;
   readonly paced?: boolean;
+  readonly pinned?: readonly IssueRef[];
 }
 
 // Tokens live here, in memory, for one run; nothing in `Run` or the snapshot

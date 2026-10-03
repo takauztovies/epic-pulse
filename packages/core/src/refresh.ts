@@ -5,8 +5,8 @@ import { pinsOf, readPins } from './pins.js';
 import { pruneSnapshot } from './refresh-apply.js';
 import { overBudget, runBatch, type Context, type Run } from './refresh-batch.js';
 import {
-  chunk, epicRefsOf, gatherRefs, groupByRepo, needsFetch, needsResolution, PHASE_A_BATCH, PHASE_A_COST,
-  phaseBBatchSize, rollUsage, withSession, type RepoGroup,
+  chunk, epicRefsOf, epicsToWatch, gatherRefs, groupByRepo, needsFetch, needsResolution, PHASE_A_BATCH, PHASE_A_COST,
+  phaseBBatchSize, pinnedRefs, rollUsage, withSession, type RepoGroup,
 } from './refresh-plan.js';
 import { pruneSessions, readLiveSessions, readSession, type SessionState } from './registry.js';
 import { unfetchedEpics, unresolvedRefs } from './resolve.js';
@@ -28,6 +28,10 @@ export interface RefreshOptions {
 
 export type RefreshOutcome =
   | { readonly status: 'busy' }
+  // Held back only by pacing: nothing is wrong, cached data waits for this
+  // repository's turn in the hour every refresher shares. `until` is when that
+  // is, in milliseconds since the epoch.
+  | { readonly status: 'paced'; readonly until: number }
   | { readonly status: 'done'; readonly requests: number; readonly points: number; readonly error: ErrorCode | null };
 
 // The status line names its own session here when it starts a refresh.
@@ -37,12 +41,12 @@ export const REFRESH_SESSION_ENV = 'EPIC_PULSE_SESSION';
 // a live holder is always fresh; a dead one frees the lock within a minute.
 const LOCK_STALE_MS = 60_000;
 
-// The user's hour as a run starts: the ledger, what it says was spent, and
-// whether this repository still has to wait its turn.
+// The user's hour as a run starts: the ledger, what it says was spent, and how
+// long this repository still has to wait its turn (0: it does not).
 interface UsageView {
   readonly ledger: UsageLedger | undefined;
   readonly spent: number;
-  readonly paced: boolean;
+  readonly waitMs: number;
 }
 
 // A paced run still asks for what nothing has shown yet, a ref never resolved
@@ -53,9 +57,11 @@ function toResolve(run: Run, refs: readonly IssueRef[]): readonly IssueRef[] {
   return run.paced ? unresolvedRefs(refs, run.snapshot) : needsResolution(run.snapshot, refs, run.now);
 }
 
+// A pinned issue that may be an epic itself is asked about like any cached
+// data: it waits its turn, since the pin shows its parent's epic meanwhile.
 function toFetch(run: Run, refs: readonly IssueRef[]): readonly IssueRef[] {
-  const epics = epicRefsOf(run.snapshot, refs);
-  return run.paced ? unfetchedEpics(epics, run.snapshot) : needsFetch(run.snapshot, epics, run.now);
+  if (run.paced) return unfetchedEpics(epicRefsOf(run.snapshot, refs), run.snapshot);
+  return needsFetch(run.snapshot, epicsToWatch(run.snapshot, refs, run.pinned ?? []), run.now);
 }
 
 async function runPhaseA(run: Run, refs: readonly IssueRef[], ctx: Context): Promise<Run> {
@@ -87,8 +93,9 @@ async function runPhaseB(run: Run, refs: readonly IssueRef[], ctx: Context): Pro
   return current;
 }
 
-function pendingRefs(snapshot: Snapshot, refs: readonly IssueRef[], now: number): readonly IssueRef[] {
-  return [...needsResolution(snapshot, refs, now), ...needsFetch(snapshot, epicRefsOf(snapshot, refs), now)];
+function pendingRefs(run: Run, refs: readonly IssueRef[]): readonly IssueRef[] {
+  const { snapshot, now } = run;
+  return [...needsResolution(snapshot, refs, now), ...needsFetch(snapshot, epicsToWatch(snapshot, refs, run.pinned ?? []), now)];
 }
 
 // Tokens are looked up only for hosts with work to do and only when even the
@@ -99,7 +106,7 @@ function pendingRefs(snapshot: Snapshot, refs: readonly IssueRef[], now: number)
 async function tokensFor(run: Run, refs: readonly IssueRef[], options: RefreshOptions): Promise<ReadonlyMap<string, string>> {
   if (overBudget(run, PHASE_A_COST)) return new Map();
   const given = new Map(Object.entries(options.tokens ?? {}));
-  const hosts = [...new Set(pendingRefs(run.snapshot, refs, run.now).map((ref) => ref.host))];
+  const hosts = [...new Set(pendingRefs(run, refs).map((ref) => ref.host))];
   const found = await Promise.all(hosts.map(async (host) => [host, given.get(host) ?? (await resolveToken(host, options.env))?.token] as const));
   return new Map(found.flatMap(([host, token]) => (token === undefined ? [] : [[host, token] as const])));
 }
@@ -108,22 +115,22 @@ async function tokensFor(run: Run, refs: readonly IssueRef[], options: RefreshOp
 // refreshers, so it counts as spent rather than as empty.
 async function openUsage(options: RefreshOptions): Promise<UsageView> {
   const cacheDir = userCacheDir(options.env);
-  if (cacheDir === undefined) return { ledger: undefined, spent: Number.POSITIVE_INFINITY, paced: false };
+  if (cacheDir === undefined) return { ledger: undefined, spent: Number.POSITIVE_INFINITY, waitMs: 0 };
   const ledger = usageLedgerFor(cacheDir, options.dir);
   const lines = await readUsage(ledger.file);
-  return { ledger, spent: spentIn(lines, options.now), paced: pacingDelay(lines, ledger.repo, options.now) > 0 };
+  return { ledger, spent: spentIn(lines, options.now), waitMs: pacingDelay(lines, ledger.repo, options.now) };
 }
 
 function startRun(before: SnapshotRead, now: number, usage: UsageView): Run {
   const snapshot = before.status === 'ok' ? before.snapshot : emptySnapshot(now);
   const rolled = { ...snapshot, usage: rollUsage(snapshot.usage, now) };
-  return { now, snapshot: rolled, requests: 0, points: 0, failure: null, spent: usage.spent, paced: usage.paced };
+  return { now, snapshot: rolled, requests: 0, points: 0, failure: null, spent: usage.spent, paced: usage.waitMs > 0 };
 }
 
 // Work is due, and all of it is cached data that has to wait its turn.
 function waitsItsTurn(run: Run, refs: readonly IssueRef[]): boolean {
   if (!run.paced || toResolve(run, refs).length > 0 || toFetch(run, refs).length > 0) return false;
-  return pendingRefs(run.snapshot, refs, run.now).length > 0;
+  return pendingRefs(run, refs).length > 0;
 }
 
 // The session whose status line started this refresh, read whether or not it
@@ -146,9 +153,9 @@ function unchanged(before: SnapshotRead, next: Snapshot, refs: readonly IssueRef
   return before.status === 'ok' && JSON.stringify({ ...before.snapshot, updatedAt: 0 }) === JSON.stringify({ ...next, updatedAt: 0 });
 }
 
-// A paced run whose only work is cached data says `budget` to its caller but
-// leaves the snapshot alone: waiting a turn is not a failure to show, and the
-// data ages into "stale" on its own if the turn is long.
+// A paced run whose only work is cached data says `paced`, and when its turn
+// comes, to its caller and leaves the snapshot alone: waiting a turn is not a
+// failure to show, and the data ages into "stale" on its own if the turn is long.
 async function refreshLocked(options: RefreshOptions, lock: Lock): Promise<RefreshOutcome> {
   const { now } = options;
   const paths = pathsFor(options.dir);
@@ -156,8 +163,8 @@ async function refreshLocked(options: RefreshOptions, lock: Lock): Promise<Refre
     readLiveSessions(paths, now), readPins(paths), readSnapshot(paths.snapshotFile), openUsage(options), ownSession(paths, options.env),
   ]);
   const refs = withSession(gatherRefs(sessions, pinsOf(pins), now), own, now);
-  const start = startRun(before, now, usage);
-  if (waitsItsTurn(start, refs)) return { status: 'done', requests: 0, points: 0, error: 'budget' };
+  const start = { ...startRun(before, now, usage), pinned: pinnedRefs(own ? [...sessions, own] : sessions, pinsOf(pins), now) };
+  if (waitsItsTurn(start, refs)) return { status: 'paced', until: now + usage.waitMs };
   const started = performance.now();
   const clock = () => now + Math.round(performance.now() - started);
   const ctx: Context = { tokens: await tokensFor(start, refs, options), lock, clock, ledger: usage.ledger };

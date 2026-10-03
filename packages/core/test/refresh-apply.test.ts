@@ -9,7 +9,7 @@ import { emptySnapshot, readSnapshot, writeSnapshot } from '../src/snapshot.js';
 import { countStatuses, percentDone } from '../src/status.js';
 import { loadFixture } from './helpers.js';
 import { tempDir } from './repo-helpers.js';
-import { demo, demoSnapshot } from './snapshot-helpers.js';
+import { demo, demoSnapshot, subEpicSnapshot } from './snapshot-helpers.js';
 
 const T0 = 1_800_000_000_000;
 const key = (n: number) => refKey(demo(n));
@@ -83,4 +83,34 @@ test('a checklist epic longer than the snapshot keeps is stored cut at 500 and f
   const read = await readSnapshot(file);
   const epic = read.status === 'ok' ? read.snapshot.epics[key(8)] : undefined;
   assert.deepEqual([epic?.children.length, epic?.truncated, epic?.error, epic?.children.at(-1)?.title], [500, true, null, 'step 500']);
+});
+
+// Phase B was asked about #4, a sub-issue of epic #1, because it was pinned:
+// not "what epic is it in" (Phase A answered, #1) but "is it an epic itself".
+test('an answer about an issue that resolves to its parent says whether the issue is an epic itself, and leaves the parent as it was', () => {
+  const sub = subEpicSnapshot(T0 + 5);
+  assert.deepEqual([sub.epics[key(4)]?.children.length, sub.issues[key(4)]?.isEpic, sub.issues[key(4)]?.epic?.number], [6, true, 1]);
+  assert.deepEqual(sub.issues[key(1)], { epic: demo(1), resolvedAt: T0 + 5 }, 'an issue that resolves to itself carries no flag');
+  const checklist = parsePhaseB(loadFixture('phase-b-checklist'));
+  assert.ok(checklist.ok);
+  const plain = { ...checklist.value.epics.get(8)!, body: 'Just an issue.' };
+  const none = applyEpics(demoSnapshot(T0), [[demo(4), plain]], T0 + 5);
+  assert.deepEqual([none.epics[key(4)], none.issues[key(4)]?.isEpic, none.issues[key(4)]?.epic?.number, none.issues[key(4)]?.resolvedAt], [undefined, false, 1, T0]);
+  assert.ok(none.epics[key(1)]);
+});
+
+test('asking Phase A again forgets what Phase B found, so a pinned issue is asked about again with its resolution', () => {
+  const parsed = parsePhaseA(loadFixture('phase-a'));
+  assert.ok(parsed.ok);
+  const again = applyResolutions(subEpicSnapshot(T0), [[demo(4), parsed.value.issues.get(4) ?? null]], T0 + 1);
+  assert.deepEqual(again.issues[key(4)], { epic: demo(1), resolvedAt: T0 + 1 });
+});
+
+test('the epic entry of a pinned issue that is one is kept beside its parent\'s, and goes with it when nothing keeps either', () => {
+  const sub = subEpicSnapshot(T0);
+  const kept = pruneSnapshot(sub, [demo(4)], T0 + 1);
+  assert.deepEqual(Object.keys(kept.epics).sort(), [key(1), key(4), key(8)].sort());
+  const onlyOlder = pruneSnapshot({ ...sub, issues: { [key(4)]: sub.issues[key(4)]! } }, [], T0 + RETAIN_MS - 1);
+  assert.deepEqual(Object.keys(onlyOlder.epics).sort(), [key(1), key(4)].sort());
+  assert.deepEqual(pruneSnapshot(sub, [], T0 + RETAIN_MS).epics, {});
 });

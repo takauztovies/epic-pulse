@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { foldSession, RegistryLineSchema, type SessionState } from '@epic-pulse/core';
+import { foldSession, refKey, RegistryLineSchema, type SessionState } from '@epic-pulse/core';
 import type { RefreshAttempt } from '../src/refresh-attempt.js';
 import { refreshDue } from '../src/refresh-spawn.js';
 import { demo, demoSnapshot } from './fixtures.js';
@@ -23,6 +23,27 @@ test('an epic past its two-minute cache, an unresolved issue or a pin is due', (
   assert.equal(refreshDue({ snapshot, session: bound([4]), pins: [], now: NOW + 2 * MINUTE }), true);
   assert.equal(refreshDue({ snapshot, session: bound([6]), pins: [], now: NOW + MINUTE }), true);
   assert.equal(refreshDue({ snapshot, session: bound([]), pins: [{ ref: demo(6), addedAt: NOW }], now: NOW + MINUTE }), true);
+});
+
+function pinnedBy(numbers: readonly number[], ts = NOW): SessionState {
+  const binds = numbers.map((n) => ({ ref: demo(n), via: 'pin' as const }));
+  return foldSession(SESSION, [RegistryLineSchema.parse({ v: 1, ts, ev: 'tool', binds })])!;
+}
+
+// #4 is a child of epic #1: a pin names it, so the refresher also asks whether
+// it is an epic itself, until it has found that it is not.
+test('a pin on a child of an epic is due until the issue has been found not to be an epic itself', () => {
+  const snapshot = demoSnapshot(NOW);
+  const key = refKey(demo(4));
+  const resolution = snapshot.issues[key];
+  assert.ok(resolution, 'the demo snapshot no longer resolves #4');
+  const known = { ...snapshot, issues: { ...snapshot.issues, [key]: { ...resolution, isEpic: false } } };
+  const at = NOW + MINUTE;
+  assert.equal(refreshDue({ snapshot: { status: 'ok', snapshot }, session: bound([]), pins: [{ ref: demo(4), addedAt: NOW }], now: at }), true);
+  assert.equal(refreshDue({ snapshot: { status: 'ok', snapshot }, session: pinnedBy([4]), pins: [], now: at }), true);
+  assert.equal(refreshDue({ snapshot: { status: 'ok', snapshot: known }, session: bound([]), pins: [{ ref: demo(4), addedAt: NOW }], now: at }), false);
+  assert.equal(refreshDue({ snapshot: { status: 'ok', snapshot: known }, session: pinnedBy([4]), pins: [], now: at }), false);
+  assert.equal(refreshDue({ snapshot: { status: 'ok', snapshot }, session: bound([4]), pins: [], now: at }), false, 'work bound to it is not a pin');
 });
 
 test('a missing or corrupt snapshot makes every bound issue due', () => {

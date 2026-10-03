@@ -90,15 +90,29 @@ issues the call worked on. It binds an issue when the call:
 `gh issue view`, `list`, `search`, `status` and `create` never bind, and neither do reads. A call that
 names more than three issues binds none of them. A binding lapses six hours after the last call that
 saw it; a pin lasts until it is untracked or the session ends. A session counts as live for two hours
-after its last hook call; its own status line keeps its issues current after that too.
+after its last hook call, unless it has ended; its own status line keeps its issues current after that
+too. A session has ended when its end is later than its latest start, so a hook call that ran late,
+after the end, does not bring it back, and resuming it, which starts it again, does.
 
 `epic-pulse track <issue> --repo`, or `epic-pulse track <issue>` run in a terminal rather than in a
 session, pins the issue for every session of the repository instead, in `pins.json`.
 
+In a session the hook finds the pin by the command's name, so run it as `epic-pulse track …`, by name
+or by the path of the command. Behind a launcher (`npx`, `pnpm exec`, `sudo`, `env`, or `node` and a
+script) the hook sees a command with another name and pins nothing. `track` says so when it can tell,
+which it can for `npx` and `pnpm exec` (they set `npm_command=exec`), and then writes nothing; it can
+not tell for the others. `--repo` needs no hook, so it works behind any launcher.
+
 An issue's epic is its parent issue. An issue without a parent is an epic itself when it has
-sub-issues or, failing that, a task list.
+sub-issues or, failing that, a task list. A pin names its issue, so a pinned issue that is itself an
+epic (it has sub-issues, or a task list) shows its own progress even when it has a parent; any other
+pinned issue shows its parent's epic, as work on it does. The refresher asks GitHub about it once
+(3 points) and again only after the 30-minute cache of its resolution.
 
 ## What it costs a session
+
+epic-pulse makes one promise about speed: the hook that follows a tool call runs in the background and
+never blocks it, and its startup cost is measured and published here, not promised as a number.
 
 The hook after a tool call runs asynchronously: Claude Code starts it and carries on, so no tool call
 waits for epic-pulse. The hooks at session start and end run once each, and Claude Code waits for
@@ -127,6 +141,9 @@ only limit is a 1.5-second tripwire that catches a render waiting on the network
 | In review | open, with a ready pull request that will close it |
 | Done | closed as completed, or closed without a reason |
 | Dropped | closed as not planned, or as a duplicate |
+
+A close with no recorded reason (older closes have none) counts as Done: only "not planned" and
+"duplicate" take a sub-issue out of the count.
 
 A pull request counts when it is open, belongs to the issue's own repository (which may not be the
 epic's), and either GitHub links it as closing the issue or its body closes the issue with a keyword.
@@ -283,6 +300,11 @@ about it.
   **`rate_limited`**: GitHub asked to slow down; epic-pulse waits five minutes.
 - **`loading…` that does not end**: run `epic-pulse refresh` in the repository to see what a refresh
   reports, and look at `hook errors` in `doctor`.
+- **`epic-pulse refresh` says it is waiting for its turn in the shared hourly budget**: nothing is
+  wrong. To spread the 300 points over the hour, a repository refreshes data it already has again only
+  once its last refresh is paid off at its share of the hour (50 points on its own take 10 minutes).
+  The command prints when that is and exits 0. What nothing has shown yet, a new binding or an epic
+  not fetched, is never made to wait.
 - **`error (forbidden)`** or **`error (not_found)`**: the token can not read that repository's
   issues, or it does not exist. GitHub's answer is kept for 30 minutes, so a fix shows within that.
 - **`runtime: present, a different build`** after an upgrade: start a new session, or run

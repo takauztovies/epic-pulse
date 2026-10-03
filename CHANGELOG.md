@@ -15,9 +15,9 @@ The first release.
   tag and never from `main`. Its hooks record, offline,
   which issues a session works on: mutating `gh issue` commands, closing keywords in `gh pr create`
   bodies and commit messages, edits in a worktree whose branch name carries an issue number, and
-  `epic-pulse track` pins. The hook after each tool call runs asynchronously, so no tool call waits
-  for it; the README gives its measured cost rather than a target. `/epic-pulse:track` pins an issue
-  or epic to the session.
+  `epic-pulse track` pins. The performance promise is that the hook after each tool call runs in the
+  background and never blocks it, and that its startup cost is measured, in the README, rather than
+  promised as a number. `/epic-pulse:track` pins an issue or epic to the session.
 - The `epic-pulse` command on npm, with no runtime dependencies: `statusline`,
   `statusline install [--dry-run] [--project]`, `json`, `track`, `untrack`, `refresh`, `doctor`, and
   `hook`, which the plugin runs.
@@ -27,9 +27,14 @@ The first release.
   writes one command that sh, cmd and PowerShell all run, and that finds the runtime through
   `CLAUDE_CONFIG_DIR`.
 - Statuses derived from GitHub: todo, in progress, in review, done and dropped. Progress is
-  done / (total − dropped). Epics made of a task list count their boxes.
+  done / (total − dropped). A closed sub-issue is done unless it was closed as not planned or as a
+  duplicate, so one closed with no reason at all counts as done. Epics made of a task list count their
+  boxes.
+- A pin on an issue that is itself an epic (sub-issues or a task list) shows that issue's own
+  progress, not its parent's, whether it was pinned to a session or to the repository.
 - One shared refresher per repository with a 300-points-an-hour budget across every repository on the
-  machine, and backing off when GitHub rate-limits.
+  machine, and backing off when GitHub rate-limits. `epic-pulse refresh` held back only by that
+  pacing says when it can run and exits 0, instead of reporting a budget failure.
 - A VS Code extension, Epic Pulse, on the Visual Studio Marketplace and Open VSX, with its own icon.
   Each VS Code sign-in's token goes only to the host it belongs to.
 - `.epic-pulse.json` with `branchIssuePattern`, `ignorePaths` and `ignoreMainCheckout`.

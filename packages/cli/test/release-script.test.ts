@@ -85,11 +85,45 @@ test('anything but a plain major.minor.patch is a usage error that changes nothi
   assert.deepEqual(repoState(repo), clean);
 });
 
-test('a version that is not newer than every manifest is refused', (t) => {
+// The first release of a version is cut from manifests that already say it: the
+// version in development is the one that ships. The tag, not the manifests,
+// says whether it was released.
+test('the version the manifests already carry is released while its tag does not exist, and only plugin/dist is new', (t) => {
+  const repo = releaseRepo(t);
+  const current = cliVersion(repo);
+  const before = new Map(manifestsIn(repo).map((path) => [path, readFileSync(join(repo, path), 'utf8')]));
+  const run = release(repo, [current]);
+  assert.equal(run.status, 0, run.stderr);
+  assert.equal(git(repo, ['rev-parse', '--abbrev-ref', 'HEAD']).trim(), `release/v${current}`);
+  assert.equal(git(repo, ['log', '-1', '--format=%s']).trim(), `chore: release v${current}`);
+  assert.deepEqual(git(repo, ['show', '--name-only', '--format=', 'HEAD']).split('\n').filter(Boolean).sort(), [PLUGIN_BUNDLE, PLUGIN_NOTICES].sort());
+  for (const [path, text] of before) assert.equal(readFileSync(join(repo, path), 'utf8'), text, path);
+});
+
+test('a manifest behind the version is brought up to it, and one ahead of it refuses it', (t) => {
+  const repo = releaseRepo(t);
+  const current = cliVersion(repo);
+  const plugin = join(repo, 'plugin', '.claude-plugin', 'plugin.json');
+  const original = readFileSync(plugin, 'utf8');
+  writeFileSync(plugin, original.replace(`"version": "${current}"`, '"version": "0.0.1"'));
+  git(repo, ['commit', '-q', '-am', 'a manifest behind']);
+  assert.equal(release(repo, [current]).status, 0);
+  assert.equal(readFileSync(plugin, 'utf8'), original);
+  git(repo, ['switch', '-q', 'main']);
+  git(repo, ['branch', '-q', '-D', `release/v${current}`]);
+  writeFileSync(plugin, original.replace(`"version": "${current}"`, '"version": "9.9.9"'));
+  git(repo, ['commit', '-q', '-am', 'a manifest ahead']);
+  assertRefused(release(repo, [current]), 1, new RegExp(`${literal(current)} is older than plugin/\\.claude-plugin/plugin\\.json \\(9\\.9\\.9\\)`));
+});
+
+test('a lower version, and the current one once its tag exists, are refused', (t) => {
   const repo = releaseRepo(t);
   const clean = repoState(repo);
-  assertRefused(release(repo, [cliVersion(repo)]), 1, /is not newer than packages\/cli\/package\.json/);
-  assertRefused(release(repo, ['0.0.1']), 1, /is not newer than /);
+  const current = cliVersion(repo);
+  assertRefused(release(repo, ['0.0.1']), 1, new RegExp(`^epic-pulse: 0\\.0\\.1 is older than packages/cli/package\\.json \\(${literal(current)}\\)`));
+  git(repo, ['tag', `v${current}`]);
+  assertRefused(release(repo, [current]), 1, new RegExp(literal(`the tag v${current} already exists`)));
+  git(repo, ['tag', '-d', `v${current}`]);
   assert.deepEqual(repoState(repo), clean);
 });
 

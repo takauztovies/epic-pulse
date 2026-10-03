@@ -24,10 +24,28 @@ async function refFor(target: IssueTarget, cwd: string): Promise<IssueRef | unde
   return repo ? makeRef({ ...repo, number: target.number }) : undefined;
 }
 
+// The hook finds its pin by the command's name, `epic-pulse`, however the shell
+// reaches it. A launcher word in front of the name hides it: `npx epic-pulse
+// track 4` is a command named npx, which pins nothing. npx and pnpm exec both
+// set npm_command=exec for what they start, so that is what is looked for; it
+// is also set for a Claude Code that was itself started that way, in which case
+// this warns about a command that would have worked.
+function behindLauncher(env: NodeJS.ProcessEnv): boolean {
+  return env['npm_command'] === 'exec';
+}
+
+function unseen(verb: TrackVerb, word: string): number {
+  const [pin, from] = verb === 'track' ? ['pin', 'to'] : ['unpin', 'from'];
+  printError(`epic-pulse: this looks like it was started through npx or pnpm exec, which the hook can not read, so it will not ${pin} ${word} ${from} this session.`);
+  printError(`epic-pulse: nothing was written. Run it as \`epic-pulse ${verb} ${word}\`, or add --repo to change the pin for the whole repository.`);
+  return 0;
+}
+
 // Inside Claude Code the PostToolUse hook reads this very command line and pins
 // the issue to the session that ran it, and to no other. A repository pin
 // written here would show in every session, so nothing is written.
 async function sessionOnly(verb: TrackVerb, word: string, env: NodeJS.ProcessEnv): Promise<number> {
+  if (behindLauncher(env)) return unseen(verb, word);
   printLine(verb === 'track' ? `epic-pulse: the hook pins ${word} to this session.` : `epic-pulse: the hook unpins ${word} from this session.`);
   printLine('epic-pulse: nothing was written. Add --repo to change the pin for the whole repository.');
   const dir = await registryDirFor(process.cwd(), env);

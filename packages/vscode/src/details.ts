@@ -36,6 +36,8 @@ export function refreshText(summary: RefreshSummary): string {
       return 'failed, the registry could not be written';
     case 'busy':
       return 'left to another refresher, which holds the lock';
+    case 'paced':
+      return `waiting for its turn in the hourly budget, until ${new Date(summary.until).toISOString()}`;
     case 'done':
       return `${summary.requests} requests, ${summary.points} points, error ${summary.error ?? 'none'}`;
   }

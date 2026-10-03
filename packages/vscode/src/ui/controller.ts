@@ -3,8 +3,8 @@ import * as vscode from 'vscode';
 import { errorLabel, outcomeLine, type DetailsInput } from '../details.js';
 import { CONFIG_SECTION, VIEW_ID } from '../ids.js';
 import { buildModel } from '../model.js';
-import { pollAll, type RepoResult } from '../poll.js';
-import { Poller } from '../poller.js';
+import { pollAll, readAll, type RepoResult } from '../poll.js';
+import { Poller, type PollMode } from '../poller.js';
 import { discoverRepos } from '../repos.js';
 import { parseSettings, type Settings } from '../settings.js';
 import { statusBarOf } from '../status-model.js';
@@ -38,10 +38,11 @@ export class Controller {
   #logged: ReadonlyMap<string, string> = new Map();
 
   // The first poll runs at once, focused or not, so a window that starts in
-  // the background still shows something; after that, ticks wait for focus.
+  // the background still shows something; after that, ticks without focus only
+  // read the files again, and the refresh waits for focus.
   constructor(context: vscode.ExtensionContext) {
     this.#poller = new Poller({
-      run: () => this.#poll(),
+      run: (mode) => this.#poll(mode),
       intervalMs: this.#settings.refreshSeconds * 1000,
       focused: vscode.window.state.focused,
       onError: (error) => this.#log.error(`poll failed: ${errorLabel(error)}`),
@@ -57,16 +58,29 @@ export class Controller {
     return this.#poller.dispose();
   }
 
-  async #poll(): Promise<void> {
+  async #poll(mode: PollMode): Promise<void> {
     const now = Date.now();
+    const next = mode === 'read' ? await this.#reread(now) : await this.#refreshed(now);
+    if (next === undefined) return;
+    this.#latest = next;
+    const model = buildModel(next);
+    this.#tree.update(treeOf(model));
+    this.#statusBar.show(statusBarOf(model));
+    this.#logChanges(next.results);
+  }
+
+  async #refreshed(now: number): Promise<DetailsInput> {
     const auth = await readAuth(this.#log);
     const repos = await discoverRepos(folderPaths(), process.env);
     const results = await pollAll(repos, { now, env: process.env, grant: auth.grant });
-    const model = buildModel({ results, now });
-    this.#latest = { results, accounts: auth.accounts, hostProblems: parseHostList(process.env['EPIC_PULSE_HOSTS']).problems, now };
-    this.#tree.update(treeOf(model));
-    this.#statusBar.show(statusBarOf(model));
-    this.#logChanges(results);
+    return { results, accounts: auth.accounts, hostProblems: parseHostList(process.env['EPIC_PULSE_HOSTS']).problems, now };
+  }
+
+  // Nothing to read again before a poll has finished; the tick that finds that
+  // out leaves the screen as it is.
+  async #reread(now: number): Promise<DetailsInput | undefined> {
+    const latest = this.#latest;
+    return latest && { ...latest, results: await readAll(latest.results, now), now };
   }
 
   // A line when a repository's outcome changes, not one per poll.

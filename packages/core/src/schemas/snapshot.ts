@@ -34,8 +34,13 @@ export const EpicEntrySchema = z
 
 // `error`: GitHub refused the lookup for good (refresh-batch.ts), so the
 // issue resolves to no epic for as long as any resolution is cached.
+// `isEpic`: an issue with a parent resolves to the parent, and a pin names the
+// issue itself, so Phase B also asks whether a pinned issue is an epic. true:
+// it is, and its own entry is in `epics`; false: it is not, and is not asked
+// again until Phase A resolves it again, which drops the answer. Absent: not
+// asked.
 export const ResolutionSchema = z
-  .object({ epic: IssueRefSchema.nullable(), resolvedAt: z.number().int().nonnegative(), error: ErrorCodeSchema.optional() })
+  .object({ epic: IssueRefSchema.nullable(), resolvedAt: z.number().int().nonnegative(), error: ErrorCodeSchema.optional(), isEpic: z.boolean().optional() })
   .readonly();
 
 export const UsageSchema = z

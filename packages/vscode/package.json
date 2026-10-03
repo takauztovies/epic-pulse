@@ -117,7 +117,7 @@
           "default": 60,
           "minimum": 30,
           "maximum": 86400,
-          "markdownDescription": "How often, in seconds, Epic Pulse refreshes while this window has focus. GitHub usage stays inside the hourly budget every epic-pulse refresher shares, whatever this is set to."
+          "markdownDescription": "How often, in seconds, Epic Pulse refreshes while this window has focus, and reads what is on disk again, without asking GitHub, while it does not. GitHub usage stays inside the hourly budget every epic-pulse refresher shares, whatever this is set to."
         },
         "epicPulse.statusBar.enabled": {
           "type": "boolean",

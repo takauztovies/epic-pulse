@@ -144,12 +144,20 @@ test('outside a repository there is no epic to show', async (t) => {
 });
 
 // A mistyped host is for doctor and the VS Code details to say. The status line
-// is redrawn every thirty seconds, from disk, and stays as quiet as it was.
+// is redrawn every thirty seconds, from disk, and stays as quiet as it was:
+// one explicit line, and nothing about the entries. Which state it is depends on
+// whether the refresh the render starts has finished (loading… before it,
+// error (no_token) after), so the state is not pinned, only that it is one.
+const EXPLICIT_LINE = /^(?:epic-pulse: (?:hook inactive|no epic|loading…|unsupported host \(no sub-issues\)|error \([a-z_]+\))|#\d+ [^\n]*)\n$/;
+
 test('the status line says nothing about an ignored EPIC_PULSE_HOSTS entry', async (t) => {
   const bound = await boundSession(t);
-  const plain = await statusLine(bound);
+  const canary = plantCanary(bound.paths);
   const env = cliEnv(bound.box, { EPIC_PULSE_HOSTS: 'https://ghe.example.com,bad_host' });
   const run = await runCli(['statusline'], { cwd: bound.repo, env, input: statusPayload(bound.repo) });
-  assert.deepEqual([run.code, run.stdout, run.stderr], [0, plain.stdout, '']);
-  assert.doesNotMatch(run.stdout, /EPIC_PULSE_HOSTS|ignored/);
+  assert.deepEqual([run.code, run.stderr], [0, '']);
+  assert.match(run.stdout, EXPLICIT_LINE);
+  assert.doesNotMatch(run.stdout, /EPIC_PULSE_HOSTS|ignored|ghe\.example|bad_host/);
+  // The refresh it started must be over before the temp directories go.
+  await refreshFinished(bound.paths, canary);
 });

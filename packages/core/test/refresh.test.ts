@@ -123,7 +123,7 @@ test('a repository refreshes cached data again only once its last cost is paid o
   assert.deepEqual(await at(0), sent);
   const before = readFileSync(paths.snapshotFile);
   // The request was charged 1 point: at 300 an hour that is 12 s, times the 2 repositories.
-  assert.deepEqual(await at(23_999), { status: 'done', requests: 0, points: 0, error: 'budget' });
+  assert.deepEqual(await at(23_999), { status: 'paced', until: now + 24_000 });
   assert.deepEqual(readFileSync(paths.snapshotFile), before, 'a paced run leaves the snapshot alone');
   assert.deepEqual(await at(24_000), sent);
 });

@@ -19,7 +19,9 @@ export const DEMO_REMOTE = 'https://github.com/takauztovies/epic-pulse.git';
 // on a Windows runner and git never writes, which the JS realpath leaves alone.
 export function tempDir(t: TestContext, prefix = 'ep-cli-'): string {
   const dir = realpathSync.native(mkdtempSync(join(tmpdir(), prefix)));
-  t.after(() => rmSync(dir, { recursive: true, force: true, maxRetries: 5 }));
+  // A detached refresh may still be ending, and on Windows holds its directory
+  // until it has: rmSync retries EBUSY, with a growing wait, for about 3 s.
+  t.after(() => rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }));
   return dir;
 }
 
@@ -44,8 +46,10 @@ export function sandbox(t: TestContext): Sandbox {
 }
 
 // The real HOME, Claude config, tokens and git variables never reach a child:
-// the host running these tests may itself be a Claude Code session.
-const SCRUBBED = /^(?:GIT_|GH_|GITHUB_|CLAUDE|EPIC_PULSE_)/;
+// the host running these tests may itself be a Claude Code session. So does
+// npm_command, which `pnpm exec` and `npx` set to "exec": track reads it as
+// "started through a launcher", and a test run through either would say so.
+const SCRUBBED = /^(?:GIT_|GH_|GITHUB_|CLAUDE|EPIC_PULSE_|npm_command$)/;
 
 export function cliEnv(box: Sandbox, extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   const kept = Object.fromEntries(Object.entries(process.env).filter(([key]) => !SCRUBBED.test(key)));

@@ -24,6 +24,15 @@ export function demoSnapshot(now: number): Snapshot {
   return applyEpics(resolved, [[demo(1), subIssues.value.epics.get(1) ?? null], [demo(8), checklist.value.epics.get(8) ?? null]], now);
 }
 
+// demoSnapshot, and #4, a sub-issue of epic #1, fetched as an epic of its own.
+// The demo has no nested epic, so the node is the recorded epic #1 answered for
+// #4: real data, addressed to the issue that stands in for a sub-epic.
+export function subEpicSnapshot(now: number): Snapshot {
+  const subIssues = parsePhaseB(loadFixture('phase-b-subissues'));
+  assert.ok(subIssues.ok);
+  return applyEpics(demoSnapshot(now), [[demo(4), subIssues.value.epics.get(1) ?? null]], now);
+}
+
 // An empty PATH: `gh` can not be found, so only env vars can supply a token.
 // A private cache directory: no test reads or charges the user's real usage
 // ledger.

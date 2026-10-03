@@ -4,7 +4,7 @@ import { RATE_LIMITED_BACKOFF_MS, RETAIN_MS } from './refresh-plan.js';
 import { buildEpic, epicRefFor } from './resolve.js';
 import type { ErrorCode, IssueRef } from './schemas/common.js';
 import type { EpicNode, PhaseAIssue } from './schemas/graphql.js';
-import type { EpicEntry, Snapshot } from './schemas/snapshot.js';
+import type { EpicEntry, Resolution, Snapshot } from './schemas/snapshot.js';
 
 // Pure snapshot transitions. Each returns a new snapshot; the refresher
 // decides which ones to apply and in what order.
@@ -26,6 +26,15 @@ export function applyRefusal(snapshot: Snapshot, refs: readonly IssueRef[], refu
   return { ...snapshot, issues: { ...snapshot.issues, ...Object.fromEntries(refused) } };
 }
 
+// An answer about an issue whose own resolution names another epic, its
+// parent, says whether the issue is an epic itself: Phase B asks that of a pin
+// (probeTargets). An issue that resolves to itself needs no such answer.
+function withOwnAnswer(key: string, resolution: Resolution, answered: ReadonlyMap<string, boolean>): Resolution {
+  const own = answered.get(key);
+  if (own === undefined || resolution.epic === null || refKey(resolution.epic) === key) return resolution;
+  return { ...resolution, isEpic: own };
+}
+
 // A fetched epic replaces its entry. An answer that is not an epic (not found,
 // or an issue with neither sub-issues nor a checklist) removes the entry and
 // re-points every issue that led to it at "no epic", which the 30-minute
@@ -33,11 +42,12 @@ export function applyRefusal(snapshot: Snapshot, refs: readonly IssueRef[], refu
 export function applyEpics(snapshot: Snapshot, answers: readonly (readonly [IssueRef, EpicNode | null])[], now: number): Snapshot {
   const built = answers.map(([ref, node]) => [refKey(ref), node ? buildEpic(node, ref) : null] as const);
   const gone = new Set(built.flatMap(([key, data]) => (data ? [] : [key])));
+  const answered = new Map(built.map(([key, data]) => [key, data !== null] as const));
   const fetched = built.flatMap(([key, data]) => (data ? [[key, { ...data, fetchedAt: now, error: null }] as const] : []));
   const kept = Object.entries(snapshot.epics).filter(([key]) => !gone.has(key));
   const issues = Object.entries(snapshot.issues).map(([key, resolution]) => {
     const pointsAtGone = resolution.epic !== null && gone.has(refKey(resolution.epic));
-    return [key, pointsAtGone ? { epic: null, resolvedAt: now } : resolution] as const;
+    return [key, pointsAtGone ? { epic: null, resolvedAt: now } : withOwnAnswer(key, resolution, answered)] as const;
   });
   return { ...snapshot, epics: Object.fromEntries([...kept, ...fetched]), issues: Object.fromEntries(issues) };
 }
@@ -64,11 +74,11 @@ export function rateLimited(snapshot: Snapshot, now: number): Snapshot {
 }
 
 // Keeps what the gathered refs need plus anything resolved in the last six
-// hours, and only the epics a kept issue points at.
+// hours, and only the epics a kept issue points at, or is itself.
 export function pruneSnapshot(snapshot: Snapshot, refs: readonly IssueRef[], now: number): Snapshot {
   const wanted = new Set(refs.map(refKey));
   const issues = Object.entries(snapshot.issues).filter(([key, r]) => wanted.has(key) || now - r.resolvedAt < RETAIN_MS);
-  const epicKeys = new Set(issues.flatMap(([, r]) => (r.epic ? [refKey(r.epic)] : [])));
+  const epicKeys = new Set(issues.flatMap(([key, r]) => [...(r.epic ? [refKey(r.epic)] : []), ...(r.isEpic ? [key] : [])]));
   const epics = Object.entries(snapshot.epics).filter(([key]) => epicKeys.has(key));
   return { ...snapshot, issues: Object.fromEntries(issues), epics: Object.fromEntries(epics) };
 }

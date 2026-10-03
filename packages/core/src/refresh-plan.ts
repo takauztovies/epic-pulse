@@ -42,6 +42,14 @@ export function gatherRefs(sessions: readonly SessionState[], pins: readonly Pin
   return unique([...bound.map((binding) => binding.ref), ...pins.map((pin) => pin.ref)]);
 }
 
+// The issues the user named on purpose: a session's pins, which last until they
+// are untracked, and the repository's pins. Pass the live sessions, and the
+// status line's own session too, as withSession does.
+export function pinnedRefs(sessions: readonly SessionState[], pins: readonly Pin[], now: number): readonly IssueRef[] {
+  const bound = sessions.flatMap((session) => activeBindings(session, now)).filter((binding) => binding.via === 'pin');
+  return unique([...bound.map((binding) => binding.ref), ...pins.map((pin) => pin.ref)]);
+}
+
 // The status line shows its own session's bindings however long the session
 // has been quiet, so those count whether or not it is live, first.
 export function withSession(refs: readonly IssueRef[], session: SessionState | undefined, now: number): readonly IssueRef[] {
@@ -69,6 +77,24 @@ export function needsResolution(snapshot: Snapshot, refs: readonly IssueRef[], n
 // The distinct epics the refs resolved to; refs with no epic, or none yet, add nothing.
 export function epicRefsOf(snapshot: Snapshot, refs: readonly IssueRef[]): readonly IssueRef[] {
   return unique(refs.flatMap((ref) => snapshot.issues[refKey(ref)]?.epic ?? []));
+}
+
+// An issue with a parent resolves to the parent, which is right for work bound
+// to it and wrong for a pin, which names the issue: if that is an epic itself
+// (a sub-epic) it shows as that. Phase B has to look at it to know, so a pinned
+// issue whose resolution points at a parent is asked about as an epic of its
+// own, unless it was found not to be one, which holds until Phase A asks again.
+export function probeTargets(snapshot: Snapshot, pinned: readonly IssueRef[]): readonly IssueRef[] {
+  return unique(pinned.filter((ref) => {
+    const resolution = snapshot.issues[refKey(ref)];
+    return resolution?.epic != null && refKey(resolution.epic) !== refKey(ref) && resolution.isEpic !== false;
+  }));
+}
+
+// What Phase B keeps current: the epics the refs resolved to, then the pinned
+// issues that may be epics themselves.
+export function epicsToWatch(snapshot: Snapshot, refs: readonly IssueRef[], pinned: readonly IssueRef[]): readonly IssueRef[] {
+  return unique([...epicRefsOf(snapshot, refs), ...probeTargets(snapshot, pinned)]);
 }
 
 // Oldest first, so a tight budget refreshes whatever has waited longest.
