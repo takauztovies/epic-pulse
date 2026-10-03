@@ -1,63 +1,53 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { test, type TestContext } from 'node:test';
-import { git, ROOT, tempDir } from './helpers.js';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { test } from 'node:test';
+import { DIGEST, KEY, repoWith, run, WORD } from './denylist-helpers.js';
+import { ROOT } from './helpers.js';
 
-// scripts/check-denylist.mjs fails on any word whose SHA-256 digest is in
-// scripts/denylist.sha256. The list holds the digest of one nonsense word for
-// these tests, spelled here in two pieces so that this file, which the check
-// reads too, does not hold it.
-const WORD = ['zqxplor', 'vantumbek'].join('');
-const SCRIPT = join(ROOT, 'scripts', 'check-denylist.mjs');
+// scripts/check-denylist.mjs fails on any word whose HMAC-SHA256 digest, under
+// a secret key, is listed in scripts/denylist.hmac. These tests run it, in
+// throwaway repositories with a list of their own, under a throwaway key, on
+// one nonsense word. The real list is checked where the real key is: in CI.
 
-// Without the GIT_* variables a git hook exports, which would point the
-// script's `git ls-files` at the repository running the tests.
-function check(cwd: string, script = SCRIPT): { readonly status: number | null; readonly out: string } {
-  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
-  const run = spawnSync(process.execPath, [script], { cwd, env, encoding: 'utf8' });
-  return { status: run.status, out: `${run.stdout}${run.stderr}` };
-}
+const WITH_KEY = { env: { EPIC_PULSE_DENYLIST_KEY: KEY } };
+const HIT = (place: string) => `epic-pulse: ${place} holds a denylisted word (hmac ${DIGEST.slice(0, 12)}...)\n`;
 
-// A throwaway repository in which these files are tracked: in its index.
-function repoWith(t: TestContext, files: Readonly<Record<string, string>>): string {
-  const dir = tempDir(t);
-  git(dir, ['init', '-q', '-b', 'main']);
-  for (const [path, text] of Object.entries(files)) {
-    mkdirSync(dirname(join(dir, path)), { recursive: true });
-    writeFileSync(join(dir, path), text);
-  }
-  git(dir, ['add', '--', ...Object.keys(files)]);
-  return dir;
-}
-
-test('the repository, its fixtures and its built bundles hold no denylisted word', () => {
-  const run = check(ROOT);
-  assert.equal(run.status, 0, run.out);
-  const files = Number(/no denylisted word in (\d+) files/.exec(run.out)?.[1] ?? 0);
+test('the check reads the repository, its fixtures and its built bundles', (t) => {
+  const result = run(t, ROOT, WITH_KEY);
+  assert.equal(result.status, 0, result.out);
+  const files = Number(/no denylisted word in (\d+) files/.exec(result.out)?.[1] ?? 0);
   assert.ok(files > 150, `only ${files} files were read, so the check looked at too little`);
 });
 
 test('a listed word in a tracked file, in any case, fails the check, which names the place and not the word', (t) => {
-  const run = check(repoWith(t, { 'notes/plan.md': `line one\nWe met the ${WORD.toUpperCase()}-team.\n` }));
-  assert.equal(run.status, 1, run.out);
-  assert.equal(run.out, 'epic-pulse: notes/plan.md:2 holds a denylisted word (sha256 5409dfdc8f2c...)\n');
-  assert.equal(run.out.toLowerCase().includes(WORD), false, 'the check printed the word it hides');
+  const repo = repoWith(t, { 'notes/plan.md': `line one\nWe met the ${WORD.toUpperCase()}-team.\n` });
+  const result = run(t, repo, WITH_KEY);
+  assert.deepEqual(result, { status: 1, out: HIT('notes/plan.md:2') });
+  assert.equal(result.out.toLowerCase().includes(WORD), false, 'the check printed the word it hides');
 });
 
 test('a listed word in what a build wrote fails it too, though dist is not tracked', (t) => {
   const repo = repoWith(t, { 'README.md': 'clean\n' });
   mkdirSync(join(repo, 'plugin', 'dist'), { recursive: true });
   writeFileSync(join(repo, 'plugin', 'dist', 'epic-pulse.mjs'), `const x = "${WORD}";\n`);
-  assert.deepEqual(check(repo), { status: 1, out: 'epic-pulse: plugin/dist/epic-pulse.mjs:1 holds a denylisted word (sha256 5409dfdc8f2c...)\n' });
+  assert.deepEqual(run(t, repo, WITH_KEY), { status: 1, out: HIT('plugin/dist/epic-pulse.mjs:1') });
 });
 
-// A digest one character short would never match anything.
-test('a denylist line that is not a digest is refused rather than skipped', (t) => {
-  const repo = repoWith(t, { 'README.md': 'clean\n' });
-  mkdirSync(join(repo, 'scripts'));
-  copyFileSync(SCRIPT, join(repo, 'scripts', 'check-denylist.mjs'));
-  writeFileSync(join(repo, 'scripts', 'denylist.sha256'), '# a comment\n\n5409dfdc8f2c9b71c34c0085e168cd5978642573a36251e39bc3c1ab2123af7\n');
-  assert.deepEqual(check(repo, join(repo, 'scripts', 'check-denylist.mjs')), { status: 2, out: 'epic-pulse: scripts/denylist.sha256 line 3: not a SHA-256 hex digest\n' });
+// The digest in the list is only the word's HMAC under KEY: under any other key
+// the same word hashes to something else and the list matches nothing.
+test('a word is listed under its key only: another key finds nothing', (t) => {
+  const repo = repoWith(t, { 'notes/plan.md': `We met the ${WORD}.\n` });
+  const result = run(t, repo, { env: { EPIC_PULSE_DENYLIST_KEY: `${KEY}-but-another` } });
+  assert.equal(result.status, 0, result.out);
+  assert.match(result.out, /^epic-pulse: no denylisted word in 1 files\.\n$/);
+});
+
+// A line one character short would never match anything.
+test('a denylist line that is not a digest is refused rather than skipped, with a key or without', (t) => {
+  const list = `# a comment\n\n${DIGEST.slice(1)}\n`;
+  const repo = repoWith(t, { 'README.md': 'clean\n' }, list);
+  const refused = { status: 2, out: 'epic-pulse: scripts/denylist.hmac line 3: not an HMAC-SHA256 hex digest\n' };
+  assert.deepEqual(run(t, repo, WITH_KEY), refused);
+  assert.deepEqual(run(t, repo), refused);
 });

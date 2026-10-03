@@ -1,5 +1,6 @@
-# Every pull request and every push to main. The token is read-only and no
-# secret is used: nothing here can publish or write.
+# Every pull request and every push to main. The token is read-only, and the
+# one secret, the denylist key, only lets a check read a list: nothing here can
+# publish or write.
 name: CI
 
 on:
@@ -79,9 +80,16 @@ jobs:
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         run: node scripts/check-dist-guard.mjs
 
-      # No word on scripts/denylist.sha256 anywhere in the repository or in
-      # what it builds; the test job runs the same check inside `pnpm test`.
+      # No word on scripts/denylist.hmac anywhere in the repository or in what
+      # it builds. The list holds HMACs, so the check needs the key, and this is
+      # the one step that has it: `pnpm test` runs the check's own tests under a
+      # throwaway key. A run of this repository's own that finds no key fails
+      # rather than skips; a pull request from a fork gets no secrets, and
+      # HEAD_REPO is how the script tells it from one of ours.
       - name: no denylisted word in the repository or its bundles
+        env:
+          EPIC_PULSE_DENYLIST_KEY: ${{ secrets.DENYLIST_KEY }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
         run: node scripts/check-denylist.mjs
 
       - name: claude plugin validate
