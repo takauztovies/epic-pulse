@@ -57,6 +57,35 @@ jobs:
         if: runner.os == 'Windows'
         run: node scripts/check-statusline-shells.mjs cmd pwsh
 
+  # The live tests run the real refresher against this repository's public demo
+  # issues, so a change in GitHub's schema, or in how it links pull requests,
+  # shows up on the change that meets it rather than in the weekly Live
+  # workflow. epic-pulse reads GITHUB_TOKEN when GH_TOKEN is not set. A pull
+  # request from a fork is not trusted with a token, so only a push or a pull
+  # request from a branch of this repository runs it.
+  live:
+    name: live tests (demo issues)
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: live tests against the demo issues
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm test:live
+
   release-guards:
     name: release guards
     runs-on: ubuntu-latest

@@ -44,5 +44,6 @@ The first release.
   allowlist of every address in the bundle, the documented list of written files, and no token on disk.
 - `THIRD_PARTY_NOTICES.md` beside every bundle, in the npm package, the plugin and the extension, with
   the licence text of each package the bundle contains (zod).
-- CI on macOS, Linux and Windows with Node 22 and 24, a release workflow with provenance, and a weekly
-  live check against the public demo issues.
+- CI on macOS, Linux and Windows with Node 22 and 24, a release workflow with provenance, and a live
+  check against the public demo issues, weekly and on every push and pull request from a branch of this
+  repository.
