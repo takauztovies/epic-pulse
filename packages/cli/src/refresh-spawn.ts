@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process';
+import { statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import {
-  emptySnapshot, epicRefsOf, gatherRefs, needsFetch, needsResolution, REFRESH_SESSION_ENV, withSession,
+  emptySnapshot, epicRefsOf, gatherRefs, homeDirectory, needsFetch, needsResolution, REFRESH_SESSION_ENV, withSession,
   type Pin, type SessionState, type SnapshotRead,
 } from '@epic-pulse/core';
 import { retryingLater, type RefreshAttempt } from './refresh-attempt.js';
@@ -30,23 +32,42 @@ export function refreshDue(input: DueInput): boolean {
   return needsFetch(snapshot, epicRefsOf(snapshot, refs), input.now).length > 0;
 }
 
-// Detached and unreferenced: the status line prints and exits at once while the
-// refresh runs on, single-flight behind its lock. The registry is handed over
-// through EPIC_PULSE_DIR, which also works when no working directory would,
-// and the status line's own session, whose issues the refresh then keeps
-// current even when the session is not live, through EPIC_PULSE_SESSION.
-export function spawnRefresh(dir: string, env: NodeJS.ProcessEnv, session?: string): void {
+function isDirectory(path: string): boolean {
   try {
-    const child = spawn(process.execPath, [bundlePath(), 'refresh'], {
-      detached: true,
-      stdio: 'ignore',
-      windowsHide: true,
-      env: { ...env, EPIC_PULSE_DIR: dir, [REFRESH_SESSION_ENV]: session ?? '' },
-    });
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+// Where a detached process starts: not in the directory the status line was
+// started in, which is the repository. On Windows a running process keeps its
+// working directory from being removed (EBUSY), so a refresh started there held
+// a worktree, a checkout or a test's temp copy for as long as it ran. The home
+// directory, which nobody removes, else the temp directory for an account that
+// has none: a working directory that is not there stops the process from
+// starting at all. With neither, it inherits its parent's, as it always did.
+function neutralDirectory(): string | undefined {
+  return [homeDirectory(), tmpdir()].find((path) => path !== undefined && isDirectory(path));
+}
+
+// A process that outlives this one: detached and unreferenced, its output
+// ignored, so the caller prints and exits at once while it runs on.
+export function spawnDetached(file: string, args: readonly string[], env: NodeJS.ProcessEnv): void {
+  try {
+    const child = spawn(file, args, { detached: true, stdio: 'ignore', windowsHide: true, cwd: neutralDirectory(), env });
     child.on('error', () => undefined); // it could not start; the next render tries again
     child.unref();
   } catch {
     // spawn throws when the system is out of processes or descriptors; the
     // status line is already printed, and the next render tries again.
   }
+}
+
+// The refresh runs on single-flight behind its lock. The registry is handed
+// over through EPIC_PULSE_DIR, which also works when no working directory
+// would, and the status line's own session, whose issues the refresh then keeps
+// current even when the session is not live, through EPIC_PULSE_SESSION.
+export function spawnRefresh(dir: string, env: NodeJS.ProcessEnv, session?: string): void {
+  spawnDetached(process.execPath, [bundlePath(), 'refresh'], { ...env, EPIC_PULSE_DIR: dir, [REFRESH_SESSION_ENV]: session ?? '' });
 }

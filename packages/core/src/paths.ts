@@ -36,7 +36,7 @@ export async function registryDirFor(cwd: string, env: NodeJS.ProcessEnv): Promi
   return worktree ? join(worktree.commonDir, REGISTRY_DIR_NAME) : undefined;
 }
 
-function homeDirectory(): string | undefined {
+export function homeDirectory(): string | undefined {
   try {
     return homedir();
   } catch {

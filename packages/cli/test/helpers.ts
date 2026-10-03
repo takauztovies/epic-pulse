@@ -19,7 +19,9 @@ export const DEMO_REMOTE = 'https://github.com/takauztovies/epic-pulse.git';
 // on a Windows runner and git never writes, which the JS realpath leaves alone.
 export function tempDir(t: TestContext, prefix = 'ep-cli-'): string {
   const dir = realpathSync.native(mkdtempSync(join(tmpdir(), prefix)));
-  t.after(() => rmSync(dir, { recursive: true, force: true, maxRetries: 5 }));
+  // A detached refresh may still be ending, and on Windows holds its directory
+  // until it has: rmSync retries EBUSY, with a growing wait, for about 3 s.
+  t.after(() => rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }));
   return dir;
 }
 
