@@ -44,20 +44,22 @@ function fit(variants: readonly string[], width: number): string {
 }
 
 // Detail goes before anything is cut: first the bar, then review and progress
-// counts, then the other-epics count. The stale marker is in every variant.
-function epicLine(epic: JsonEpic, more: number, width: number): string {
+// counts, then the loading count and the other-epics count. The stale marker is
+// in every variant.
+function epicLine(epic: JsonEpic, options: { readonly more: number; readonly pending: number; readonly width: number }): string {
   const { in_review: review, in_progress: progress } = epic.counts;
   const detail = [review > 0 ? `rev ${review}` : '', progress > 0 ? `wip ${progress}` : ''].filter(Boolean);
   const stale = epic.stale ? [epic.error === null ? 'stale' : `stale (${epic.error})`] : [];
-  const extra = more > 0 ? ` (+${more})` : '';
+  const loading = options.pending > 0 ? [`${options.pending} loading`] : [];
+  const extra = options.more > 0 ? ` (+${options.more})` : '';
   const head = `#${epic.number} ${epic.percent}% ${fraction(epic)}`;
   const withBar = `#${epic.number} ${bar(epic.percent)} ${epic.percent}% ${fraction(epic)}`;
   return fit([
-    [withBar, ...detail, ...stale].join(' · ') + extra,
-    [head, ...detail, ...stale].join(' · ') + extra,
-    [head, ...stale].join(' · ') + extra,
+    [withBar, ...detail, ...stale, ...loading].join(' · ') + extra,
+    [head, ...detail, ...stale, ...loading].join(' · ') + extra,
+    [head, ...stale, ...loading].join(' · ') + extra,
     [`#${epic.number} ${epic.percent}%`, ...stale].join(' · '),
-  ], width);
+  ], options.width);
 }
 
 function stateText(view: JsonV1): string {
@@ -70,5 +72,5 @@ export function renderStatusLine(view: JsonV1, options: RenderOptions = {}): str
   const width = widthOf(options.width);
   const [primary, ...rest] = view.epics;
   const showsEpic = view.snapshot.state === 'ok' || view.snapshot.state === 'stale';
-  return showsEpic && primary ? epicLine(primary, rest.length, width) : fit([stateText(view)], width);
+  return showsEpic && primary ? epicLine(primary, { more: rest.length, pending: view.pending, width }) : fit([stateText(view)], width);
 }

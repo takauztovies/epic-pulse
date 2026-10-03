@@ -90,3 +90,27 @@ test('an issue whose resolution was refused for good shows that code while nothi
   assert.deepEqual(seen(refused('forbidden')), { state: 'error', fetchedAt: new Date(T0).toISOString(), error: 'forbidden' });
   assert.deepEqual([seen(refused('unsupported')).state, seen(refused('unsupported')).error], ['unsupported', 'unsupported']);
 });
+
+// What the status line says as "1 loading": bindings that have not been
+// answered yet, beside the epic that has.
+test('bindings still waiting for an answer are counted beside the epic already shown', () => {
+  const own = session(A, [[4, 'gh'], [6, 'gh']]);
+  const result = view({ sessions: [own], scope: { session: own } });
+  assert.deepEqual([result.snapshot.state, result.epics.map((e) => e.number), result.pending], ['ok', [1], 1]);
+  const resolved = session(A, [[4, 'gh'], [8, 'gh']]);
+  assert.equal(view({ sessions: [resolved], scope: { session: resolved } }).pending, 0);
+  const several = session(A, [[4, 'gh'], [6, 'gh'], [7, 'gh']]);
+  assert.equal(view({ sessions: [several], scope: { session: several } }).pending, 2);
+});
+
+// Resolved to an epic that has not been fetched yet is waiting too; one the
+// last refresh failed on has the error to say, as stateOf does, and is not.
+test('an epic not fetched yet is pending, and nothing is pending once the refresh failed', () => {
+  const snapshot = demoSnapshot(T0);
+  const unfetched: SnapshotRead = { status: 'ok', snapshot: { ...snapshot, epics: {} } };
+  const own = session(A, [[4, 'gh']]);
+  assert.deepEqual([view({ snapshot: unfetched, sessions: [own], scope: { session: own } }).pending, view({ snapshot: unfetched, sessions: [own], scope: { session: own } }).epics.length], [1, 0]);
+  const failed: SnapshotRead = { status: 'ok', snapshot: { ...snapshot, epics: {}, error: 'network' } };
+  assert.equal(view({ snapshot: failed, sessions: [own], scope: { session: own } }).pending, 0);
+  assert.equal(view({ snapshot: { status: 'missing' }, sessions: [own], scope: { session: own } }).pending, 1);
+});

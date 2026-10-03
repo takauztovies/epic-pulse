@@ -26,6 +26,7 @@ const BROKEN: JsonV1 = {
   version: 1,
   generatedAt: new Date(0).toISOString(),
   liveSessions: 0,
+  pending: 0,
   snapshot: { state: 'error', fetchedAt: null, error: null },
   epics: [],
 };

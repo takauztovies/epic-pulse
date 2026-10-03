@@ -67,6 +67,12 @@ function refusal(refs: readonly IssueRef[], snapshot: Snapshot | undefined): Err
   return refs.map((ref) => snapshot?.issues[refKey(ref)]?.error).find((code) => code !== undefined);
 }
 
+// Bindings the status line says are still loading. Once the last refresh has
+// failed they are not: that has its error to say, as in stateOf.
+function pendingCount({ refs, snapshot }: Scoped): number {
+  return snapshot?.error ? 0 : refs.filter((ref) => isPending(ref, snapshot)).length;
+}
+
 // The code behind the state: the last refresh's, or with nothing to show, a
 // refused resolution's.
 function errorOf({ refs, entries, snapshot }: Scoped): ErrorCode | null {
@@ -121,6 +127,7 @@ export function buildView(input: ViewInput): JsonV1 {
     version: 1,
     generatedAt: iso(input.now),
     liveSessions: live.length,
+    pending: pendingCount(scoped),
     snapshot: { state: stateOf(scoped), fetchedAt: snapshot ? iso(snapshot.updatedAt) : null, error: errorOf(scoped) },
     epics: entries.map((entry) => jsonEpic(entry, bound, input.now)),
   };

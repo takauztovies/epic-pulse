@@ -36,6 +36,10 @@ export const JsonV1Schema = z
     version: z.literal(1),
     generatedAt: z.iso.datetime(),
     liveSessions: z.number().int().nonnegative(),
+    // How many of the view's bindings are still waiting for an answer: never
+    // resolved, or resolved to an epic not fetched yet. 0 once a refresh has
+    // failed, which has its error to say instead. Added to version 1 later.
+    pending: z.number().int().nonnegative(),
     snapshot: z
       .object({
         state: StateKindSchema,

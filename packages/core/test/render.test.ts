@@ -26,6 +26,17 @@ test('the demo epic renders as the documented line, with the pinned epic counted
   assert.equal(renderStatusLine(demoView(bound(4)), { width: 120 }), '#1 ▓▓░░░░░░░░ 20% 1/5 · rev 1 · wip 2 (+1)');
 });
 
+test('a binding still loading is counted after the epic, and goes before anything else is cut', () => {
+  const loading = demoView(bound(4, 6));
+  assert.equal(renderStatusLine(loading, { width: 120 }), '#1 ▓▓░░░░░░░░ 20% 1/5 · rev 1 · wip 2 · 1 loading (+1)');
+  assert.equal(renderStatusLine(loading, { width: 50 }), '#1 20% 1/5 · rev 1 · wip 2 · 1 loading (+1)');
+  assert.equal(renderStatusLine(loading, { width: 30 }), '#1 20% 1/5 · 1 loading (+1)');
+  assert.equal(renderStatusLine(loading, { width: 14 }), '#1 20%');
+  assert.equal(renderStatusLine(demoView(bound(4, 6, 7)), { width: 120 }), '#1 ▓▓░░░░░░░░ 20% 1/5 · rev 1 · wip 2 · 2 loading (+1)');
+  const stale = demoView(bound(4, 6), T0 + STALE_AFTER_MS + 1);
+  assert.equal(renderStatusLine(stale, { width: 120 }), '#1 ▓▓░░░░░░░░ 20% 1/5 · rev 1 · wip 2 · stale · 1 loading (+1)');
+});
+
 test('a checkbox epic shows checked over countable, dropped left out', () => {
   assert.equal(renderStatusLine(demoView(bound(8)), { width: 120 }), '#8 ▓▓▓▓▓░░░░░ 50% 2/4');
 });

@@ -144,6 +144,7 @@ Every state of the status line says what it is:
 | --- | --- |
 | `#1 … 20% 1/5` | the session's epic, from fresh data |
 | `… · stale` | data over ten minutes old, or a refresh failed (`stale (network)` says why); it stays shown |
+| `… · 2 loading` | two more bindings or pins of the session have not been answered yet (`pending` in `epic-pulse json`); the epic it already has stays shown. Not counted once a refresh has failed: the error says that |
 | `epic-pulse: loading…` | the first refresh has not finished yet |
 | `epic-pulse: no epic` | nothing bound or pinned belongs to an epic |
 | `epic-pulse: error (no_token)` | nothing could be fetched; the code says why |
