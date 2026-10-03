@@ -73,7 +73,9 @@ Maintainers cut a release in four steps:
 
 1. Move the changes under **Unreleased** in [CHANGELOG.md](CHANGELOG.md) to a heading for the new
    version, and merge that to `main`.
-2. On an up-to-date `main`, run `node scripts/release.mjs <major.minor.patch>`. It sets every
+2. On an up-to-date `main`, run `node scripts/release.mjs <major.minor.patch>`. The version may be the
+   one the manifests already say, for the first release of the version in development, until its tag
+   exists; an older one, or one already tagged, is refused. It sets every
    manifest to the version (the npm package, the plugin manifest, its marketplace entry and the VS Code
    extension), points the marketplace entry's plugin source at the tag `v<version>`, rebuilds, commits
    the manifests and `plugin/dist` on `release/v<version>`, and prints the commands that follow. It

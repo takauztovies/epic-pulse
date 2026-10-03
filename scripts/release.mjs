@@ -6,6 +6,10 @@
 //   node scripts/release.mjs --check v0.2.0   exit 1 unless every manifest says 0.2.0
 //                                             and the marketplace installs v0.2.0
 //
+// The version may be the one the manifests already carry, for the first release
+// of the version in development, while its tag does not exist; a version older
+// than any manifest, or already tagged, is refused.
+//
 // plugin/dist is ignored everywhere but on release branches, so it is added
 // with -f: Claude Code fetches the plugin's directory from the release tag as
 // it is, and this is the copy it runs. release.yml runs --check against the tag.
@@ -60,10 +64,14 @@ function parseVersion(text) {
   return match ? { text: match.slice(1).join('.'), parts: match.slice(1).map(Number) } : undefined;
 }
 
-function isNewer(next, current) {
+// The first release of a version is cut from manifests that already say it: the
+// version in development is the one that ships. So a manifest at the version
+// itself is fine, and only an older one is behind. Whether the version was
+// released is for its tag to say (assertReadyToCut).
+function isNotOlder(next, current) {
   const [a, b] = [next.parts, parseVersion(current)?.parts ?? [0, 0, 0]];
   const differing = a.findIndex((part, i) => part !== b[i]);
-  return differing !== -1 && a[differing] > b[differing];
+  return differing === -1 || a[differing] > b[differing];
 }
 
 function presentManifests() {
@@ -102,8 +110,8 @@ function assertReadyToCut(version) {
   if (dirty.length > 0) throw new ReleaseError(`commit or stash these first:\n${dirty.join('\n')}`);
   if (gitSucceeds(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`])) throw new ReleaseError(`the branch ${branch} already exists`);
   if (gitSucceeds(['rev-parse', '--verify', '--quiet', `refs/tags/v${version.text}`])) throw new ReleaseError(`the tag v${version.text} already exists`);
-  const stale = presentManifests().filter((manifest) => !isNewer(version, manifestVersion(manifest)));
-  if (stale.length > 0) throw new ReleaseError(`${version.text} is not newer than ${stale.map((m) => `${m.path} (${manifestVersion(m)})`).join(', ')}`);
+  const ahead = presentManifests().filter((manifest) => !isNotOlder(version, manifestVersion(manifest)));
+  if (ahead.length > 0) throw new ReleaseError(`${version.text} is older than ${ahead.map((m) => `${m.path} (${manifestVersion(m)})`).join(', ')}`);
 }
 
 // Everything that can be refused is, before anything changes.
