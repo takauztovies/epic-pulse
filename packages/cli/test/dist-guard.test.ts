@@ -1,10 +1,9 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
-import { devNull } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { git } from './helpers.js';
+import { git, GIT_CONFIG } from './helpers.js';
 import { releaseRepo } from './release-helpers.js';
 
 // scripts/check-dist-guard.mjs, the plugin/dist guard CI runs on every pull
@@ -21,7 +20,7 @@ interface Pull {
 function guard(repo: string, pull: Pull): { readonly status: number | null; readonly stdout: string } {
   const clean = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_') && key !== 'GITHUB_REPOSITORY'));
   const shas = { BASE_SHA: git(repo, ['rev-parse', 'main']).trim(), HEAD_SHA: git(repo, ['rev-parse', 'HEAD']).trim() };
-  const env = { ...clean, ...shas, HEAD_REF: pull.ref, HEAD_REPO: pull.from ?? REPO, GITHUB_REPOSITORY: REPO, GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_NOSYSTEM: '1' };
+  const env = { ...clean, ...shas, HEAD_REF: pull.ref, HEAD_REPO: pull.from ?? REPO, GITHUB_REPOSITORY: REPO, GIT_CONFIG_GLOBAL: GIT_CONFIG, GIT_CONFIG_NOSYSTEM: '1' };
   const run = spawnSync(process.execPath, [join(repo, 'scripts', 'check-dist-guard.mjs')], { cwd: repo, env, encoding: 'utf8' });
   return { status: run.status, stdout: `${run.stdout}${run.stderr}` };
 }

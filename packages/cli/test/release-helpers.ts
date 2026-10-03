@@ -1,11 +1,10 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync } from 'node:fs';
-import { devNull } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { TestContext } from 'node:test';
 import { z } from 'zod';
-import { git, ROOT, tempDir } from './helpers.js';
+import { git, GIT_CONFIG, ROOT, tempDir } from './helpers.js';
 
 export const RELEASE_MANIFESTS = ['packages/cli/package.json', 'plugin/.claude-plugin/plugin.json', '.claude-plugin/marketplace.json'];
 const VSCODE_MANIFEST = 'packages/vscode/package.json';
@@ -21,7 +20,7 @@ export interface Run {
 function releaseEnv(): NodeJS.ProcessEnv {
   const clean = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
   const identity = { GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 'test@example.com', GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 'test@example.com' };
-  return { ...clean, ...identity, GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_NOSYSTEM: '1' };
+  return { ...clean, ...identity, GIT_CONFIG_GLOBAL: GIT_CONFIG, GIT_CONFIG_NOSYSTEM: '1' };
 }
 
 export function release(repo: string, args: readonly string[]): Run {

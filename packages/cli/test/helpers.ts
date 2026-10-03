@@ -1,7 +1,7 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
-import { devNull, tmpdir } from 'node:os';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { TestContext } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -81,11 +81,25 @@ export function runCli(args: readonly string[], options: RunOptions): Promise<Cl
   });
 }
 
+// git's global config in tests: an empty file, not os.devNull. On Windows that
+// is `\\.\nul`, which git refuses to open ("unable to access '\\.\nul':
+// Invalid argument"), so every git command failed there. One file per test
+// process, removed as the process exits.
+function emptyGitConfig(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'ep-gitconfig-'));
+  process.once('exit', () => rmSync(dir, { recursive: true, force: true }));
+  const file = join(dir, 'config');
+  writeFileSync(file, '');
+  return file;
+}
+
+export const GIT_CONFIG = emptyGitConfig();
+
 // Real repositories through real `git`, with every GIT_* variable and the
 // user's global config kept out.
 export function git(cwd: string, args: readonly string[]): string {
   const clean = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
-  const env = { ...clean, GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_NOSYSTEM: '1' };
+  const env = { ...clean, GIT_CONFIG_GLOBAL: GIT_CONFIG, GIT_CONFIG_NOSYSTEM: '1' };
   const identity = ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false'];
   return execFileSync('git', [...identity, ...args], { cwd, env, encoding: 'utf8' });
 }
