@@ -87,13 +87,16 @@ Only when none of these yields a token GitHub accepts does the view offer **Sign
 
 | Setting | Default | |
 | --- | --- | --- |
-| `epicPulse.refreshSeconds` | `60` | How often to refresh while the window has focus, from 30 to 86400. |
+| `epicPulse.refreshSeconds` | `60` | How often to refresh while the window has focus, and to read what is on disk again while it has not, from 30 to 86400. |
 | `epicPulse.statusBar.enabled` | `true` | Show the current epic in the status bar. |
 
 A window refreshes once when it opens, then only while it has focus, and whenever you come back to
-it, click Refresh, sign in or change its folders. In a multi-root workspace every folder's
-repository is in the one view. Every window, the plugin and the CLI share one lock per repository
-and one hourly budget, so more windows do not mean more requests to GitHub.
+it, click Refresh, sign in or change its folders. Without focus it asks GitHub for nothing, but on the
+same interval it reads the files again and redraws, so the status bar and the Epics view keep their
+ages and the stale marker right and show what a hook or another refresher has written. In a
+multi-root workspace every folder's repository is in the one view. Every window, the plugin and the
+CLI share one lock per repository and one hourly budget, so more windows do not mean more requests to
+GitHub.
 
 ## Requirements
 

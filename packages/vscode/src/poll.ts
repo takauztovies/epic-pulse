@@ -87,3 +87,15 @@ export async function pollRepo(repo: RepoTarget, options: PollOptions): Promise<
 export function pollAll(repos: readonly RepoTarget[], options: PollOptions): Promise<readonly RepoResult[]> {
   return Promise.all(repos.map((repo) => pollRepo(repo, options)));
 }
+
+// What a window without focus does on each tick: the repositories of the last
+// poll, read again from their files alone. Nothing is fetched, no lock is taken
+// and nothing is written, so what the window shows ages honestly (fresh data
+// turns stale on screen) and picks up what a hook or another refresher wrote,
+// at no cost to the hourly budget. The last refresh, its token and its hosts
+// are what that poll found, and change only when a refresh runs. A repository
+// the last poll did not find waits for the next one, which opening a folder or
+// coming back to the window runs at once.
+export function readAll(previous: readonly RepoResult[], now: number): Promise<readonly RepoResult[]> {
+  return Promise.all(previous.map(async (result) => ({ ...result, ...(await inspectRepo(result.repo.dir, now)) })));
+}
