@@ -75,16 +75,35 @@ test('32 concurrent appends for one session leave 32 whole lines', async (t) => 
   assert.equal(parseLines(text).length, 32);
 });
 
-test('a session is live until it ends or goes quiet for two hours; activity after an end resumes it', () => {
+test('a session is live until it ends or goes quiet for two hours', () => {
   const t0 = 1_000_000_000;
   const ended = foldSession(ID, [line({ v: 1, ts: t0, ev: 'start' }), line({ v: 1, ts: t0 + 5, ev: 'end' })])!;
   assert.equal(isLive(ended, t0 + 10), false);
-  const resumed = foldSession(ID, [line({ v: 1, ts: t0 + 5, ev: 'end' }), line({ v: 1, ts: t0 + 9, ev: 'tool' })])!;
-  assert.equal(isLive(resumed, t0 + 10), true);
   const quiet = foldSession(ID, [line({ v: 1, ts: t0, ev: 'tool' })])!;
   assert.equal(isLive(quiet, t0 + LIVE_WINDOW_MS), true);
   assert.equal(isLive(quiet, t0 + LIVE_WINDOW_MS + 1), false);
   assert.equal(foldSession(ID, []), undefined);
+});
+
+// The PostToolUse hook runs asynchronously, so one that was still starting when
+// the session ended writes a tool line stamped after the end line. That is the
+// last word of an ended session, and it must not bring it back to life for two
+// hours; only a new SessionStart, which resuming a session writes, does.
+test('a session has ended when an end line is later than its latest start; a late tool line does not revive it, a new start does', () => {
+  const t0 = 1_000_000_000;
+  const at = (ts: number, ev: 'start' | 'tool' | 'end', binds: readonly number[] = []) =>
+    line({ v: 1, ts: t0 + ts, ev, binds: binds.map((n) => ({ ref: ref(n), via: 'gh' as const })) });
+  const lateTool = foldSession(ID, [at(0, 'start'), at(3, 'tool', [5]), at(5, 'end'), at(9, 'tool', [6])])!;
+  assert.deepEqual([lateTool.ended, isLive(lateTool, t0 + 10)], [true, false]);
+  assert.deepEqual(lateTool.bindings.map((binding) => binding.ref.number), [5, 6], 'what the late call bound is still known');
+  const resumed = foldSession(ID, [at(0, 'start'), at(5, 'end'), at(8, 'start')])!;
+  assert.deepEqual([resumed.ended, isLive(resumed, t0 + 10)], [false, true]);
+  const endedAgain = foldSession(ID, [at(0, 'start'), at(5, 'end'), at(8, 'start'), at(12, 'end'), at(13, 'tool')])!;
+  assert.equal(endedAgain.ended, true);
+  const sameInstant = foldSession(ID, [at(5, 'end'), at(5, 'start')])!;
+  assert.equal(sameInstant.ended, false, 'an end that is not later than the start does not end it');
+  const noStart = foldSession(ID, [at(0, 'tool'), at(5, 'end')])!;
+  assert.equal(noStart.ended, true, 'a session whose start the plugin never saw still ends at its end');
 });
 
 test('lines apply in time order, not file order', () => {

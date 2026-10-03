@@ -90,7 +90,9 @@ issues the call worked on. It binds an issue when the call:
 `gh issue view`, `list`, `search`, `status` and `create` never bind, and neither do reads. A call that
 names more than three issues binds none of them. A binding lapses six hours after the last call that
 saw it; a pin lasts until it is untracked or the session ends. A session counts as live for two hours
-after its last hook call; its own status line keeps its issues current after that too.
+after its last hook call, unless it has ended; its own status line keeps its issues current after that
+too. A session has ended when its end is later than its latest start, so a hook call that ran late,
+after the end, does not bring it back, and resuming it, which starts it again, does.
 
 `epic-pulse track <issue> --repo`, or `epic-pulse track <issue>` run in a terminal rather than in a
 session, pins the issue for every session of the repository instead, in `pins.json`.

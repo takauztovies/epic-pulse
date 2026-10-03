@@ -78,6 +78,11 @@ export function parseLines(text: string): readonly RegistryLine[] {
 // An unbind also keeps every later non-pin bind of that issue out for the rest
 // of the session; without that, `untrack` on a branch-bound issue was undone
 // by the next edit in its worktree. Only a pin (`track`) lets it back in.
+// A session has ended when an end line is later than its latest start. The
+// last line is not the test: PostToolUse runs asynchronously, so one that was
+// still starting when the session ended writes a line stamped after the end,
+// and reading that as activity brought the ended session back to life for two
+// hours. Resuming a session writes a new start, which does.
 export function foldSession(id: string, lines: readonly RegistryLine[]): SessionState | undefined {
   const ordered = [...lines].sort((a, b) => a.ts - b.ts);
   const last = ordered.at(-1);
@@ -97,7 +102,12 @@ export function foldSession(id: string, lines: readonly RegistryLine[]): Session
       untracked.add(refKey(ref));
     }
   }
-  return { id, lastTs: last.ts, ended: last.ev === 'end', bindings: [...bindings.values()] };
+  return { id, lastTs: last.ts, ended: latest(ordered, 'end') > latest(ordered, 'start'), bindings: [...bindings.values()] };
+}
+
+// The time of the latest line of this kind, or minus infinity when there is none.
+function latest(lines: readonly RegistryLine[], ev: RegistryLine['ev']): number {
+  return lines.reduce((best, line) => (line.ev === ev ? Math.max(best, line.ts) : best), Number.NEGATIVE_INFINITY);
 }
 
 export function isLive(session: SessionState, now: number): boolean {
