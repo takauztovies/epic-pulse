@@ -71,3 +71,21 @@ test('a bundled package without a licence file stops the build instead of going 
   assert.equal(noticed.status, 0, noticed.stderr);
   assert.match(noticed.stdout, /\n## @ep-test\/quiet-dep 1\.0\.0\n\nLicence: MIT\n\n```text\nThe quiet licence\.\n```\n$/);
 });
+
+// esbuild names a module relative to its working directory, and by its
+// absolute path where there is no relative one: another drive, which a Windows
+// runner has (temp on C:, the workspace on D:). The release and dist-guard
+// tests build in a temp copy that links the workspace's node_modules, so every
+// package they bundle is named that way there. No POSIX run of esbuild writes
+// such a path, so the metafile is written out by hand.
+test('a bundled package is read where its absolute path says, not under the working directory', (t) => {
+  const work = tempDir(t);
+  const pkg = join(tempDir(t), 'node_modules', 'far-dep');
+  mkdirSync(pkg, { recursive: true });
+  writeFileSync(join(pkg, 'package.json'), JSON.stringify({ name: 'far-dep', version: '2.0.0', license: 'MIT' }));
+  writeFileSync(join(pkg, 'LICENSE'), 'The far licence.\n');
+  const metafile = { inputs: {}, outputs: { 'out.js': { bytes: 1, inputs: { [join(pkg, 'index.js')]: { bytesInOutput: 1 } }, imports: [], exports: [] } } };
+  const run = spawnSync(process.execPath, ['--input-type=module', '-e', NOTICES_RUN, work], { input: JSON.stringify(metafile), encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(run.stdout, /\n## far-dep 2\.0\.0\n\nLicence: MIT\n\n```text\nThe far licence\.\n```\n$/);
+});

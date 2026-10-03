@@ -7,7 +7,7 @@
 // Used by scripts/build.mjs (the CLI and plugin bundle) and
 // packages/vscode/scripts/build.mjs (the extension).
 import { readdir, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 export const NOTICES_FILE = 'THIRD_PARTY_NOTICES.md';
 
@@ -64,8 +64,10 @@ function byNameThenVersion(a, b) {
 }
 
 // `workingDir` is the build's absWorkingDir, which the metafile's paths are
-// relative to.
+// relative to, except where esbuild has no relative path to give (a package on
+// another drive on Windows): that one it names absolutely, and `join` would
+// append such a path to the working directory instead of reading it.
 export async function noticesFor(metafile, workingDir) {
-  const packages = await Promise.all(bundledDirs(metafile).map((dir) => describe(join(workingDir, dir))));
+  const packages = await Promise.all(bundledDirs(metafile).map((dir) => describe(resolve(workingDir, dir))));
   return [HEADER, ...packages.sort(byNameThenVersion).map(section)].join('\n');
 }
