@@ -87,8 +87,10 @@ export function phaseBDocument(numbers: readonly number[]): string {
 ${EPIC_FRAGMENT}`;
 }
 
-function toRate(node: RateLimitNode): RateInfo {
-  return { cost: node.cost, remaining: node.remaining, resetAt: Date.parse(node.resetAt) || 0 };
+// Null when the server reports no rate limit; the refresher then charges its
+// own estimate (refresh-batch.ts).
+function toRate(node: RateLimitNode | null): RateInfo | null {
+  return node === null ? null : { cost: node.cost, remaining: node.remaining, resetAt: Date.parse(node.resetAt) || 0 };
 }
 
 // HTTP status, then the GraphQL envelope, then fatal GraphQL errors. Returns the
@@ -111,7 +113,7 @@ function keyed<T>(prefix: string, record: Readonly<Record<string, T | null>>): R
 }
 
 export interface PhaseAParsed {
-  readonly rate: RateInfo;
+  readonly rate: RateInfo | null;
   readonly issues: ReadonlyMap<number, PhaseAIssue | null>;
 }
 
@@ -124,7 +126,7 @@ export function parsePhaseA(res: RawResponse): Result<PhaseAParsed, Failure> {
 }
 
 export interface PhaseBParsed {
-  readonly rate: RateInfo;
+  readonly rate: RateInfo | null;
   readonly epics: ReadonlyMap<number, EpicNode | null>;
 }
 

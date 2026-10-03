@@ -18,6 +18,8 @@ export const GqlEnvelopeSchema = z.looseObject({
   errors: z.array(GqlErrorSchema).optional().catch(undefined),
 });
 
+// Taken as nullable below: a GitHub Enterprise Server with rate limiting
+// turned off answers `rateLimit: null`.
 export const RateLimitNodeSchema = z.object({
   cost: z.number(),
   remaining: z.number(),
@@ -35,7 +37,7 @@ export const PhaseAIssueSchema = z.object({
 // Repository fields are aliases chosen at query time (`i5`, `e1`), so the
 // repository object is a record rather than a fixed shape.
 export const PhaseADataSchema = z.object({
-  rateLimit: RateLimitNodeSchema,
+  rateLimit: RateLimitNodeSchema.nullable(),
   repository: z.record(z.string(), PhaseAIssueSchema.nullable()).nullable(),
 });
 
@@ -81,7 +83,7 @@ export const EpicNodeSchema = z.object({
 });
 
 export const PhaseBDataSchema = z.object({
-  rateLimit: RateLimitNodeSchema,
+  rateLimit: RateLimitNodeSchema.nullable(),
   repository: z.record(z.string(), EpicNodeSchema.nullable()).nullable(),
 });
 

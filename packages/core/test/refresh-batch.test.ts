@@ -36,3 +36,20 @@ test('a Phase A refusal that a token or time can cure caches nothing', () => {
     assert.deepEqual([next.failure?.code, next.snapshot.issues], [code, {}], code);
   }
 });
+
+// A GitHub Enterprise Server with rate limiting off answers `rateLimit: null`;
+// the recorded responses, with that one field as such a server sends it.
+function withoutRateLimit(name: string): RawResponse {
+  const res = loadFixture(name);
+  const body = res.body as { readonly data: Readonly<Record<string, unknown>> };
+  return { ...res, body: { ...body, data: { ...body.data, rateLimit: null } } };
+}
+
+test('an answer without a rate limit is used, charged the estimate, and leaves the known limit alone', () => {
+  const limit = { remaining: 4000, resetAt: T0 + 60_000 };
+  const before: Run = { ...sent, snapshot: { ...emptySnapshot(T0), rateLimit: limit } };
+  const a = answered(before, { ...PHASE_A, refs: [demo(4)] }, withoutRateLimit('phase-a'));
+  assert.deepEqual([a.failure, a.points, a.snapshot.usage.points, a.snapshot.rateLimit, a.snapshot.issues[refKey(demo(4))]?.epic?.number], [null, 1, 1, limit, 1]);
+  const b = answered(before, { ...PHASE_A, phase: 'B', refs: [demo(1)] }, withoutRateLimit('phase-b-subissues'));
+  assert.deepEqual([b.failure, b.points, b.snapshot.usage.points, b.snapshot.rateLimit, b.snapshot.epics[refKey(demo(1))]?.children.length], [null, 3, 3, limit, 6]);
+});

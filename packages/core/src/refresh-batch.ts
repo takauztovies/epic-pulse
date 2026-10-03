@@ -122,7 +122,12 @@ function rejected(run: Run, batch: Batch, failure: Failure): Run {
   return failed(charged, batch, failure);
 }
 
-function charged(run: Run, rate: RateInfo, snapshot: Snapshot): Run {
+// GitHub says what the query cost and what is left of the token's hour. A
+// server that says neither (rate limiting turned off) is charged the
+// estimate, never nothing, and the limit last seen stands.
+function charged(run: Run, batch: Batch, answer: { readonly rate: RateInfo | null; readonly snapshot: Snapshot }): Run {
+  const { rate, snapshot } = answer;
+  if (rate === null) return { ...run, snapshot: chargePoints(snapshot, costOf(batch)), points: run.points + costOf(batch) };
   return { ...run, snapshot: chargeRate(snapshot, rate), points: run.points + rate.cost };
 }
 
@@ -131,12 +136,12 @@ export function answered(run: Run, batch: Batch, res: RawResponse): Run {
     const parsed = parsePhaseA(res);
     if (!parsed.ok) return rejected(run, batch, parsed.error);
     const answers = batch.refs.map((ref) => [ref, parsed.value.issues.get(ref.number) ?? null] as const);
-    return charged(run, parsed.value.rate, applyResolutions(run.snapshot, answers, run.now));
+    return charged(run, batch, { rate: parsed.value.rate, snapshot: applyResolutions(run.snapshot, answers, run.now) });
   }
   const parsed = parsePhaseB(res);
   if (!parsed.ok) return rejected(run, batch, parsed.error);
   const answers = batch.refs.map((ref) => [ref, parsed.value.epics.get(ref.number) ?? null] as const);
-  return charged(run, parsed.value.rate, applyEpics(run.snapshot, answers, run.now));
+  return charged(run, batch, { rate: parsed.value.rate, snapshot: applyEpics(run.snapshot, answers, run.now) });
 }
 
 export async function runBatch(run: Run, batch: Batch, ctx: Context): Promise<Run> {

@@ -7,7 +7,7 @@ import { loadFixture } from './helpers.js';
 test('phase A: sub-issue resolves to its parent, epics and missing issues are reported', () => {
   const parsed = parsePhaseA(loadFixture('phase-a'));
   assert.ok(parsed.ok);
-  assert.equal(parsed.value.rate.cost, 1);
+  assert.equal(parsed.value.rate?.cost, 1);
   assert.equal(parsed.value.issues.get(4)?.parent?.number, 1);
   assert.equal(parsed.value.issues.get(1)?.parent, null);
   assert.equal(parsed.value.issues.get(8)?.parent, null);
@@ -17,7 +17,7 @@ test('phase A: sub-issue resolves to its parent, epics and missing issues are re
 test('phase B: the sub-issue epic keeps every child with its link evidence', () => {
   const parsed = parsePhaseB(loadFixture('phase-b-subissues'));
   assert.ok(parsed.ok);
-  assert.equal(parsed.value.rate.cost, 3);
+  assert.equal(parsed.value.rate?.cost, 3);
   const epic = parsed.value.epics.get(1);
   assert.equal(epic?.subIssues.totalCount, 6);
   assert.deepEqual(epic?.subIssues.nodes.map((n) => n?.number), [2, 3, 4, 5, 6, 7]);
