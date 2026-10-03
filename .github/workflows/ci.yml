@@ -49,6 +49,14 @@ jobs:
       # Builds the bundle first; the tests run it as a real process.
       - run: pnpm test
 
+      # `statusline install --project` writes one command for every teammate's
+      # shell, and a Windows teammate's is cmd or PowerShell, which the tests (a
+      # POSIX sh at most) never start. Install into a temp project, and run
+      # what was written under both, expecting a status line from each.
+      - name: the --project status line command runs under cmd and PowerShell
+        if: runner.os == 'Windows'
+        run: node scripts/check-statusline-shells.mjs cmd pwsh
+
   release-guards:
     name: release guards
     runs-on: ubuntu-latest

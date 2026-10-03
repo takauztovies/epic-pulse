@@ -61,9 +61,11 @@ path that survives plugin updates, and sets only `statusLine`, to
 `node "<that path>" statusline` with a `refreshInterval` of 30 seconds. It saves a timestamped backup
 of the settings file first and writes it atomically. Run again, it leaves the settings alone and only
 refreshes the runtime copy if that is outdated. If another `statusLine` is already set it changes
-nothing and prints the difference instead. A project's settings name the runtime as
-`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/epic-pulse/runtime.mjs` rather than one person's home directory;
-each teammate still needs the plugin, or `statusline install`, for that copy to exist.
+nothing and prints the difference instead. A project's settings can not name one person's home
+directory, so with `--project` the command is `node -e "<script>" statusline`, whose short script finds
+the runtime in `CLAUDE_CONFIG_DIR`, or in `~/.claude` when that is not set. It is one text that sh, cmd
+and PowerShell all run. Each teammate still needs the plugin, or `statusline install`, for that copy
+to exist.
 
 The status line reads from disk only and never waits on the network. When something is due, it
 starts a background refresh, which asks GitHub and writes what it learned for the next render. After

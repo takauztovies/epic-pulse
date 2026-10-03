@@ -22,7 +22,9 @@ The first release.
   `statusline install [--dry-run] [--project]`, `json`, `track`, `untrack`, `refresh`, `doctor`, and
   `hook`, which the plugin runs.
 - A status line that shows the session's epic as a percentage, a bar and the sub-issues in review and
-  in progress, renders from disk, and names every state it can be in.
+  in progress, renders from disk, and names every state it can be in. `statusline install --project`
+  writes one command that sh, cmd and PowerShell all run, and that finds the runtime through
+  `CLAUDE_CONFIG_DIR`.
 - Statuses derived from GitHub: todo, in progress, in review, done and dropped. Progress is
   done / (total − dropped). Epics made of a task list count their boxes.
 - One shared refresher per repository with a 300-points-an-hour budget across every repository on the

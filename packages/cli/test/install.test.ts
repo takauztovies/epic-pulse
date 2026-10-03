@@ -1,13 +1,17 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { statusPayload } from './fixtures.js';
-import { BUNDLE, cliEnv, runCli, sandbox, sha256, tempDir, type CliRun, type Sandbox } from './helpers.js';
+import { BUNDLE, cliEnv, ROOT, runCli, sandbox, sha256, tempDir, type CliRun, type Sandbox } from './helpers.js';
 
 const ORIGINAL = '{\n  "model": "opus",\n  "env": {\n    "EXAMPLE": "1"\n  },\n  "permissions": { "allow": ["Bash(ls:*)"] }\n}\n';
-const SHARED_COMMAND = 'node "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/epic-pulse/runtime.mjs" statusline';
+// A project's settings are shared, and an install is "ours" only while the
+// command is this text exactly, so changing it turns every teammate's file into
+// somebody else's status line. Node finds the runtime itself, because sh, cmd
+// and PowerShell each spell an environment variable differently.
+const SHARED_COMMAND = 'node -e "p=require(\'path\'),c=process.env.CLAUDE_CONFIG_DIR,d=c&&c.trim()?p.resolve(c.trim()):p.join(require(\'os\').homedir(),\'.claude\'),f=p.join(d,\'epic-pulse\',\'runtime.mjs\');process.argv.splice(1,0,f);import(require(\'url\').pathToFileURL(f).href)" statusline';
 
 const settingsOf = (box: Sandbox) => join(box.config, 'settings.json');
 const runtimeOf = (box: Sandbox) => join(box.config, 'epic-pulse', 'runtime.mjs');
@@ -107,6 +111,20 @@ test('without CLAUDE_CONFIG_DIR the user settings are ~/.claude/settings.json', 
   assert.equal(sha256(join(home, '.claude', 'epic-pulse', 'runtime.mjs')), sha256(BUNDLE));
 });
 
+// sh, cmd and PowerShell each need a text they read the same way, so the
+// command is `node -e "<script>" statusline` and the script has no character
+// that any of them reads specially inside double quotes, and no whitespace for
+// PowerShell to re-quote. CI runs the real cmd and PowerShell on Windows.
+test('--project writes a command with no shell syntax in it, so sh, cmd and PowerShell read it alike', async (t) => {
+  const box = sandbox(t);
+  const project = tempDir(t);
+  assert.equal((await install(box, ['--project'], project)).code, 0);
+  const { statusLine } = JSON.parse(readFileSync(join(project, '.claude', 'settings.json'), 'utf8')) as { statusLine: { command: string } };
+  const script = /^node -e "([^"]*)" statusline$/.exec(statusLine.command)?.[1];
+  assert.ok(script !== undefined, `not node -e "<script>" statusline: ${statusLine.command}`);
+  assert.doesNotMatch(script, /[$%`\\!"\s]/);
+});
+
 // Claude Code runs the command through a shell; so does this.
 test('both installed commands run the runtime copy and print a status line', { skip: process.platform === 'win32' && 'no POSIX sh' }, async (t) => {
   const box = sandbox(t);
@@ -115,11 +133,41 @@ test('both installed commands run the runtime copy and print a status line', { s
   await install(box, ['--project'], project);
   const shared = join(project, '.claude', 'settings.json');
   const env = { ...cliEnv(box), PATH: `${dirname(process.execPath)}:/usr/bin:/bin` };
-  // The shared command finds the runtime through CLAUDE_CONFIG_DIR, or through
-  // $HOME/.claude when that is unset, which in the sandbox is the same place.
-  for (const [file, shellEnv] of [[settingsOf(box), env], [shared, env], [shared, withoutConfigDir(env)]] as const) {
+  // The shared command finds the runtime through CLAUDE_CONFIG_DIR, trimmed as
+  // claudeConfigDir trims it, or through ~/.claude when that is unset or empty,
+  // which in the sandbox is the same place.
+  const variants = [[settingsOf(box), env], [shared, env], [shared, withoutConfigDir(env)], [shared, { ...env, CLAUDE_CONFIG_DIR: '' }], [shared, { ...env, CLAUDE_CONFIG_DIR: ` ${box.config}\t` }]] as const;
+  for (const [file, shellEnv] of variants) {
     const { statusLine } = JSON.parse(readFileSync(file, 'utf8')) as { statusLine: { command: string } };
     const out = execFileSync('sh', ['-c', statusLine.command], { cwd: project, env: shellEnv, input: statusPayload(project), encoding: 'utf8' });
     assert.equal(out, 'epic-pulse: no epic\n', file);
   }
+});
+
+// scripts/check-statusline-shells.mjs, which CI runs under cmd and PowerShell
+// on Windows, here under this machine's sh.
+function shellCheck(args: readonly string[], env: NodeJS.ProcessEnv = process.env) {
+  const run = spawnSync(process.execPath, [join(ROOT, 'scripts', 'check-statusline-shells.mjs'), ...args], { env, encoding: 'utf8' });
+  return { status: run.status, out: `${run.stdout}${run.stderr}` };
+}
+
+// The machine's own CLAUDE_CONFIG_DIR, here a decoy that holds no runtime, must
+// reach neither scenario: one sets its own, the other unsets it.
+test('the shell check installs into a temp project and has each shell print the status line', { skip: process.platform === 'win32' && 'no POSIX sh' }, (t) => {
+  const run = shellCheck(['sh'], { ...process.env, CLAUDE_CONFIG_DIR: join(tempDir(t), 'decoy') });
+  assert.equal(run.status, 0, run.out);
+  assert.equal(run.out, 'sh, CLAUDE_CONFIG_DIR set: epic-pulse: no epic\nsh, CLAUDE_CONFIG_DIR unset: epic-pulse: no epic\n');
+});
+
+test('the shell check fails where the command prints no status line, or the shell is not there, or is not known', { skip: process.platform === 'win32' && 'no POSIX sh' }, (t) => {
+  const bin = tempDir(t);
+  symlinkSync('/bin/sh', join(bin, 'sh'));
+  const noNode = shellCheck(['sh'], { ...process.env, PATH: bin });
+  assert.equal(noNode.status, 1, noNode.out);
+  assert.match(noNode.out, /^::error::sh, CLAUDE_CONFIG_DIR set: /m);
+  const noShell = shellCheck(['sh'], { ...process.env, PATH: tempDir(t) });
+  assert.equal(noShell.status, 1, noShell.out);
+  assert.match(noShell.out, /^::error::sh, CLAUDE_CONFIG_DIR set: the shell did not start/m);
+  assert.equal(shellCheck(['fish']).status, 2);
+  assert.equal(shellCheck([]).status, 2);
 });
