@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { test } from 'node:test';
+import { promisify } from 'node:util';
 import { apiUrl, describeFetchError, ghChildEnv, postGraphql, resolveToken } from '../src/github.js';
 
 // An empty directory as PATH makes `gh` unfindable, so only env vars can answer.
@@ -82,6 +84,21 @@ async function withGhLogin(run: (env: NodeJS.ProcessEnv) => Promise<void>): Prom
   }
 }
 
+// resolveToken keeps no reason: a gh that is missing, logged out or too slow
+// all come back as "no token". When the login is not found, this asks gh again
+// without the limit and says what happened, so a failure on a machine nobody
+// can log in to (a CI runner) names its cause.
+async function whyNoToken(env: NodeJS.ProcessEnv): Promise<string> {
+  const started = Date.now();
+  const asked = () => `after ${Date.now() - started} ms`;
+  try {
+    const { stdout } = await promisify(execFile)('gh', ['auth', 'token', '--hostname', 'ghe.example.com'], { env, timeout: 120_000, windowsHide: true });
+    return `gh answered ${asked()} with ${stdout.trim() === 'gh-login-token' ? 'the login, so resolveToken gave up too early' : 'something else'}`;
+  } catch (error) {
+    return `gh failed ${asked()}: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
 // gh prefers these variables to its own logins: GH_ENTERPRISE_TOKEN for any
 // host, GH_TOKEN for *.ghe.com. Left in its environment, gh would hand one to
 // a host resolveToken has just refused it.
@@ -89,7 +106,8 @@ test('gh is asked without the token variables, so it answers only with its own l
   await withGhLogin(async (env) => {
     const secret = 'env-secret';
     const leaked = { ...env, GH_TOKEN: secret, GITHUB_TOKEN: secret, GH_ENTERPRISE_TOKEN: secret, GITHUB_ENTERPRISE_TOKEN: secret };
-    assert.deepEqual(await resolveToken('ghe.example.com', leaked), { token: 'gh-login-token', source: 'gh-cli' });
+    const login = await resolveToken('ghe.example.com', leaked);
+    assert.deepEqual(login, { token: 'gh-login-token', source: 'gh-cli' }, login === undefined ? await whyNoToken(env) : undefined);
     assert.equal(await resolveToken('untrusted.example', leaked), undefined);
     assert.equal(await resolveToken('acme.ghe.com', leaked), undefined);
   });

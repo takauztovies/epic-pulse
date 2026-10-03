@@ -63,10 +63,17 @@ export function ghChildEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return { ...Object.fromEntries(kept), GH_PROMPT_DISABLED: '1' };
 }
 
+// gh is slow to start on Windows: the test that asks it three times took 3.9 s
+// and 4.1 s on idle CI runners (0.3 s on macOS), and on loaded ones its first
+// question ran into the 5 s this limit used to be, which came back as "not
+// logged in". Only the refresher and `doctor` wait for gh, never the hook or
+// the status line, so a generous limit costs nothing but a hung gh.
+const GH_TOKEN_TIMEOUT_MS = 20_000;
+
 async function ghCliToken(host: string, env: NodeJS.ProcessEnv): Promise<string | undefined> {
   try {
     const { stdout } = await run('gh', ['auth', 'token', '--hostname', host], {
-      timeout: 5000,
+      timeout: GH_TOKEN_TIMEOUT_MS,
       env: ghChildEnv(env),
       windowsHide: true,
     });
