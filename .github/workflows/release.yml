@@ -124,11 +124,19 @@ jobs:
 
       # NPM_TOKEN when it is set; otherwise npm trusted publishing (OIDC),
       # which needs npm 11.5.1 or newer and takes precedence over the
-      # placeholder token setup-node writes.
+      # placeholder token setup-node writes. Trusted publishing can only be set
+      # up for a package that already exists, so until the first publish is done
+      # by hand and the repository variable PUBLISH_NPM is set to true, npm is
+      # skipped like the stores below instead of failing the release.
       - name: npm
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PUBLISH_NPM: ${{ vars.PUBLISH_NPM }}
         run: |
+          if [ -z "$NPM_TOKEN" ] && [ "$PUBLISH_NPM" != true ]; then
+            echo "::notice::neither NPM_TOKEN nor PUBLISH_NPM=true is set, so npm is skipped."
+            exit 0
+          fi
           status="$(curl -s -o /dev/null -w '%{http_code}' "https://registry.npmjs.org/epic-pulse/$VERSION")"
           if [ "$status" = 200 ]; then
             echo "::notice::npm already has epic-pulse@$VERSION; nothing to publish."
