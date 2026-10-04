@@ -94,8 +94,12 @@ The workflow needs these, set as secrets of the `release` environment:
 
 | Secret | For | If it is missing |
 | --- | --- | --- |
-| `NPM_TOKEN` | npm, with publish rights to `epic-pulse` | npm trusted publishing (OIDC) is used instead |
+| `NPM_TOKEN` | npm, with publish rights to `epic-pulse` | npm trusted publishing (OIDC) is used if the variable `PUBLISH_NPM` is `true`; otherwise npm is skipped with a notice |
 | `VSCE_PAT` | the VS Code Marketplace, publisher `takauztovies` | that step is skipped with a notice |
 | `OVSX_PAT` | Open VSX, namespace `takauztovies` | that step is skipped with a notice |
+
+npm trusted publishing can only be set up for a package that already exists. Do the first npm publish
+by hand, configure trusted publishing for this repository's `release.yml` on npmjs.com, then set the
+repository variable `PUBLISH_NPM` to `true`. Until then a release skips npm and still publishes the rest.
 
 Every publish step leaves an already published version alone, so a failed release can be re-run.
