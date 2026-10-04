@@ -1,0 +1,77 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { foldSession, refKey, RegistryLineSchema, type SessionState } from '@epic-pulse/core';
+import type { RefreshAttempt } from '../src/refresh-attempt.js';
+import { refreshDue } from '../src/refresh-spawn.js';
+import { demo, demoSnapshot } from './fixtures.js';
+import { SESSION } from './helpers.js';
+
+const NOW = 1_800_000_000_000;
+const MINUTE = 60_000;
+
+function bound(numbers: readonly number[], ts = NOW): SessionState {
+  const binds = numbers.map((n) => ({ ref: demo(n), via: 'gh' as const }));
+  return foldSession(SESSION, [RegistryLineSchema.parse({ v: 1, ts, ev: 'tool', binds })])!;
+}
+
+test('nothing is due while every resolution and epic is inside its cache', () => {
+  assert.equal(refreshDue({ snapshot: { status: 'ok', snapshot: demoSnapshot(NOW) }, session: bound([4]), pins: [], now: NOW + MINUTE }), false);
+});
+
+test('an epic past its two-minute cache, an unresolved issue or a pin is due', () => {
+  const snapshot = { status: 'ok', snapshot: demoSnapshot(NOW) } as const;
+  assert.equal(refreshDue({ snapshot, session: bound([4]), pins: [], now: NOW + 2 * MINUTE }), true);
+  assert.equal(refreshDue({ snapshot, session: bound([6]), pins: [], now: NOW + MINUTE }), true);
+  assert.equal(refreshDue({ snapshot, session: bound([]), pins: [{ ref: demo(6), addedAt: NOW }], now: NOW + MINUTE }), true);
+});
+
+function pinnedBy(numbers: readonly number[], ts = NOW): SessionState {
+  const binds = numbers.map((n) => ({ ref: demo(n), via: 'pin' as const }));
+  return foldSession(SESSION, [RegistryLineSchema.parse({ v: 1, ts, ev: 'tool', binds })])!;
+}
+
+// #4 is a child of epic #1: a pin names it, so the refresher also asks whether
+// it is an epic itself, until it has found that it is not.
+test('a pin on a child of an epic is due until the issue has been found not to be an epic itself', () => {
+  const snapshot = demoSnapshot(NOW);
+  const key = refKey(demo(4));
+  const resolution = snapshot.issues[key];
+  assert.ok(resolution, 'the demo snapshot no longer resolves #4');
+  const known = { ...snapshot, issues: { ...snapshot.issues, [key]: { ...resolution, isEpic: false } } };
+  const at = NOW + MINUTE;
+  assert.equal(refreshDue({ snapshot: { status: 'ok', snapshot }, session: bound([]), pins: [{ ref: demo(4), addedAt: NOW }], now: at }), true);
+  assert.equal(refreshDue({ snapshot: { status: 'ok', snapshot }, session: pinnedBy([4]), pins: [], now: at }), true);
+  assert.equal(refreshDue({ snapshot: { status: 'ok', snapshot: known }, session: bound([]), pins: [{ ref: demo(4), addedAt: NOW }], now: at }), false);
+  assert.equal(refreshDue({ snapshot: { status: 'ok', snapshot: known }, session: pinnedBy([4]), pins: [], now: at }), false);
+  assert.equal(refreshDue({ snapshot: { status: 'ok', snapshot }, session: bound([4]), pins: [], now: at }), false, 'work bound to it is not a pin');
+});
+
+test('a missing or corrupt snapshot makes every bound issue due', () => {
+  for (const snapshot of [{ status: 'missing' }, { status: 'corrupt' }] as const) {
+    assert.equal(refreshDue({ snapshot, session: bound([4]), pins: [], now: NOW }), true, snapshot.status);
+  }
+});
+
+test('with nothing bound or pinned, or no session the hook wrote for, nothing is due', () => {
+  const missing = { status: 'missing' } as const;
+  assert.equal(refreshDue({ snapshot: missing, session: bound([]), pins: [], now: NOW }), false);
+  assert.equal(refreshDue({ snapshot: missing, session: undefined, pins: [{ ref: demo(6), addedAt: NOW }], now: NOW }), false);
+});
+
+// A refresh that stops before it sends anything (no token, a spent hour)
+// changes nothing that would make the next render's answer different.
+test('after a refresh that failed nothing is due for a minute; one that succeeded, or a future record, holds nothing back', () => {
+  const failed: RefreshAttempt = { v: 1, at: NOW, code: 'no_token' };
+  const due = (attempt: RefreshAttempt, now: number) => refreshDue({ snapshot: { status: 'missing' }, session: bound([4]), pins: [], now, attempt });
+  assert.equal(due(failed, NOW + MINUTE - 1), false);
+  assert.equal(due(failed, NOW + MINUTE), true);
+  assert.equal(due({ ...failed, code: null }, NOW + 1), true);
+  assert.equal(due({ ...failed, at: NOW + 60 * MINUTE }, NOW), true, 'a clock that moved back must not hold refreshes off');
+});
+
+// The status line shows its own session's bindings whether or not the session
+// is live, so their refresh is due whether or not it is.
+test('a session quiet past the live window still has its bindings and pins due', () => {
+  const quiet = bound([4], NOW - 3 * 60 * MINUTE);
+  assert.equal(refreshDue({ snapshot: { status: 'missing' }, session: quiet, pins: [], now: NOW }), true);
+});

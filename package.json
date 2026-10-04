@@ -1,0 +1,29 @@
+{
+  "name": "epic-pulse-workspace",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Workspace root for epic-pulse: GitHub epic progress for Claude Code sessions.",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@10.27.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/build.mjs && tsx --test --test-concurrency=2 \"packages/*/test/**/*.test.ts\"",
+    "test:live": "node scripts/build.mjs && EPIC_PULSE_LIVE=1 tsx --test --test-concurrency=1 \"packages/*/test/**/*.test.ts\"",
+    "record-fixtures": "tsx scripts/record-fixtures.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.4",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.11.0",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.0"
+  }
+}

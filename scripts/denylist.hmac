@@ -1,0 +1,43 @@
+# Words that must never appear in this repository, as HMAC-SHA256 digests of the
+# lowercase word under a secret key, one per line. scripts/check-denylist.mjs
+# splits every tracked text file, the fixtures and the built bundles into
+# lowercase [a-z0-9]+ words and fails on any word whose digest is listed here.
+#
+# Why a key: a plain hash of a short word can be guessed back by hashing a
+# dictionary, so a list of plain hashes publishes what it hides. An HMAC can not
+# be attacked that way without the key.
+#
+# The key is not in this repository. A maintainer keeps it in the environment
+# variable EPIC_PULSE_DENYLIST_KEY or in ~/.config/epic-pulse/denylist.key (mode
+# 0600), and CI reads the repository secret DENYLIST_KEY. Without a key the check
+# prints "denylist: skipped (no key)" and exits 0, so a contributor or a fork can
+# still run the tests. CI on a push to this repository, or on a pull request from
+# one of its own branches, has the key, and fails the check if it is missing
+# rather than let the list go unchecked. `pnpm test` runs the check's own tests
+# under a throwaway key; this list itself is checked only where the key is.
+#
+# To add a word, take its HMAC under the key in $KEY, of the lowercase word with
+# no trailing newline, and put the digest (the last field of what openssl
+# prints) on a line of its own:
+#
+#   printf %s word | openssl dgst -sha256 -hmac "$KEY"
+#
+# Never write the word itself here, in a commit message or in a pull request.
+# Words are matched whole, so a name written in several words needs a digest for
+# each word that must not appear, and one for the run-together form. A digest
+# made under another key matches nothing, and the check still passes: when the
+# key changes, every digest here changes with it.
+
+# The key-check line: the HMAC of the public word epic-pulse-denylist-key-check
+# under the key. The check recomputes it, so a wrong key fails instead of
+# silently matching nothing:
+#   printf %s epic-pulse-denylist-key-check | openssl dgst -sha256 -hmac "$KEY"
+key-check b8398ee89e9f09a7140ffde769578fd719a054a32db5c025377e90376436f3a5
+
+# Private project terms (keyed digests; the words are never committed).
+56b5147c3834fd071f4351900e735772ea4a0d7dd8b61c921a8623975b05442d
+981ada606cd87ee9d148c87d99d6385c608022f03d5189750582cfcc608ec10b
+5377d40d227a8b1f1b1708a3b797cf023024f5075a3825ef3b35d2bacba94d2a
+019372c5afd51bd6ff04887ab2822e8a6515819593c7e61c9d95882d56fcaf52
+1fe1d5d2c667591df8adf71a066d54aea956986a29b6a3756541415766fa1a91
+43431649176c85e2f3a54c35d8db7239f0e55842072f10412fff9ef2041202ca

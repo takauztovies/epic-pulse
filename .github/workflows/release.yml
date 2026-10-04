@@ -1,0 +1,194 @@
+# A version tag (v1.2.3) publishes a release. `verify` checks and builds
+# everything that ships, with a read-only token and no secret. `publish` waits
+# in the `release` environment until a maintainer approves, then only uploads
+# what `verify` built. Every publish step can be re-run: what is already out
+# is left alone.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # All branches, for the "is it on main" check.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      # No dependency cache: a release builds from the lockfile alone.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - run: pnpm install --frozen-lockfile
+
+      # --check also holds the marketplace to this tag: a plugin user installs
+      # the plugin from the release tag, so a marketplace that names another
+      # would publish a release whose plugin is not in it.
+      - name: the tag is the version of every manifest and the tag the marketplace installs
+        id: version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          node scripts/release.mjs --check "$TAG"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      # A tag on an unmerged branch would publish code nobody reviewed.
+      - name: the tagged commit is on main
+        run: git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main
+
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+
+      # `pnpm test` has just rebuilt it; the plugin channel serves the
+      # committed copy, which must be exactly that build.
+      - name: the committed plugin/dist is what this commit builds
+        run: |
+          git ls-files --error-unmatch plugin/dist/epic-pulse.mjs
+          git diff --exit-code -- plugin/dist
+
+      # npm shows the package's own README and ships its own LICENSE, and
+      # packages/cli keeps neither: they are copied from the root here.
+      - name: pack the npm package
+        working-directory: packages/cli
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          cp ../../README.md ../../LICENSE .
+          mkdir -p "$RUNNER_TEMP/release"
+          pnpm pack --pack-destination "$RUNNER_TEMP/release"
+          test -f "$RUNNER_TEMP/release/epic-pulse-$VERSION.tgz"
+
+      # By path: the extension and the CLI are both named epic-pulse.
+      - name: package the VS Code extension
+        if: hashFiles('packages/vscode/package.json') != ''
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          pnpm --filter ./packages/vscode run package --no-gitHubIssueLinking
+          vsix="packages/vscode/epic-pulse-$VERSION.vsix"
+          if [ ! -f "$vsix" ]; then
+            echo "::error::packaging produced no $vsix"
+            exit 1
+          fi
+          mv "$vsix" "$RUNNER_TEMP/release/"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release
+          path: ${{ runner.temp }}/release/
+          if-no-files-found: error
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write # the GitHub Release
+      id-token: write # npm provenance, npm trusted publishing and the attestation
+      attestations: write # actions/attest-build-provenance
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: release
+          path: release
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: release/*
+
+      # NPM_TOKEN when it is set; otherwise npm trusted publishing (OIDC),
+      # which needs npm 11.5.1 or newer and takes precedence over the
+      # placeholder token setup-node writes.
+      - name: npm
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          status="$(curl -s -o /dev/null -w '%{http_code}' "https://registry.npmjs.org/epic-pulse/$VERSION")"
+          if [ "$status" = 200 ]; then
+            echo "::notice::npm already has epic-pulse@$VERSION; nothing to publish."
+            exit 0
+          fi
+          if [ "$status" != 404 ]; then
+            echo "::error::the npm registry answered HTTP $status for epic-pulse@$VERSION"
+            exit 1
+          fi
+          if [ -n "$NPM_TOKEN" ]; then
+            export NODE_AUTH_TOKEN="$NPM_TOKEN"
+          else
+            echo "::notice::NPM_TOKEN is not set, so this publishes through npm trusted publishing (OIDC)."
+            npm install --global npm@^11.5.1
+          fi
+          npm publish "release/epic-pulse-$VERSION.tgz" --provenance --access public
+
+      - name: VS Code Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          vsix="release/epic-pulse-$VERSION.vsix"
+          if [ ! -f "$vsix" ]; then
+            echo "::notice::this release has no VS Code extension, so the Marketplace is skipped."
+            exit 0
+          fi
+          if [ -z "$VSCE_PAT" ]; then
+            echo "::notice::VSCE_PAT is not set, so the VS Code Marketplace is skipped."
+            exit 0
+          fi
+          npx --yes @vscode/vsce@3 publish --packagePath "$vsix" --skip-duplicate
+
+      - name: Open VSX
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          vsix="release/epic-pulse-$VERSION.vsix"
+          if [ ! -f "$vsix" ]; then
+            echo "::notice::this release has no VS Code extension, so Open VSX is skipped."
+            exit 0
+          fi
+          if [ -z "$OVSX_PAT" ]; then
+            echo "::notice::OVSX_PAT is not set, so Open VSX is skipped."
+            exit 0
+          fi
+          if ! out="$(npx --yes ovsx@0 create-namespace takauztovies 2>&1)"; then
+            if ! grep -qi 'already exists' <<<"$out"; then
+              echo "$out"
+              exit 1
+            fi
+            echo "::notice::the Open VSX namespace takauztovies already exists."
+          fi
+          npx --yes ovsx@0 publish --packagePath "$vsix" --skip-duplicate
+
+      - name: GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$TAG" release/* --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" release/* --repo "$GITHUB_REPOSITORY" --title "$TAG" --verify-tag --generate-notes
+          fi

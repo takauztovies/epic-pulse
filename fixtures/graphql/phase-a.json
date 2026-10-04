@@ -1,0 +1,56 @@
+{
+  "recordedAt": "2026-10-02T05:49:18.797Z",
+  "note": "sub-issue, epic, checklist epic and a missing issue",
+  "status": 200,
+  "remaining": 4994,
+  "retryAfter": false,
+  "body": {
+    "data": {
+      "rateLimit": {
+        "cost": 1,
+        "remaining": 4994,
+        "resetAt": "2026-10-02T06:45:06Z"
+      },
+      "repository": {
+        "i1": {
+          "number": 1,
+          "url": "https://github.com/takauztovies/epic-pulse/issues/1",
+          "parent": null
+        },
+        "i4": {
+          "number": 4,
+          "url": "https://github.com/takauztovies/epic-pulse/issues/4",
+          "parent": {
+            "number": 1,
+            "url": "https://github.com/takauztovies/epic-pulse/issues/1",
+            "repository": {
+              "nameWithOwner": "takauztovies/epic-pulse"
+            }
+          }
+        },
+        "i8": {
+          "number": 8,
+          "url": "https://github.com/takauztovies/epic-pulse/issues/8",
+          "parent": null
+        },
+        "i9999": null
+      }
+    },
+    "errors": [
+      {
+        "type": "NOT_FOUND",
+        "path": [
+          "repository",
+          "i9999"
+        ],
+        "locations": [
+          {
+            "line": 7,
+            "column": 5
+          }
+        ],
+        "message": "Could not resolve to an Issue with the number of 9999."
+      }
+    ]
+  }
+}

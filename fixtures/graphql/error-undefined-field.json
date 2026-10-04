@@ -1,0 +1,31 @@
+{
+  "recordedAt": "2026-10-02T05:49:20.279Z",
+  "note": "schema lacks a field (what an older GHES answers)",
+  "status": 200,
+  "remaining": 4984,
+  "retryAfter": false,
+  "body": {
+    "errors": [
+      {
+        "path": [
+          "query",
+          "repository",
+          "issue",
+          "noSuchField"
+        ],
+        "extensions": {
+          "code": "undefinedField",
+          "typeName": "Issue",
+          "fieldName": "noSuchField"
+        },
+        "locations": [
+          {
+            "line": 1,
+            "column": 84
+          }
+        ],
+        "message": "Field 'noSuchField' doesn't exist on type 'Issue'"
+      }
+    ]
+  }
+}

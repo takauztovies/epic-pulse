@@ -1,0 +1,35 @@
+{
+  "recordedAt": "2026-10-02T05:49:20.016Z",
+  "note": "issue that does not exist",
+  "status": 200,
+  "remaining": 4985,
+  "retryAfter": false,
+  "body": {
+    "data": {
+      "rateLimit": {
+        "cost": 3,
+        "remaining": 4985,
+        "resetAt": "2026-10-02T06:45:06Z"
+      },
+      "repository": {
+        "e9999": null
+      }
+    },
+    "errors": [
+      {
+        "type": "NOT_FOUND",
+        "path": [
+          "repository",
+          "e9999"
+        ],
+        "locations": [
+          {
+            "line": 4,
+            "column": 5
+          }
+        ],
+        "message": "Could not resolve to an Issue with the number of 9999."
+      }
+    ]
+  }
+}

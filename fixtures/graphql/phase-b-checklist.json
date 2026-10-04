@@ -1,0 +1,28 @@
+{
+  "recordedAt": "2026-10-02T05:49:19.700Z",
+  "note": "checklist-only epic",
+  "status": 200,
+  "remaining": 4988,
+  "retryAfter": false,
+  "body": {
+    "data": {
+      "rateLimit": {
+        "cost": 3,
+        "remaining": 4988,
+        "resetAt": "2026-10-02T06:45:06Z"
+      },
+      "repository": {
+        "e8": {
+          "number": 8,
+          "title": "Demo checklist epic: docs site",
+          "url": "https://github.com/takauztovies/epic-pulse/issues/8",
+          "body": "Checkbox-only epic (no sub-issues).\n\n- [x] Pick a static site generator\n- [x] Write the install page\n- [ ] Write the configuration page\n- [ ] Add screenshots\n- [ ] ~~Translate into French~~",
+          "subIssues": {
+            "totalCount": 0,
+            "nodes": []
+          }
+        }
+      }
+    }
+  }
+}

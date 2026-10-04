@@ -1,0 +1,154 @@
+# Every pull request and every push to main. The token is read-only, and the
+# one secret, the denylist key, only lets a check read a list: nothing here can
+# publish or write.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    name: test (${{ matrix.os }}, Node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [22, 24]
+    steps:
+      # Windows runners check text files out with CRLF line ends. The build and
+      # the tests are meant to see the bytes the repository holds.
+      - name: keep the committed line ends
+        if: runner.os == 'Windows'
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # The pnpm version comes from "packageManager" in package.json.
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      # Builds the bundle first; the tests run it as a real process.
+      - run: pnpm test
+
+      # `statusline install --project` writes one command for every teammate's
+      # shell, and a Windows teammate's is cmd or PowerShell, which the tests (a
+      # POSIX sh at most) never start. Install into a temp project, and run
+      # what was written under both, expecting a status line from each.
+      - name: the --project status line command runs under cmd and PowerShell
+        if: runner.os == 'Windows'
+        run: node scripts/check-statusline-shells.mjs cmd pwsh
+
+  # The live tests run the real refresher against this repository's public demo
+  # issues, so a change in GitHub's schema, or in how it links pull requests,
+  # shows up on the change that meets it rather than in the weekly Live
+  # workflow. epic-pulse reads GITHUB_TOKEN when GH_TOKEN is not set. A pull
+  # request from a fork is not trusted with a token, so only a push or a pull
+  # request from a branch of this repository runs it.
+  live:
+    name: live tests (demo issues)
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: live tests against the demo issues
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm test:live
+
+  release-guards:
+    name: release guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The dist guard diffs the pull request against its base.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      # plugin/dist is what every plugin user runs once a release tag holds it,
+      # and a tag is cut from main, so only a release branch of this repository
+      # may change it, and a release branch must commit exactly what its sources
+      # build.
+      # The script, and its test, hold both rules; it runs after the build,
+      # which the release check compares against.
+      - name: plugin/dist changes only on a release branch, as its sources build it
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: node scripts/check-dist-guard.mjs
+
+      # No word on scripts/denylist.hmac anywhere in the repository or in what
+      # it builds. The list holds HMACs, so the check needs the key, and this is
+      # the one step that has it: `pnpm test` runs the check's own tests under a
+      # throwaway key. A run of this repository's own that finds no key fails
+      # rather than skips; a pull request from a fork gets no secrets, and
+      # HEAD_REPO is how the script tells it from one of ours.
+      - name: no denylisted word in the repository or its bundles
+        env:
+          EPIC_PULSE_DENYLIST_KEY: ${{ secrets.DENYLIST_KEY }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+        run: node scripts/check-denylist.mjs
+
+      - name: claude plugin validate
+        env:
+          DISABLE_AUTOUPDATER: '1'
+          DISABLE_TELEMETRY: '1'
+          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+        run: |
+          npm install --global @anthropic-ai/claude-code@2
+          claude plugin validate --strict ./plugin
+          claude plugin validate --strict .
+
+      # By path: the extension and the CLI are both named epic-pulse.
+      - name: package the VS Code extension
+        if: hashFiles('packages/vscode/package.json') != ''
+        run: |
+          pnpm --filter ./packages/vscode run package --no-gitHubIssueLinking
+          version="$(node -p "require('./packages/vscode/package.json').version")"
+          vsix="packages/vscode/epic-pulse-$version.vsix"
+          if [ ! -f "$vsix" ]; then
+            echo "::error::packaging produced no $vsix"
+            exit 1
+          fi
+          echo "packaged $vsix"

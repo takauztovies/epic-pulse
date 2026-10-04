@@ -1,0 +1,25 @@
+{
+  "name": "epic-pulse",
+  "owner": {
+    "name": "takauztovies",
+    "url": "https://github.com/takauztovies"
+  },
+  "metadata": {
+    "description": "GitHub epic progress for Claude Code sessions."
+  },
+  "plugins": [
+    {
+      "name": "epic-pulse",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/takauztovies/epic-pulse.git",
+        "path": "plugin",
+        "ref": "v0.1.0"
+      },
+      "description": "Shows how far the GitHub epics behind a Claude Code session have got: percent done and sub-issues by status.",
+      "version": "0.1.0",
+      "license": "MIT",
+      "homepage": "https://github.com/takauztovies/epic-pulse"
+    }
+  ]
+}
