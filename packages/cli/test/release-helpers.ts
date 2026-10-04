@@ -43,10 +43,17 @@ function linkDependencies(dir: string): void {
 // This checkout's files, committed or not, minus whatever git ignores, as the
 // first commit of a repository of their own on `main`. The script runs there
 // for real; this repository's branches and tags are never touched.
+// plugin/dist is the one tracked file set that differs by where the tests run:
+// a release branch, and main after a release, track it; a feature branch does
+// not. The throwaway main is the sources only, so every test starts from the
+// same base wherever it runs.
+const RELEASE_BUILT = 'plugin/dist/';
+
 export function releaseRepo(t: TestContext): string {
   const dir = tempDir(t, 'ep-release-');
   const listed = git(ROOT, ['ls-files', '-z', '--cached', '--others', '--exclude-standard']).split('\0').filter(Boolean);
-  for (const file of listed.filter((name) => existsSync(join(ROOT, name)))) {
+  const sources = listed.filter((name) => !name.startsWith(RELEASE_BUILT) && existsSync(join(ROOT, name)));
+  for (const file of sources) {
     mkdirSync(dirname(join(dir, file)), { recursive: true });
     copyFileSync(join(ROOT, file), join(dir, file));
   }
