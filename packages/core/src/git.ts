@@ -15,10 +15,14 @@ export interface WorktreeInfo {
 }
 
 const MAX_GIT_FILE_BYTES = 64 * 1024;
+// `config` is not an identity file: a repo that has carried hundreds of
+// worktrees over its life accretes a `[branch "x"]` stanza per branch (seen:
+// 867 branches, 95KB) with nothing wrong, so it gets its own, far roomier cap.
+const MAX_GIT_CONFIG_BYTES = 4 * 1024 * 1024;
 
-async function readSmall(path: string): Promise<string | undefined> {
+async function readSmall(path: string, maxBytes = MAX_GIT_FILE_BYTES): Promise<string | undefined> {
   try {
-    if ((await stat(path)).size > MAX_GIT_FILE_BYTES) return undefined;
+    if ((await stat(path)).size > maxBytes) return undefined;
     return await readFile(path, 'utf8');
   } catch {
     return undefined;
@@ -138,7 +142,7 @@ function remoteSections(config: string): readonly RemoteSection[] {
 // first remote in the file. An earlier version took `origin` first, which in
 // a fork is the fork.
 export async function readRemote(commonDir: string): Promise<RepoRef | undefined> {
-  const config = (await readSmall(join(commonDir, 'config'))) ?? '';
+  const config = (await readSmall(join(commonDir, 'config'), MAX_GIT_CONFIG_BYTES)) ?? '';
   const remotes = remoteSections(config).filter((remote) => remote.url !== undefined);
   const named = (name: string) => remotes.find((remote) => remote.name === name);
   const chosen = remotes.find((remote) => remote.base) ?? named('upstream') ?? named('origin') ?? remotes[0];
