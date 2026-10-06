@@ -19735,7 +19735,8 @@ var CONFIG_LIMITS = {
 var RawConfigSchema = external_exports.looseObject({
   branchIssuePattern: external_exports.string().optional().catch(void 0),
   ignorePaths: external_exports.array(external_exports.unknown()).optional().catch(void 0),
-  ignoreMainCheckout: external_exports.boolean().optional().catch(void 0)
+  ignoreMainCheckout: external_exports.boolean().optional().catch(void 0),
+  progress: external_exports.unknown().optional()
 });
 
 // packages/core/src/branch-pattern.ts
@@ -19992,75 +19993,28 @@ function checklistChildren(body, epic) {
 }
 
 // packages/core/src/config.ts
-import { readFile, stat } from "node:fs/promises";
-import { join as join2, relative } from "node:path";
-var CONFIG_FILE = ".epic-pulse.json";
-var DEFAULT_CONFIG = {
-  branchIssuePattern: DEFAULT_BRANCH_PATTERN,
-  ignorePaths: [],
-  ignoreMainCheckout: false
-};
-function normaliseIgnorePath(entry) {
-  if (typeof entry !== "string" || entry.length > CONFIG_LIMITS.maxIgnorePathLength) return void 0;
-  const slashed = entry.replace(/\\/g, "/");
-  const parts = slashed.split("/").filter((part) => part !== "" && part !== ".");
-  const absolute = slashed.startsWith("/") || /^[a-z]:/i.test(slashed);
-  return absolute || parts.length === 0 || parts.includes("..") ? void 0 : parts.join("/");
-}
-function ignorePathsOf(entries) {
-  const normalised = (entries ?? []).flatMap((entry) => normaliseIgnorePath(entry) ?? []);
-  return [...new Set(normalised)].slice(0, CONFIG_LIMITS.maxIgnorePaths);
-}
-function parseConfig(value) {
-  const raw = RawConfigSchema.safeParse(value);
-  if (!raw.success) return DEFAULT_CONFIG;
-  const source = raw.data.branchIssuePattern;
-  const compiled = source === void 0 ? void 0 : compileBranchPattern(source);
-  return {
-    branchIssuePattern: compiled?.ok ? compiled.value : DEFAULT_BRANCH_PATTERN,
-    ignorePaths: ignorePathsOf(raw.data.ignorePaths),
-    ignoreMainCheckout: raw.data.ignoreMainCheckout ?? false
-  };
-}
-async function loadConfig(root) {
-  const file2 = join2(root, CONFIG_FILE);
-  try {
-    if ((await stat(file2)).size > CONFIG_LIMITS.maxFileBytes) return DEFAULT_CONFIG;
-    return parseConfig(parseJson(await readFile(file2, "utf8")));
-  } catch {
-    return DEFAULT_CONFIG;
-  }
-}
-function isIgnoredPath(config2, root, path) {
-  const inside = relative(root, path).replace(/\\/g, "/");
-  return config2.ignorePaths.some((prefix) => inside === prefix || inside.startsWith(`${prefix}/`));
-}
-
-// packages/core/src/extract.ts
-import { isAbsolute as isAbsolute2, resolve as resolve4 } from "node:path";
-
-// packages/core/src/extract-commands.ts
-import { resolve as resolve3 } from "node:path";
+import { readFile as readFile2, stat as stat2 } from "node:fs/promises";
+import { join as join3, relative } from "node:path";
 
 // packages/core/src/git.ts
-import { lstat, readFile as readFile2, stat as stat2 } from "node:fs/promises";
-import { dirname as dirname3, join as join3, resolve as resolve2 } from "node:path";
+import { lstat, readFile, stat } from "node:fs/promises";
+import { dirname as dirname3, join as join2, resolve as resolve2 } from "node:path";
 var MAX_GIT_FILE_BYTES = 64 * 1024;
 var MAX_GIT_CONFIG_BYTES = 4 * 1024 * 1024;
 async function readSmall(path, maxBytes = MAX_GIT_FILE_BYTES) {
   try {
-    if ((await stat2(path)).size > maxBytes) return void 0;
-    return await readFile2(path, "utf8");
+    if ((await stat(path)).size > maxBytes) return void 0;
+    return await readFile(path, "utf8");
   } catch {
     return void 0;
   }
 }
 async function commonDirOf(gitDir) {
-  const pointer = (await readSmall(join3(gitDir, "commondir")))?.trim();
+  const pointer = (await readSmall(join2(gitDir, "commondir")))?.trim();
   return pointer ? canonicalPath(resolve2(gitDir, pointer)) : gitDir;
 }
 async function inspect(dir) {
-  const marker = join3(dir, ".git");
+  const marker = join2(dir, ".git");
   const entry = await lstat(marker).catch(() => void 0);
   if (!entry) return void 0;
   let gitDir = marker;
@@ -20076,7 +20030,7 @@ async function inspect(dir) {
 async function startDirectory(path) {
   let current = resolve2(path);
   for (; ; ) {
-    const info = await stat2(current).catch(() => void 0);
+    const info = await stat(current).catch(() => void 0);
     if (info) return info.isDirectory() ? current : dirname3(current);
     const parent = dirname3(current);
     if (parent === current) return current;
@@ -20094,7 +20048,7 @@ async function findWorktree(start) {
   }
 }
 async function readBranch(info) {
-  const head = await readSmall(join3(info.gitDir, "HEAD"));
+  const head = await readSmall(join2(info.gitDir, "HEAD"));
   return /^ref:\s*refs\/heads\/(.+?)\s*$/.exec(head ?? "")?.[1];
 }
 var SCP_LIKE = /^(?:[^@/\s]+@)?([^:/\s]{2,}):(?!\/\/)(\S+)$/;
@@ -20134,14 +20088,101 @@ function remoteSections(config2) {
   return [...remotes.values()];
 }
 async function readRemote(commonDir) {
-  const config2 = await readSmall(join3(commonDir, "config"), MAX_GIT_CONFIG_BYTES) ?? "";
+  const config2 = await readSmall(join2(commonDir, "config"), MAX_GIT_CONFIG_BYTES) ?? "";
   const remotes = remoteSections(config2).filter((remote) => remote.url !== void 0);
   const named = (name) => remotes.find((remote) => remote.name === name);
   const chosen = remotes.find((remote) => remote.base) ?? named("upstream") ?? named("origin") ?? remotes[0];
   return chosen?.url ? parseRemoteUrl(chosen.url) : void 0;
 }
 
+// packages/core/src/progress-config.ts
+var PROGRESS_LIMITS = { maxSizes: 30, maxLabelLength: 60, maxPoints: 1e3 };
+var DEFAULT_SIZES = { "size/xs": 1, "size/s": 2, "size/m": 3, "size/l": 5, "size/xl": 8 };
+function medianOf(sizes) {
+  const sorted = Object.values(sizes).sort((a, b) => a - b);
+  return sorted[Math.floor((sorted.length - 1) / 2)] ?? 1;
+}
+var DEFAULT_PROGRESS = { inProgress: 25, inReview: 75, sizes: DEFAULT_SIZES, unsized: medianOf(DEFAULT_SIZES) };
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function integerIn(value, min, max) {
+  return typeof value === "number" && Number.isInteger(value) && value >= min && value <= max ? value : void 0;
+}
+function weightsOf(raw) {
+  const inProgress = integerIn(raw["inProgress"], 0, 99) ?? DEFAULT_PROGRESS.inProgress;
+  const inReview = integerIn(raw["inReview"], 0, 99) ?? DEFAULT_PROGRESS.inReview;
+  return inProgress <= inReview ? { inProgress, inReview } : { inProgress: DEFAULT_PROGRESS.inProgress, inReview: DEFAULT_PROGRESS.inReview };
+}
+function sizesOf(value) {
+  if (!isRecord(value)) return DEFAULT_SIZES;
+  const entries = Object.entries(value).flatMap(([name, points]) => {
+    const key = name.trim().toLowerCase();
+    const worth = integerIn(points, 1, PROGRESS_LIMITS.maxPoints);
+    return key.length > 0 && key.length <= PROGRESS_LIMITS.maxLabelLength && worth !== void 0 ? [[key, worth]] : [];
+  });
+  return entries.length === 0 ? DEFAULT_SIZES : Object.fromEntries(entries.slice(0, PROGRESS_LIMITS.maxSizes));
+}
+function parseProgress(value) {
+  if (!isRecord(value)) return DEFAULT_PROGRESS;
+  const sizes = sizesOf(value["sizes"]);
+  return { ...weightsOf(value), sizes, unsized: integerIn(value["unsized"], 1, PROGRESS_LIMITS.maxPoints) ?? medianOf(sizes) };
+}
+
+// packages/core/src/config.ts
+var CONFIG_FILE = ".epic-pulse.json";
+var DEFAULT_CONFIG = {
+  branchIssuePattern: DEFAULT_BRANCH_PATTERN,
+  ignorePaths: [],
+  ignoreMainCheckout: false,
+  progress: DEFAULT_PROGRESS
+};
+function normaliseIgnorePath(entry) {
+  if (typeof entry !== "string" || entry.length > CONFIG_LIMITS.maxIgnorePathLength) return void 0;
+  const slashed = entry.replace(/\\/g, "/");
+  const parts = slashed.split("/").filter((part) => part !== "" && part !== ".");
+  const absolute = slashed.startsWith("/") || /^[a-z]:/i.test(slashed);
+  return absolute || parts.length === 0 || parts.includes("..") ? void 0 : parts.join("/");
+}
+function ignorePathsOf(entries) {
+  const normalised = (entries ?? []).flatMap((entry) => normaliseIgnorePath(entry) ?? []);
+  return [...new Set(normalised)].slice(0, CONFIG_LIMITS.maxIgnorePaths);
+}
+function parseConfig(value) {
+  const raw = RawConfigSchema.safeParse(value);
+  if (!raw.success) return DEFAULT_CONFIG;
+  const source = raw.data.branchIssuePattern;
+  const compiled = source === void 0 ? void 0 : compileBranchPattern(source);
+  return {
+    branchIssuePattern: compiled?.ok ? compiled.value : DEFAULT_BRANCH_PATTERN,
+    ignorePaths: ignorePathsOf(raw.data.ignorePaths),
+    ignoreMainCheckout: raw.data.ignoreMainCheckout ?? false,
+    progress: parseProgress(raw.data.progress)
+  };
+}
+async function loadProgressFor(dir) {
+  const worktree = await findWorktree(dir);
+  return worktree ? (await loadConfig(worktree.root)).progress : DEFAULT_PROGRESS;
+}
+async function loadConfig(root) {
+  const file2 = join3(root, CONFIG_FILE);
+  try {
+    if ((await stat2(file2)).size > CONFIG_LIMITS.maxFileBytes) return DEFAULT_CONFIG;
+    return parseConfig(parseJson(await readFile2(file2, "utf8")));
+  } catch {
+    return DEFAULT_CONFIG;
+  }
+}
+function isIgnoredPath(config2, root, path) {
+  const inside = relative(root, path).replace(/\\/g, "/");
+  return config2.ignorePaths.some((prefix) => inside === prefix || inside.startsWith(`${prefix}/`));
+}
+
+// packages/core/src/extract.ts
+import { isAbsolute as isAbsolute2, resolve as resolve4 } from "node:path";
+
 // packages/core/src/extract-commands.ts
+import { resolve as resolve3 } from "node:path";
 var MUTATING_ISSUE_VERBS = {
   comment: ["-b", "--body", "-F", "--body-file"],
   close: ["-c", "--comment", "-r", "--reason", "--duplicate-of"],
@@ -20552,6 +20593,11 @@ function deriveStatus(node2, repo) {
   if (prs.some((pr) => !pr.isDraft)) return "in_review";
   return prs.length > 0 || node2.assignees.totalCount > 0 ? "in_progress" : "todo";
 }
+function pointsByStatus(children, progress = DEFAULT_PROGRESS) {
+  const zero = { todo: 0, in_progress: 0, in_review: 0, done: 0, dropped: 0 };
+  const worth = (labels) => Math.max(0, ...(labels ?? []).map((label) => progress.sizes[label] ?? 0)) || progress.unsized;
+  return children.reduce((points, child) => ({ ...points, [child.status]: points[child.status] + worth(child.labels) }), zero);
+}
 function countStatuses(children) {
   const zero = { todo: 0, in_progress: 0, in_review: 0, done: 0, dropped: 0 };
   return children.reduce((counts, child) => ({ ...counts, [child.status]: counts[child.status] + 1 }), zero);
@@ -20560,6 +20606,13 @@ function percentDone(counts) {
   const total2 = STATUSES.reduce((sum, status) => sum + counts[status], 0);
   const denominator = total2 - counts.dropped;
   return denominator <= 0 ? 0 : Math.floor(counts.done * 100 / denominator);
+}
+function weightedPercentDone(points, progress = DEFAULT_PROGRESS) {
+  const total2 = STATUSES.reduce((sum, status) => sum + points[status], 0);
+  const denominator = total2 - points.dropped;
+  if (denominator <= 0) return 0;
+  const credited = points.done * 100 + points.in_review * progress.inReview + points.in_progress * progress.inProgress;
+  return Math.floor(credited / denominator);
 }
 function isStale(entry, now) {
   return entry.error !== null || now - entry.fetchedAt > STALE_AFTER_MS;
@@ -21000,6 +21053,8 @@ var SubIssueNodeSchema = external_exports.object({
   stateReason: external_exports.string().nullable(),
   repository: RepoNameSchema,
   assignees: external_exports.object({ totalCount: external_exports.number().int().nonnegative() }),
+  // Optional so an answer cached or recorded before labels were asked for still parses.
+  labels: external_exports.object({ nodes: external_exports.array(external_exports.object({ name: external_exports.string() }).nullable()) }).optional(),
   closedByPullRequestsReferences: external_exports.object({ nodes: external_exports.array(PrNodeSchema.nullable()) }),
   timelineItems: external_exports.object({ nodes: external_exports.array(TimelineNodeSchema.nullable()) })
 });
@@ -21039,6 +21094,7 @@ var EPIC_FRAGMENT = `fragment EpicFields on Issue {
     nodes {
       number title url state stateReason repository { nameWithOwner }
       assignees(first: 1) { totalCount }
+      labels(first: 20) { nodes { name } }
       closedByPullRequestsReferences(first: 5) {
         nodes { number state isDraft url repository { nameWithOwner } }
       }
@@ -21279,7 +21335,7 @@ function needsFetch(snapshot, epics, now) {
   return epics.filter((epic) => now - fetchedAt(epic) >= EPIC_TTL_MS).sort((a, b) => fetchedAt(a) - fetchedAt(b));
 }
 function phaseBCost(epics) {
-  return Math.max(1, Math.round(epics * 301 / 100));
+  return Math.max(1, Math.round(epics * 401 / 100));
 }
 function phaseBBatchSize(usage) {
   let size = 0;
@@ -21303,7 +21359,10 @@ var ChildSchema = external_exports.object({
   number: IssueNumberSchema.nullable(),
   title: external_exports.string().max(300),
   url: external_exports.string().max(500).nullable(),
-  status: StatusSchema
+  status: StatusSchema,
+  // The labels on the item, lowercased, so a size can be read from them under
+  // whatever table the repository configures; absent: it has none.
+  labels: external_exports.array(external_exports.string().max(60)).max(20).readonly().optional()
 }).readonly();
 var MAX_CHILDREN = 500;
 var EpicEntrySchema = external_exports.object({
@@ -21343,12 +21402,18 @@ function ownRepo(node2, epic) {
   const own2 = owner && repo ? makeRef({ host: epic.host, owner, repo, number: node2.number }) : void 0;
   return own2 ?? epic;
 }
+function labelsOf(node2) {
+  const names = (node2.labels?.nodes ?? []).flatMap((label) => label ? [label.name.toLowerCase()] : []);
+  return names.filter((name) => name.length <= PROGRESS_LIMITS.maxLabelLength);
+}
 function subIssueChild(node2, epic) {
+  const labels = labelsOf(node2);
   return {
     number: node2.number,
     title: node2.title.slice(0, 300),
     url: node2.url.slice(0, 500),
-    status: deriveStatus(node2, ownRepo(node2, epic))
+    status: deriveStatus(node2, ownRepo(node2, epic)),
+    ...labels.length === 0 ? {} : { labels }
   };
 }
 function buildEpic(node2, ref) {
@@ -21762,7 +21827,7 @@ function epicLine(epic, options) {
   const loading = options.pending > 0 ? [`${options.pending} loading`] : [];
   const extra = options.more > 0 ? ` (+${options.more})` : "";
   const head = `#${epic.number} ${epic.percent}% ${fraction(epic)}`;
-  const withBar = `#${epic.number} ${bar(epic.percent)} ${epic.percent}% ${fraction(epic)}`;
+  const withBar = `#${epic.number} ${bar(epic.weightedPercent)} ${epic.percent}% ${fraction(epic)}`;
   return fit([
     [withBar, ...detail, ...stale, ...loading].join(" \xB7 ") + extra,
     [head, ...detail, ...stale, ...loading].join(" \xB7 ") + extra,
@@ -21797,6 +21862,7 @@ var JsonEpicSchema = external_exports.object({
   kind: EpicKindSchema,
   counts: StatusCountsSchema,
   percent: external_exports.number().int().min(0).max(100),
+  weightedPercent: external_exports.number().int().min(0).max(100),
   children: external_exports.array(JsonChildSchema).readonly(),
   fetchedAt: external_exports.iso.datetime(),
   stale: external_exports.boolean(),
@@ -21824,7 +21890,7 @@ var SettingsFileSchema = external_exports.looseObject({ statusLine: external_exp
 var StatusLineSettingSchema = external_exports.looseObject({ type: external_exports.string().optional(), command: external_exports.string() });
 
 // packages/core/src/settings-merge.ts
-function isRecord(value) {
+function isRecord2(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function diffLine(sign, value) {
@@ -21832,7 +21898,7 @@ function diffLine(sign, value) {
 }
 function mergeStatusLine(existingText, desired) {
   const current = existingText === void 0 ? {} : parseJson(existingText);
-  if (!SettingsFileSchema.safeParse(current).success || !isRecord(current)) return { action: "abort" };
+  if (!SettingsFileSchema.safeParse(current).success || !isRecord2(current)) return { action: "abort" };
   const existing = current["statusLine"];
   if (existing === void 0 || existing === null) {
     const nextText = `${JSON.stringify({ ...current, statusLine: desired }, null, 2)}
@@ -21903,11 +21969,12 @@ function childKey(child, epic) {
   const ref = target && own2 ? makeRef({ host: own2.host ?? epic.host, owner: own2.owner, repo: own2.repo, number: target.number }) : child.number === null ? void 0 : makeRef({ ...epic, number: child.number });
   return ref ? refKey(ref) : void 0;
 }
-function jsonEpic(entry, bound, now) {
+function jsonEpic(entry, bound, input2) {
   const counts = countStatuses(entry.children);
+  const points = pointsByStatus(entry.children, input2.progress);
   const children = entry.children.map((child) => {
     const key = childKey(child, entry.ref);
-    return { ...child, sessionCount: key === void 0 ? 0 : bound.filter((keys) => keys.has(key)).length };
+    return { number: child.number, title: child.title, url: child.url, status: child.status, sessionCount: key === void 0 ? 0 : bound.filter((keys) => keys.has(key)).length };
   });
   return {
     number: entry.ref.number,
@@ -21915,10 +21982,11 @@ function jsonEpic(entry, bound, now) {
     url: entry.url,
     kind: entry.kind,
     counts,
-    percent: percentDone(counts),
+    percent: percentDone(points),
+    weightedPercent: weightedPercentDone(points, input2.progress),
     children,
     fetchedAt: iso(entry.fetchedAt),
-    stale: isStale(entry, now),
+    stale: isStale(entry, input2.now),
     error: entry.error,
     truncated: entry.truncated
   };
@@ -21936,7 +22004,7 @@ function buildView(input2) {
     liveSessions: live.length,
     pending: pendingCount(scoped),
     snapshot: { state: stateOf(scoped), fetchedAt: snapshot ? iso(snapshot.updatedAt) : null, error: errorOf(scoped) },
-    epics: entries.map((entry) => jsonEpic(entry, bound, input2.now))
+    epics: entries.map((entry) => jsonEpic(entry, bound, { now: input2.now, progress: input2.progress ?? DEFAULT_PROGRESS }))
   };
 }
 
@@ -22293,12 +22361,18 @@ async function runInstall(args, env) {
 async function runJson(args, env) {
   const parsed = parseCommandArgs(args, { strings: ["cwd"] });
   if (!parsed) return usageError("json [--cwd <dir>]");
-  const dir = await registryDirFor(parsed.strings.get("cwd") ?? process.cwd(), env);
+  const cwd = parsed.strings.get("cwd") ?? process.cwd();
+  const dir = await registryDirFor(cwd, env);
   if (dir === void 0) return failWith(NOT_A_REPO);
   const paths = pathsFor(dir);
   const now = Date.now();
-  const [sessions, snapshot, pins] = await Promise.all([readLiveSessions(paths, now), readSnapshot(paths.snapshotFile), readPins(paths)]);
-  printLine(JSON.stringify(buildView({ snapshot, sessions, pins: pinsOf(pins), now }), null, 2));
+  const [sessions, snapshot, pins, progress] = await Promise.all([
+    readLiveSessions(paths, now),
+    readSnapshot(paths.snapshotFile),
+    readPins(paths),
+    loadProgressFor(cwd)
+  ]);
+  printLine(JSON.stringify(buildView({ snapshot, sessions, pins: pinsOf(pins), now, progress }), null, 2));
   return 0;
 }
 
@@ -22409,14 +22483,15 @@ async function render(env, now) {
     return { line: renderStatusLine(buildView({ snapshot: { status: "missing" }, sessions: [], pins: [], now })), refresh: void 0 };
   }
   const paths = pathsFor(registry2);
-  const [session, snapshot, read, attempt] = await Promise.all([
+  const [session, snapshot, read, attempt, progress] = await Promise.all([
     origin.sessionId === void 0 ? void 0 : readSession(paths, origin.sessionId),
     readSnapshot(paths.snapshotFile),
     readPins(paths),
-    readAttempt(registry2)
+    readAttempt(registry2),
+    loadProgressFor(origin.dir)
   ]);
   const pins = pinsOf(read);
-  const view = buildView({ snapshot, sessions: session ? [session] : [], pins, now, scope: { session } });
+  const view = buildView({ snapshot, sessions: session ? [session] : [], pins, now, scope: { session }, progress });
   const due = session !== void 0 && refreshDue({ snapshot, session, pins, now, attempt });
   return { line: renderStatusLine(view), refresh: due ? { dir: registry2, session: session.id } : void 0 };
 }
