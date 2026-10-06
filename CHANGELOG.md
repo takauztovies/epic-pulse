@@ -5,6 +5,8 @@ Every notable change to epic-pulse is listed here. Versions follow
 
 ## Unreleased
 
+## 0.2.0
+
 ### Added
 
 - `.epic-pulse.json` takes a `progress` block: how much In progress and In review work counts for
@@ -21,8 +23,15 @@ Every notable change to epic-pulse is listed here. Versions follow
   of an item, so a bar ahead of the percentage means work is moving, and it is full only when every
   item is Done. The percentage and the `done/total` count are unchanged. JSON v1 gains
   `weightedPercent` beside `percent`. The bar in the status line and the VS Code view use it.
+
+## 0.1.2
+
+### Added
+
 - The VS Code epics view shows each epic's progress as a text bar and a percentage in front of its
   title (`██░░░░░░░░ 20% Epic title`), so a long title no longer pushes the progress out of view.
+
+## 0.1.1
 
 ### Fixed
 
@@ -32,7 +41,7 @@ Every notable change to epic-pulse is listed here. Versions follow
   `commondir`, the gitdir pointer), which silently made `doctor` and the status line report
   "no GitHub remote" on an otherwise healthy repository.
 
-## 0.1.0 (unreleased)
+## 0.1.0
 
 The first release.
 
