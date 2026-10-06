@@ -82,7 +82,7 @@ test('live: the status line renders the demo epic from the cached snapshot, p95 
     const started = performance.now();
     const line = await renderOnce(paths);
     times.push(performance.now() - started);
-    assert.equal(line, '#1 ▓▓░░░░░░░░ 20% 1/5 · rev 1 · wip 2 (+1)');
+    assert.equal(line, '#1 ▓▓▓▓░░░░░░ 20% 1/5 · rev 1 · wip 2 (+1)');
   }
   const sorted = [...times].sort((a, b) => a - b);
   const p95 = sorted[Math.ceil(0.95 * sorted.length) - 1]!;
