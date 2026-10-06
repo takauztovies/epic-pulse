@@ -72,6 +72,20 @@ export function percentDone(counts: StatusCounts): number {
   return denominator <= 0 ? 0 : Math.floor((counts.done * 100) / denominator);
 }
 
+// What an open issue counts for in the progress bar: work in flight is
+// progress, but never as much as work finished, so the bar only fills with `done`.
+const PROGRESS_WEIGHTS: Readonly<Record<Status, number>> = { todo: 0, in_progress: 0.25, in_review: 0.75, done: 1, dropped: 0 };
+
+// Weighted counterpart of percentDone, floored and over the same denominator.
+// Integer quarters keep the arithmetic exact: 100 only when every item is done.
+export function weightedPercentDone(counts: StatusCounts): number {
+  const total = STATUSES.reduce((sum, status) => sum + counts[status], 0);
+  const denominator = total - counts.dropped;
+  if (denominator <= 0) return 0;
+  const quarters = STATUSES.reduce((sum, status) => sum + counts[status] * PROGRESS_WEIGHTS[status] * 4, 0);
+  return Math.floor((quarters * 25) / denominator);
+}
+
 export function isStale(entry: Pick<EpicEntry, 'fetchedAt' | 'error'>, now: number): boolean {
   return entry.error !== null || now - entry.fetchedAt > STALE_AFTER_MS;
 }

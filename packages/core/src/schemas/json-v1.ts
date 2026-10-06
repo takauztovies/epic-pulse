@@ -23,6 +23,7 @@ export const JsonEpicSchema = z
     kind: EpicKindSchema,
     counts: StatusCountsSchema,
     percent: z.number().int().min(0).max(100),
+    weightedPercent: z.number().int().min(0).max(100),
     children: z.array(JsonChildSchema).readonly(),
     fetchedAt: z.iso.datetime(),
     stale: z.boolean(),

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { parsePhaseB } from '../src/queries.js';
-import { countStatuses, deriveStatus, isStale, linkedOpenPrs, percentDone, STALE_AFTER_MS } from '../src/status.js';
+import { countStatuses, deriveStatus, isStale, linkedOpenPrs, percentDone, STALE_AFTER_MS, weightedPercentDone } from '../src/status.js';
 import type { RepoRef } from '../src/schemas/common.js';
 import type { PrSource, SubIssueNode } from '../src/schemas/graphql.js';
 import { loadFixture } from './helpers.js';
@@ -114,4 +114,20 @@ test('data older than the stale window, or carrying an error, is marked stale', 
   assert.equal(isStale({ fetchedAt: now - STALE_AFTER_MS, error: null }, now), false);
   assert.equal(isStale({ fetchedAt: now - STALE_AFTER_MS - 1, error: null }, now), true);
   assert.equal(isStale({ fetchedAt: now - 1000, error: 'rate_limited' }, now), true);
+});
+
+const NONE = { todo: 0, in_progress: 0, in_review: 0, done: 0, dropped: 0 };
+
+test('weighted progress counts work in flight: in progress a quarter, in review three quarters, done whole', () => {
+  assert.equal(weightedPercentDone({ ...NONE, in_progress: 4 }), 25);
+  assert.equal(weightedPercentDone({ ...NONE, in_review: 4 }), 75);
+  assert.equal(weightedPercentDone({ ...NONE, todo: 1, in_progress: 2, in_review: 1, done: 1, dropped: 1 }), 45);
+});
+
+test('weighted progress shares the done-percent edges: dropped leaves the denominator, nothing countable is 0, 100 only when complete', () => {
+  assert.equal(weightedPercentDone({ ...NONE, done: 1, dropped: 4 }), 100);
+  assert.equal(weightedPercentDone({ ...NONE, dropped: 3 }), 0);
+  assert.equal(weightedPercentDone(NONE), 0);
+  assert.equal(weightedPercentDone({ ...NONE, done: 199, in_review: 1 }), 99);
+  assert.ok(weightedPercentDone({ ...NONE, in_review: 50 }) < 100);
 });

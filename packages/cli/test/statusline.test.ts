@@ -8,7 +8,7 @@ import { cliEnv, demoRepo, registryOf, runCli, sandbox, SESSION, tempDir, waitFo
 
 const OTHER_SESSION = '1a2b3c4d-5e6f-4a1b-9c2d-3e4f5a6b7c8d';
 const CANARY_SESSION = '2b3c4d5e-6f7a-4b1c-8d2e-3f4a5b6c7d8e';
-const EPIC_LINE = '#1 ▓▓░░░░░░░░ 20% 1/5 · rev 1 · wip 2';
+const EPIC_LINE = '#1 ▓▓▓▓░░░░░░ 20% 1/5 · rev 1 · wip 2';
 const ELEVEN_MINUTES = 11 * 60 * 1000;
 const EIGHT_DAYS_S = 8 * 24 * 60 * 60;
 

@@ -7,6 +7,10 @@ Every notable change to epic-pulse is listed here. Versions follow
 
 ### Added
 
+- The progress bar credits work in flight: In progress counts a quarter and In review three quarters
+  of an item, so a bar ahead of the percentage means work is moving, and it is full only when every
+  item is Done. The percentage and the `done/total` count are unchanged. JSON v1 gains
+  `weightedPercent` beside `percent`. The bar in the status line and the VS Code view use it.
 - The VS Code epics view shows each epic's progress as a text bar and a percentage in front of its
   title (`██░░░░░░░░ 20% Epic title`), so a long title no longer pushes the progress out of view.
 

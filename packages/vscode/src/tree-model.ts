@@ -86,7 +86,7 @@ function epicNode(epic: JsonEpic, now: number): EpicNode {
     kind: 'epic',
     id: epic.url,
     url: epic.url,
-    label: `${barText(epic.percent)} ${epic.percent}% ${epic.title}`,
+    label: `${barText(epic.weightedPercent)} ${epic.percent}% ${epic.title}`,
     description: [progress, ...stale].join(' · '),
     tooltip: [`#${epic.number} ${epic.title}`, `${progress}: ${countsText(epic)}`, ageText(epic.fetchedAt, now)].join('\n'),
     icon: 'milestone',
