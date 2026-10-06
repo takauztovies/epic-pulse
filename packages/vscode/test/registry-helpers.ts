@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { TestContext } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
@@ -71,7 +71,7 @@ export async function makeRegistry(t: TestContext, spec: RegistrySpec, now = Dat
   for (const session of spec.sessions ?? []) await writeSession(dir, session, now);
   for (const ref of spec.pins ?? []) assert.ok((await addPin(pathsFor(dir), ref, now)).ok);
   if (spec.snapshot) await writeSnapshot(pathsFor(dir).snapshotFile, spec.snapshot);
-  return { dir, label: 'demo' };
+  return { dir, folder: dirname(dir), label: 'demo' };
 }
 
 // An empty PATH, so `gh` can not be found and only env vars supply a token,

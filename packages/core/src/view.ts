@@ -5,6 +5,7 @@ import type { JsonEpic, JsonV1 } from './schemas/json-v1.js';
 import type { Pin } from './schemas/registry.js';
 import type { Child, EpicEntry, Snapshot } from './schemas/snapshot.js';
 import type { SnapshotRead } from './snapshot.js';
+import { DEFAULT_PROGRESS, type ProgressConfig } from './progress-config.js';
 import { countStatuses, isStale, percentDone, pointsByStatus, weightedPercentDone } from './status.js';
 
 export interface ViewInput {
@@ -17,6 +18,8 @@ export interface ViewInput {
   // Without a scope the view covers every live session, which is what
   // `epic-pulse json` and the extension show.
   readonly scope?: { readonly session: SessionState | undefined };
+  // What the percentages count for; the defaults when the repository sets none.
+  readonly progress?: ProgressConfig;
 }
 
 interface Scoped {
@@ -116,17 +119,17 @@ function childKey(child: Child, epic: IssueRef): string | undefined {
   return ref ? refKey(ref) : undefined;
 }
 
-function jsonEpic(entry: EpicEntry, bound: readonly ReadonlySet<string>[], now: number): JsonEpic {
+function jsonEpic(entry: EpicEntry, bound: readonly ReadonlySet<string>[], input: { readonly now: number; readonly progress: ProgressConfig }): JsonEpic {
   const counts = countStatuses(entry.children);
-  const points = pointsByStatus(entry.children);
+  const points = pointsByStatus(entry.children, input.progress);
   const children = entry.children.map((child) => {
     const key = childKey(child, entry.ref);
-    return { ...child, sessionCount: key === undefined ? 0 : bound.filter((keys) => keys.has(key)).length };
+    return { number: child.number, title: child.title, url: child.url, status: child.status, sessionCount: key === undefined ? 0 : bound.filter((keys) => keys.has(key)).length };
   });
   return {
     number: entry.ref.number, title: entry.title, url: entry.url, kind: entry.kind, counts, percent: percentDone(points),
-    weightedPercent: weightedPercentDone(points),
-    children, fetchedAt: iso(entry.fetchedAt), stale: isStale(entry, now), error: entry.error, truncated: entry.truncated,
+    weightedPercent: weightedPercentDone(points, input.progress),
+    children, fetchedAt: iso(entry.fetchedAt), stale: isStale(entry, input.now), error: entry.error, truncated: entry.truncated,
   };
 }
 
@@ -143,6 +146,6 @@ export function buildView(input: ViewInput): JsonV1 {
     liveSessions: live.length,
     pending: pendingCount(scoped),
     snapshot: { state: stateOf(scoped), fetchedAt: snapshot ? iso(snapshot.updatedAt) : null, error: errorOf(scoped) },
-    epics: entries.map((entry) => jsonEpic(entry, bound, input.now)),
+    epics: entries.map((entry) => jsonEpic(entry, bound, { now: input.now, progress: input.progress ?? DEFAULT_PROGRESS })),
   };
 }

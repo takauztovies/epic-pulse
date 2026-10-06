@@ -14,6 +14,7 @@ export const RawConfigSchema = z.looseObject({
   branchIssuePattern: z.string().optional().catch(undefined),
   ignorePaths: z.array(z.unknown()).optional().catch(undefined),
   ignoreMainCheckout: z.boolean().optional().catch(undefined),
+  progress: z.unknown().optional(),
 });
 
 export type RawConfig = z.infer<typeof RawConfigSchema>;

@@ -7,6 +7,11 @@ Every notable change to epic-pulse is listed here. Versions follow
 
 ### Added
 
+- `.epic-pulse.json` takes a `progress` block: how much In progress and In review work counts for
+  (whole percentages), which labels are sizes and what each is worth, and what an unlabelled item is
+  worth. The status line, `epic-pulse json` and the VS Code view all read it from the folder you work
+  in. The cache now keeps each item's labels (at most 20) instead of one precomputed size, so a change
+  to the file applies at once, without a refetch.
 - Size labels weigh the progress: `size/XS`, `S`, `M`, `L` and `XL` are worth 1, 2, 3, 5 and 8, so
   finishing a large item moves the percentage and the bar more than a small one. An unlabelled item
   among sized ones counts as medium, and an epic with no size labels reads exactly as before. The

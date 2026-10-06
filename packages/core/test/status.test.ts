@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { parsePhaseB } from '../src/queries.js';
+import { DEFAULT_PROGRESS } from '../src/progress-config.js';
 import { countStatuses, deriveStatus, isStale, linkedOpenPrs, percentDone, STALE_AFTER_MS, pointsByStatus, weightedPercentDone } from '../src/status.js';
 import type { RepoRef } from '../src/schemas/common.js';
 import type { PrSource, SubIssueNode } from '../src/schemas/graphql.js';
@@ -132,7 +133,7 @@ test('weighted progress shares the done-percent edges: dropped leaves the denomi
   assert.ok(weightedPercentDone({ ...NONE, in_review: 50 }) < 100);
 });
 
-const child = (status: 'todo' | 'in_progress' | 'in_review' | 'done' | 'dropped', size?: string) => ({ number: 1, title: 't', url: null, status, ...(size ? { size } : {}) });
+const child = (status: 'todo' | 'in_progress' | 'in_review' | 'done' | 'dropped', ...labels: string[]) => ({ number: 1, title: 't', url: null, status, ...(labels.length > 0 ? { labels } : {}) });
 
 test('a finished large item moves progress more than a finished small one', () => {
   const small = pointsByStatus([child('done', 'size/xs'), child('todo', 'size/xl')]);
@@ -150,4 +151,17 @@ test('without size labels every item counts the same, so progress is the plain i
 test('an unlabelled item among sized ones counts as medium, and an unknown size label as unsized', () => {
   const points = pointsByStatus([child('done', 'size/m'), child('todo'), child('todo', 'size/huge')]);
   assert.deepEqual([points.done, points.todo], [3, 6]);
+});
+
+test('the size comes from whichever label names one, and the larger counts when an item carries two', () => {
+  assert.equal(pointsByStatus([child('done', 'bug', 'size/l', 'p1')]).done, 5);
+  assert.equal(pointsByStatus([child('done', 'size/s', 'size/xl')]).done, 8);
+});
+
+test('configured sizes and in-flight weights replace the defaults', () => {
+  const progress = { ...DEFAULT_PROGRESS, inProgress: 50, inReview: 90, sizes: { 'est:1': 1, 'est:4': 4 }, unsized: 2 };
+  const points = pointsByStatus([child('done', 'est:4'), child('in_progress', 'est:1'), child('todo'), child('done', 'size/xl')], progress);
+  assert.deepEqual([points.done, points.in_progress, points.todo], [4 + 2, 1, 2]);
+  assert.equal(weightedPercentDone(pointsByStatus([child('in_progress'), child('in_progress')]), progress), 50);
+  assert.equal(weightedPercentDone(pointsByStatus([child('in_review'), child('todo')]), progress), 45);
 });

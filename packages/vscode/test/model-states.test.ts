@@ -63,7 +63,7 @@ test('none: the hook has written here, but no live session has an issue bound', 
 test('hook inactive: a registry the hook never wrote a session to, or no registry at all', async (t) => {
   const now = Date.now();
   const snapshotOnly = await makeRegistry(t, { snapshot: demoSnapshot(now - 1000) }, now);
-  const missing = { dir: join(tempDir(t), 'epic-pulse'), label: 'missing' };
+  const missing = { dir: join(tempDir(t), 'epic-pulse'), folder: tempDir(t), label: 'missing' };
   for (const repo of [snapshotOnly, missing]) {
     const expected = ['hook-inactive', 'notice', 'Hook inactive', '', '$(debug-disconnect) Hook inactive'];
     assert.deepEqual(surface(await modelOf([repo], now)), expected, repo.label);
