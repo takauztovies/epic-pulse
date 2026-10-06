@@ -143,3 +143,15 @@ test('a sub-epic pin and work on its parent epic show the two epics, the work fi
   const read: SnapshotRead = { status: 'ok', snapshot: subEpicSnapshot(T0) };
   assert.deepEqual(view({ snapshot: read, sessions: [own], scope: { session: own } }).epics.map((epic) => epic.number), [1, 4]);
 });
+
+test('size labels weigh the percentages, and the item counts stay item counts', () => {
+  const base = demoSnapshot(T0);
+  const key = refKey(demo(1));
+  const epic = base.epics[key]!;
+  const sized = epic.children.map((c) => (c.number === 2 ? { ...c, size: 'size/xl' } : c.number === 7 ? { ...c, size: 'size/xs' } : c));
+  const snapshot: SnapshotRead = { status: 'ok', snapshot: { ...base, epics: { ...base.epics, [key]: { ...epic, children: sized } } } };
+  const own = session(A, [[4, 'gh']]);
+  const result = view({ snapshot, sessions: [own], scope: { session: own } }).epics[0];
+  assert.deepEqual(result?.counts, { todo: 1, in_progress: 2, in_review: 1, done: 1, dropped: 1 });
+  assert.equal(result?.percent, 44);
+});

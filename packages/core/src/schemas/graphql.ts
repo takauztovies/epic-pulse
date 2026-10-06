@@ -67,6 +67,8 @@ export const SubIssueNodeSchema = z.object({
   stateReason: z.string().nullable(),
   repository: RepoNameSchema,
   assignees: z.object({ totalCount: z.number().int().nonnegative() }),
+  // Optional so an answer cached or recorded before labels were asked for still parses.
+  labels: z.object({ nodes: z.array(z.object({ name: z.string() }).nullable()) }).optional(),
   closedByPullRequestsReferences: z.object({ nodes: z.array(PrNodeSchema.nullable()) }),
   timelineItems: z.object({ nodes: z.array(TimelineNodeSchema.nullable()) }),
 });

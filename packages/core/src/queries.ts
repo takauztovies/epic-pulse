@@ -51,8 +51,8 @@ export function phaseADocument(numbers: readonly number[]): string {
 // cross-reference events, whose PR body is checked for a closing keyword in
 // status.ts. Each sub-issue's own repository is read too: it may not be the
 // epic's, and its pull requests are judged against it. The nested connections
-// multiply the rate-limit cost: 1 + 100 x 3 = 301 requests, which GitHub bills
-// as 3 points per epic; the repository is a plain field and costs nothing.
+// multiply the rate-limit cost: 1 + 100 x 4 = 401 requests, which GitHub bills
+// as 4 points per epic; the repository is a plain field and costs nothing.
 const EPIC_FRAGMENT = `fragment EpicFields on Issue {
   number title url body
   subIssues(first: 100) {
@@ -60,6 +60,7 @@ const EPIC_FRAGMENT = `fragment EpicFields on Issue {
     nodes {
       number title url state stateReason repository { nameWithOwner }
       assignees(first: 1) { totalCount }
+      labels(first: 20) { nodes { name } }
       closedByPullRequestsReferences(first: 5) {
         nodes { number state isDraft url repository { nameWithOwner } }
       }

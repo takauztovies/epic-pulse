@@ -150,6 +150,13 @@ flight: In progress counts a quarter and In review three quarters, so a bar ahea
 means work is moving. It is full only when everything is Done. JSON v1 carries both, as `percent`
 and `weightedPercent`.
 
+Items are worth their size. A `size/XS`, `size/S`, `size/M`, `size/L` or `size/XL` label (any case)
+makes an item worth 1, 2, 3, 5 or 8, and the percentage and the bar are points done over points
+counted, so finishing an XL moves them more than finishing an XS. An unlabelled item among sized
+ones counts as medium, and with no size labels at all every item is worth the same, which is the
+plain ratio above. The `done/total` count stays a count of items. Reading the labels costs one more
+point per epic per refresh (4 instead of 3).
+
 A pull request counts when it is open, belongs to the issue's own repository (which may not be the
 epic's), and either GitHub links it as closing the issue or its body closes the issue with a keyword.
 

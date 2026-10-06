@@ -12,6 +12,8 @@ export const ChildSchema = z
     title: z.string().max(300),
     url: z.string().max(500).nullable(),
     status: StatusSchema,
+    // The size label this item carries, lowercased (`size/xl`); absent: unsized.
+    size: z.string().max(60).optional(),
   })
   .readonly();
 

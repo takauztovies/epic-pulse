@@ -51,5 +51,5 @@ test('an answer without a rate limit is used, charged the estimate, and leaves t
   const a = answered(before, { ...PHASE_A, refs: [demo(4)] }, withoutRateLimit('phase-a'));
   assert.deepEqual([a.failure, a.points, a.snapshot.usage.points, a.snapshot.rateLimit, a.snapshot.issues[refKey(demo(4))]?.epic?.number], [null, 1, 1, limit, 1]);
   const b = answered(before, { ...PHASE_A, phase: 'B', refs: [demo(1)] }, withoutRateLimit('phase-b-subissues'));
-  assert.deepEqual([b.failure, b.points, b.snapshot.usage.points, b.snapshot.rateLimit, b.snapshot.epics[refKey(demo(1))]?.children.length], [null, 3, 3, limit, 6]);
+  assert.deepEqual([b.failure, b.points, b.snapshot.usage.points, b.snapshot.rateLimit, b.snapshot.epics[refKey(demo(1))]?.children.length], [null, 4, 4, limit, 6]);
 });

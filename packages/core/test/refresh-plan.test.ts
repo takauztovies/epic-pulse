@@ -35,10 +35,10 @@ test('Phase A re-asks after 30 minutes; Phase B after 2 minutes, oldest first', 
   assert.deepEqual(needsFetch(older, [demo(1), demo(8), demo(3)], T0 + EPIC_TTL_MS).map((r) => r.number), [3, 8, 1]);
 });
 
-test('the cost model matches GitHub: 3 points per epic as recorded, never below 1', () => {
-  assert.deepEqual([0, 1, 2, 10].map(phaseBCost), [1, 3, 6, 30]);
+test('the cost model matches GitHub: 4 points per epic (four nested connections), never below 1', () => {
+  assert.deepEqual([0, 1, 2, 10].map(phaseBCost), [1, 4, 8, 40]);
   assert.equal(phaseBBatchSize({ windowStart: T0, points: 0 }), 10);
-  assert.equal(phaseBBatchSize({ windowStart: T0, points: 294 }), 2);
+  assert.equal(phaseBBatchSize({ windowStart: T0, points: 294 }), 1);
   assert.equal(phaseBBatchSize({ windowStart: T0, points: 298 }), 0);
 });
 

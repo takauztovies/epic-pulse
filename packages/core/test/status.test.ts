@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { parsePhaseB } from '../src/queries.js';
-import { countStatuses, deriveStatus, isStale, linkedOpenPrs, percentDone, STALE_AFTER_MS, weightedPercentDone } from '../src/status.js';
+import { countStatuses, deriveStatus, isStale, linkedOpenPrs, percentDone, STALE_AFTER_MS, pointsByStatus, weightedPercentDone } from '../src/status.js';
 import type { RepoRef } from '../src/schemas/common.js';
 import type { PrSource, SubIssueNode } from '../src/schemas/graphql.js';
 import { loadFixture } from './helpers.js';
@@ -130,4 +130,24 @@ test('weighted progress shares the done-percent edges: dropped leaves the denomi
   assert.equal(weightedPercentDone(NONE), 0);
   assert.equal(weightedPercentDone({ ...NONE, done: 199, in_review: 1 }), 99);
   assert.ok(weightedPercentDone({ ...NONE, in_review: 50 }) < 100);
+});
+
+const child = (status: 'todo' | 'in_progress' | 'in_review' | 'done' | 'dropped', size?: string) => ({ number: 1, title: 't', url: null, status, ...(size ? { size } : {}) });
+
+test('a finished large item moves progress more than a finished small one', () => {
+  const small = pointsByStatus([child('done', 'size/xs'), child('todo', 'size/xl')]);
+  const large = pointsByStatus([child('done', 'size/xl'), child('todo', 'size/xs')]);
+  assert.deepEqual([percentDone(small), percentDone(large)], [11, 88]);
+  assert.deepEqual([weightedPercentDone(small), weightedPercentDone(large)], [11, 88]);
+});
+
+test('without size labels every item counts the same, so progress is the plain item ratio', () => {
+  const children = [child('done'), child('in_progress'), child('todo'), child('todo'), child('dropped')];
+  assert.equal(percentDone(pointsByStatus(children)), percentDone(countStatuses(children)));
+  assert.equal(weightedPercentDone(pointsByStatus(children)), weightedPercentDone(countStatuses(children)));
+});
+
+test('an unlabelled item among sized ones counts as medium, and an unknown size label as unsized', () => {
+  const points = pointsByStatus([child('done', 'size/m'), child('todo'), child('todo', 'size/huge')]);
+  assert.deepEqual([points.done, points.todo], [3, 6]);
 });
