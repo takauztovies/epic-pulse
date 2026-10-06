@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, posix, win32 } from 'node:path';
 import { test } from 'node:test';
 import { findWorktree, parseRemoteUrl, readBranch, readRemote } from '../src/git.js';
@@ -46,6 +46,19 @@ test('the remote is read from the shared config, origin before other names, cred
   const viaWorktree = await readRemote((await findWorktree(wt))!.commonDir);
   assert.deepEqual(viaWorktree, { host: 'github.com', owner: 'acme', repo: 'widgets' });
   assert.ok(!JSON.stringify(viaWorktree).includes('secret'));
+});
+
+// A repo with hundreds of worktrees over its life accretes a `[branch "x"]`
+// stanza per branch and can pass 64KB (observed: 867 branches, 95KB) with
+// nothing wrong — the remote must still be found, not just the identity
+// files (HEAD, commondir, gitdir-pointer) that the same-sized cap also guards.
+test('the remote is still found when .git/config has grown past the old identity-file size cap', async (t) => {
+  const repo = makeRepo(t);
+  git(repo.root, ['remote', 'add', 'origin', 'https://github.com/Acme/Widgets.git']);
+  const padding = '# padding\n'.repeat(8000); // ~80KB, past the 64KB identity-file cap
+  appendFileSync(join(repo.root, '.git', 'config'), padding);
+  const remote = await readRemote((await findWorktree(repo.root))!.commonDir);
+  assert.deepEqual(remote, { host: 'github.com', owner: 'acme', repo: 'widgets' });
 });
 
 test('a fork reads its base: the remote gh set as default, then upstream, then origin, then the first', async (t) => {

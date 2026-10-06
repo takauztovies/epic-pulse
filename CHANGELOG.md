@@ -5,6 +5,14 @@ Every notable change to epic-pulse is listed here. Versions follow
 
 ## Unreleased
 
+### Fixed
+
+- The remote is found again on a repository whose `.git/config` has grown past 64KB from
+  carrying many worktrees over its life (seen: 867 branches, 95KB): `config` now reads with
+  its own, far roomier cap, instead of the one meant for tiny identity files (`HEAD`,
+  `commondir`, the gitdir pointer), which silently made `doctor` and the status line report
+  "no GitHub remote" on an otherwise healthy repository.
+
 ## 0.1.0 (unreleased)
 
 The first release.
