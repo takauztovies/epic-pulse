@@ -1,5 +1,5 @@
 import {
-  buildView, HookPayloadSchema, parseJson, pathsFor, pinsOf, readPins, readSession, readSnapshot, registryDirFor,
+  buildView, HookPayloadSchema, loadProgressFor, parseJson, pathsFor, pinsOf, readPins, readSession, readSnapshot, registryDirFor,
   renderStatusLine, type JsonV1,
 } from '@epic-pulse/core';
 import { printLine, readStdin } from './io.js';
@@ -49,14 +49,15 @@ async function render(env: NodeJS.ProcessEnv, now: number): Promise<Rendered> {
     return { line: renderStatusLine(buildView({ snapshot: { status: 'missing' }, sessions: [], pins: [], now })), refresh: undefined };
   }
   const paths = pathsFor(registry);
-  const [session, snapshot, read, attempt] = await Promise.all([
+  const [session, snapshot, read, attempt, progress] = await Promise.all([
     origin.sessionId === undefined ? undefined : readSession(paths, origin.sessionId),
     readSnapshot(paths.snapshotFile),
     readPins(paths),
     readAttempt(registry),
+    loadProgressFor(origin.dir),
   ]);
   const pins = pinsOf(read);
-  const view = buildView({ snapshot, sessions: session ? [session] : [], pins, now, scope: { session } });
+  const view = buildView({ snapshot, sessions: session ? [session] : [], pins, now, scope: { session }, progress });
   const due = session !== undefined && refreshDue({ snapshot, session, pins, now, attempt });
   return { line: renderStatusLine(view), refresh: due ? { dir: registry, session: session.id } : undefined };
 }

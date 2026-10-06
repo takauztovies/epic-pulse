@@ -12,8 +12,9 @@ export const ChildSchema = z
     title: z.string().max(300),
     url: z.string().max(500).nullable(),
     status: StatusSchema,
-    // The size label this item carries, lowercased (`size/xl`); absent: unsized.
-    size: z.string().max(60).optional(),
+    // The labels on the item, lowercased, so a size can be read from them under
+    // whatever table the repository configures; absent: it has none.
+    labels: z.array(z.string().max(60)).max(20).readonly().optional(),
   })
   .readonly();
 

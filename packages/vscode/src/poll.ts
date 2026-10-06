@@ -1,6 +1,6 @@
 import { readdir, stat } from 'node:fs/promises';
 import {
-  buildView, gatherRefs, pathsFor, pinsOf, readLiveSessions, readPins, readSnapshot, refresh,
+  buildView, gatherRefs, loadProgressFor, pathsFor, pinsOf, readLiveSessions, readPins, readSnapshot, refresh,
   type JsonV1, type RefreshOutcome, type RegistryPaths,
 } from '@epic-pulse/core';
 import { tokenUse, type Grant, type TokenUse } from './grant.js';
@@ -46,12 +46,12 @@ async function hookSeen(paths: RegistryPaths): Promise<boolean> {
 
 // Files only, nothing fetched: the unscoped view `epic-pulse json` prints,
 // covering every live session of the repository and its pins.
-export async function inspectRepo(dir: string, now: number): Promise<RepoState> {
-  const paths = pathsFor(dir);
-  const [sessions, snapshot, pins, seen] = await Promise.all([
-    readLiveSessions(paths, now), readSnapshot(paths.snapshotFile), readPins(paths), hookSeen(paths),
+export async function inspectRepo(repo: RepoTarget, now: number): Promise<RepoState> {
+  const paths = pathsFor(repo.dir);
+  const [sessions, snapshot, pins, seen, progress] = await Promise.all([
+    readLiveSessions(paths, now), readSnapshot(paths.snapshotFile), readPins(paths), hookSeen(paths), loadProgressFor(repo.folder),
   ]);
-  return { view: buildView({ snapshot, sessions, pins: pinsOf(pins), now }), hookSeen: seen };
+  return { view: buildView({ snapshot, sessions, pins: pinsOf(pins), now, progress }), hookSeen: seen };
 }
 
 // Every host the refresh could contact: those of the issues it keeps current.
@@ -81,7 +81,7 @@ async function runRefresh(dir: string, options: PollOptions): Promise<Pick<RepoR
 export async function pollRepo(repo: RepoTarget, options: PollOptions): Promise<RepoResult> {
   const skipped = { refresh: { status: 'skipped' }, token: 'none', hosts: [] } as const;
   const ran = (await isDirectory(repo.dir)) ? await runRefresh(repo.dir, options) : skipped;
-  return { repo, ...ran, ...(await inspectRepo(repo.dir, options.now)) };
+  return { repo, ...ran, ...(await inspectRepo(repo, options.now)) };
 }
 
 export function pollAll(repos: readonly RepoTarget[], options: PollOptions): Promise<readonly RepoResult[]> {
@@ -97,5 +97,5 @@ export function pollAll(repos: readonly RepoTarget[], options: PollOptions): Pro
 // the last poll did not find waits for the next one, which opening a folder or
 // coming back to the window runs at once.
 export function readAll(previous: readonly RepoResult[], now: number): Promise<readonly RepoResult[]> {
-  return Promise.all(previous.map(async (result) => ({ ...result, ...(await inspectRepo(result.repo.dir, now)) })));
+  return Promise.all(previous.map(async (result) => ({ ...result, ...(await inspectRepo(result.repo, now)) })));
 }

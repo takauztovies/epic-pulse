@@ -14,6 +14,7 @@ export * from './hosts.js';
 export * from './lock.js';
 export * from './paths.js';
 export * from './pins.js';
+export * from './progress-config.js';
 export * from './queries.js';
 export * from './ref.js';
 export * from './refresh.js';

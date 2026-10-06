@@ -46,7 +46,7 @@ test('the folders of one repository, its worktrees included, lead to one registr
   const nested = join(root, 'packages');
   mkdirSync(nested);
   const repos = await discoverRepos([worktree, root, nested], {});
-  assert.deepEqual(repos, [{ dir: join(root, '.git', 'epic-pulse'), label: 'app-feature' }]);
+  assert.deepEqual(repos, [{ dir: join(root, '.git', 'epic-pulse'), folder: worktree, label: 'app-feature' }]);
 });
 
 // A folder reached through a link (on a Windows runner the short 8.3 spelling of
@@ -56,7 +56,7 @@ test('a folder reached through a link is the same repository, listed once under 
   const root = makeRepo(t, 'app');
   const shortcut = join(tempDir(t), 'shortcut');
   symlinkSync(root, shortcut, 'junction');
-  assert.deepEqual(await discoverRepos([shortcut, root], {}), [{ dir: join(root, '.git', 'epic-pulse'), label: 'shortcut' }]);
+  assert.deepEqual(await discoverRepos([shortcut, root], {}), [{ dir: join(root, '.git', 'epic-pulse'), folder: shortcut, label: 'shortcut' }]);
 });
 
 test('separate repositories each get their registry, in folder order, and folders outside git none', async (t) => {

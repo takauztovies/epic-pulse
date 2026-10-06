@@ -7,6 +7,7 @@ import { JsonV1Schema, type JsonV1 } from '../src/schemas/json-v1.js';
 import { RegistryLineSchema } from '../src/schemas/registry.js';
 import { emptySnapshot, type SnapshotRead } from '../src/snapshot.js';
 import { STALE_AFTER_MS } from '../src/status.js';
+import { DEFAULT_PROGRESS } from '../src/progress-config.js';
 import { buildView, type ViewInput } from '../src/view.js';
 import { demo, demoSnapshot, subEpicSnapshot } from './snapshot-helpers.js';
 
@@ -148,10 +149,23 @@ test('size labels weigh the percentages, and the item counts stay item counts', 
   const base = demoSnapshot(T0);
   const key = refKey(demo(1));
   const epic = base.epics[key]!;
-  const sized = epic.children.map((c) => (c.number === 2 ? { ...c, size: 'size/xl' } : c.number === 7 ? { ...c, size: 'size/xs' } : c));
+  const sized = epic.children.map((c) => (c.number === 2 ? { ...c, labels: ['size/xl'] } : c.number === 7 ? { ...c, labels: ['size/xs'] } : c));
   const snapshot: SnapshotRead = { status: 'ok', snapshot: { ...base, epics: { ...base.epics, [key]: { ...epic, children: sized } } } };
   const own = session(A, [[4, 'gh']]);
   const result = view({ snapshot, sessions: [own], scope: { session: own } }).epics[0];
   assert.deepEqual(result?.counts, { todo: 1, in_progress: 2, in_review: 1, done: 1, dropped: 1 });
   assert.equal(result?.percent, 44);
+});
+
+test('the repository progress config changes the percentages, and a child in the output carries only its documented fields', () => {
+  const base = demoSnapshot(T0);
+  const key = refKey(demo(1));
+  const epic = base.epics[key]!;
+  const sized = epic.children.map((c) => (c.number === 2 ? { ...c, labels: ['est:4'] } : c));
+  const snapshot: SnapshotRead = { status: 'ok', snapshot: { ...base, epics: { ...base.epics, [key]: { ...epic, children: sized } } } };
+  const own = session(A, [[4, 'gh']]);
+  const progress = { ...DEFAULT_PROGRESS, sizes: { 'est:4': 4 }, unsized: 1, inProgress: 50, inReview: 50 };
+  const result = buildView({ snapshot, sessions: [own], pins: [], now: T0 + 1000, scope: { session: own }, progress }).epics[0];
+  assert.equal(result?.percent, 4 * 100 / (4 + 1 + 1 + 1 + 1) | 0);
+  assert.deepEqual(Object.keys(result?.children[0] ?? {}).sort(), ['number', 'sessionCount', 'status', 'title', 'url']);
 });
