@@ -20,6 +20,17 @@ test('json prints the v1 view of every live session and the pins, for the reposi
   assert.equal(four?.sessionCount, 1);
 });
 
+test('json reads the repository\'s progress config from the --cwd it is given', async (t) => {
+  const repo = demoRepo(t);
+  const env = cliEnv(sandbox(t));
+  await runCli(['hook'], { cwd: repo, env, input: bashPayload('gh issue comment 4 -b hi', repo) });
+  await writeSnapshot(registryOf(repo).snapshotFile, demoSnapshot(Date.now()));
+  const weighted = async () => JsonV1Schema.parse(JSON.parse((await runCli(['json', '--cwd', repo], { cwd: tempDir(t), env })).stdout)).epics[0]?.weightedPercent;
+  assert.equal(await weighted(), 45);
+  writeFileSync(join(repo, '.epic-pulse.json'), JSON.stringify({ progress: { inProgress: 50, inReview: 50 } }));
+  assert.equal(await weighted(), 50);
+});
+
 test('json outside a repository, or with an unknown option, fails without printing JSON', async (t) => {
   const env = cliEnv(sandbox(t));
   const outside = await runCli(['json'], { cwd: tempDir(t), env });

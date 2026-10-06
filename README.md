@@ -150,8 +150,9 @@ flight: In progress counts a quarter and In review three quarters, so a bar ahea
 means work is moving. It is full only when everything is Done. JSON v1 carries both, as `percent`
 and `weightedPercent`.
 
-Items are worth their size. A `size/XS`, `size/S`, `size/M`, `size/L` or `size/XL` label (any case)
-makes an item worth 1, 2, 3, 5 or 8, and the percentage and the bar are points done over points
+Items are worth their size. By default a `size/XS`, `size/S`, `size/M`, `size/L` or `size/XL` label
+(any case) makes an item worth 1, 2, 3, 5 or 8 (`progress.sizes` in `.epic-pulse.json` changes the
+table; an item with two sizes counts as the larger), and the percentage and the bar are points done over points
 counted, so finishing an XL moves them more than finishing an XS. An unlabelled item among sized
 ones counts as medium, and with no size labels at all every item is worth the same, which is the
 plain ratio above. The `done/total` count stays a count of items. Reading the labels costs one more
@@ -192,7 +193,12 @@ a field that is wrong falls back to its default without voiding the others.
 {
   "branchIssuePattern": "^(?:[\\w.-]+/)?#?(\\d+)(?:[-_]|$)",
   "ignorePaths": ["docs", "vendor/generated"],
-  "ignoreMainCheckout": false
+  "ignoreMainCheckout": false,
+  "progress": {
+    "inProgress": 25,
+    "inReview": 75,
+    "sizes": { "size/xs": 1, "size/s": 2, "size/m": 3, "size/l": 5, "size/xl": 8 }
+  }
 }
 ```
 
@@ -202,6 +208,14 @@ a field that is wrong falls back to its default without voiding the others.
 - `ignorePaths`: up to 100 paths, relative to the worktree, whose edits never bind.
 - `ignoreMainCheckout`: `true` binds nothing from edits in the main checkout, only from linked
   worktrees. Useful when the main checkout sits on a long-lived branch.
+- `progress`: what the percentages count for (see "Statuses and the percentage"). `inProgress` and
+  `inReview` are whole percentages of an item, 0 to 99 with `inProgress` no more than `inReview`, so
+  a bar never fills before the work is done. `sizes` maps label names (any case, at most 30) to
+  whole points, 1 to 1000, and replaces the default table as a whole, so `{ "est:1": 1, "est:3": 3 }`
+  uses your own labels. `unsized` is what an item with none of them is worth; left out, it is the
+  lower median of the sizes, which is medium in the default table. A field that is wrong keeps its
+  default. The file is read from the folder you work in, by the status line, `epic-pulse json` and the
+  VS Code view alike.
 
 ## Privacy and security
 

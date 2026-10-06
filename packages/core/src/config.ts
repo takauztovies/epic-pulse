@@ -1,6 +1,8 @@
 import { readFile, stat } from 'node:fs/promises';
 import { join, relative } from 'node:path';
+import { findWorktree } from './git.js';
 import { compileBranchPattern, DEFAULT_BRANCH_PATTERN } from './branch-pattern.js';
+import { DEFAULT_PROGRESS, parseProgress, type ProgressConfig } from './progress-config.js';
 import { parseJson } from './result.js';
 import { CONFIG_LIMITS, RawConfigSchema } from './schemas/config.js';
 
@@ -10,12 +12,14 @@ export interface Config {
   readonly branchIssuePattern: RegExp;
   readonly ignorePaths: readonly string[];
   readonly ignoreMainCheckout: boolean;
+  readonly progress: ProgressConfig;
 }
 
 export const DEFAULT_CONFIG: Config = {
   branchIssuePattern: DEFAULT_BRANCH_PATTERN,
   ignorePaths: [],
   ignoreMainCheckout: false,
+  progress: DEFAULT_PROGRESS,
 };
 
 // `docs/`, `./docs` and `docs\` all mean the docs directory. An absolute entry
@@ -45,7 +49,14 @@ export function parseConfig(value: unknown): Config {
     branchIssuePattern: compiled?.ok ? compiled.value : DEFAULT_BRANCH_PATTERN,
     ignorePaths: ignorePathsOf(raw.data.ignorePaths),
     ignoreMainCheckout: raw.data.ignoreMainCheckout ?? false,
+    progress: parseProgress(raw.data.progress),
   };
+}
+
+// The repository's own `.epic-pulse.json`, found from any directory inside it.
+export async function loadProgressFor(dir: string): Promise<ProgressConfig> {
+  const worktree = await findWorktree(dir);
+  return worktree ? (await loadConfig(worktree.root)).progress : DEFAULT_PROGRESS;
 }
 
 export async function loadConfig(root: string): Promise<Config> {

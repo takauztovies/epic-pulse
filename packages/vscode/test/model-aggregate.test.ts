@@ -37,7 +37,7 @@ test('with nothing to show in any repository, the most telling state wins', asyn
   const now = Date.now();
   const failing = await makeRegistry(t, { sessions: [{ id: SESSION_A, binds: [demo(6)] }], snapshot: { ...emptySnapshot(now), error: 'network' } }, now);
   const idle = await makeRegistry(t, { sessions: [{ id: SESSION_B, binds: [] }] }, now);
-  const silent = { dir: join(tempDir(t), 'epic-pulse'), label: 'silent' };
+  const silent = { dir: join(tempDir(t), 'epic-pulse'), folder: tempDir(t), label: 'silent' };
   const states = [[silent, idle, failing], [silent, idle], [silent]].map(async (repos) => (await modelOf(repos, now)).state);
   assert.deepEqual(await Promise.all(states), ['error', 'none', 'hook-inactive']);
 });

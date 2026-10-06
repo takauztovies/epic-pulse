@@ -1,5 +1,6 @@
 import type { RepoRef, Status, StatusCounts } from './schemas/common.js';
 import { STATUSES } from './schemas/common.js';
+import { DEFAULT_PROGRESS, type ProgressConfig } from './progress-config.js';
 import type { PrNode, SubIssueNode } from './schemas/graphql.js';
 import type { EpicEntry } from './schemas/snapshot.js';
 
@@ -59,22 +60,18 @@ export function deriveStatus(node: SubIssueNode, repo: RepoRef): Status {
   return prs.length > 0 || node.assignees.totalCount > 0 ? 'in_progress' : 'todo';
 }
 
-// What an item is worth in the percentages. The `size/` labels this repository
-// already uses; anything else is not a size, and an unlabelled item among sized
-// ones is taken as medium so it is neither free nor dominant.
-const SIZE_POINTS: Readonly<Record<string, number>> = { 'size/xs': 1, 'size/s': 2, 'size/m': 3, 'size/l': 5, 'size/xl': 8 };
-const UNSIZED_POINTS = SIZE_POINTS['size/m']!;
-
-export function isSizeLabel(name: string): boolean {
-  return Object.hasOwn(SIZE_POINTS, name);
-}
-
-// The status counts again, but summed in points instead of items. With no size
-// labels every item is worth the same, so the percentages are the item ratios.
-export function pointsByStatus(children: readonly { readonly status: Status; readonly size?: string | undefined }[]): StatusCounts {
+// The status counts again, but summed in points instead of items: an item is
+// worth the size its labels name, and the larger when they name two. An item
+// that names none is worth `unsized`. With no size labels anywhere every item
+// is worth the same, so the percentages are the plain item ratios.
+export function pointsByStatus(
+  children: readonly { readonly status: Status; readonly labels?: readonly string[] | undefined }[],
+  progress: ProgressConfig = DEFAULT_PROGRESS,
+): StatusCounts {
   const zero: StatusCounts = { todo: 0, in_progress: 0, in_review: 0, done: 0, dropped: 0 };
-  const worth = (size: string | undefined) => (size !== undefined && isSizeLabel(size) ? SIZE_POINTS[size]! : UNSIZED_POINTS);
-  return children.reduce((points, child) => ({ ...points, [child.status]: points[child.status] + worth(child.size) }), zero);
+  const worth = (labels: readonly string[] | undefined) =>
+    Math.max(0, ...(labels ?? []).map((label) => progress.sizes[label] ?? 0)) || progress.unsized;
+  return children.reduce((points, child) => ({ ...points, [child.status]: points[child.status] + worth(child.labels) }), zero);
 }
 
 export function countStatuses(children: readonly { readonly status: Status }[]): StatusCounts {
@@ -90,18 +87,16 @@ export function percentDone(counts: StatusCounts): number {
   return denominator <= 0 ? 0 : Math.floor((counts.done * 100) / denominator);
 }
 
-// What an open issue counts for in the progress bar: work in flight is
-// progress, but never as much as work finished, so the bar only fills with `done`.
-const PROGRESS_WEIGHTS: Readonly<Record<Status, number>> = { todo: 0, in_progress: 0.25, in_review: 0.75, done: 1, dropped: 0 };
-
 // Weighted counterpart of percentDone, floored and over the same denominator.
-// Integer quarters keep the arithmetic exact: 100 only when every item is done.
-export function weightedPercentDone(counts: StatusCounts): number {
-  const total = STATUSES.reduce((sum, status) => sum + counts[status], 0);
-  const denominator = total - counts.dropped;
+// Work in flight counts for the configured share of an item, never all of it,
+// so the result is 100 only when every counted item is done. Whole numbers
+// throughout: the weights are percentages, so nothing rounds before the floor.
+export function weightedPercentDone(points: StatusCounts, progress: ProgressConfig = DEFAULT_PROGRESS): number {
+  const total = STATUSES.reduce((sum, status) => sum + points[status], 0);
+  const denominator = total - points.dropped;
   if (denominator <= 0) return 0;
-  const quarters = STATUSES.reduce((sum, status) => sum + counts[status] * PROGRESS_WEIGHTS[status] * 4, 0);
-  return Math.floor((quarters * 25) / denominator);
+  const credited = points.done * 100 + points.in_review * progress.inReview + points.in_progress * progress.inProgress;
+  return Math.floor(credited / denominator);
 }
 
 export function isStale(entry: Pick<EpicEntry, 'fetchedAt' | 'error'>, now: number): boolean {

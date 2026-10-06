@@ -67,6 +67,14 @@ test('a fresh snapshot renders the session\'s epic from disk and starts no refre
   assert.equal(existsSync(canary), true);
 });
 
+test('the repository\'s .epic-pulse.json sets what work in flight counts for, so the bar follows it', async (t) => {
+  const bound = await boundSession(t);
+  await writeSnapshot(bound.paths.snapshotFile, demoSnapshot(Date.now()));
+  assert.equal((await statusLine(bound)).stdout, `${EPIC_LINE}\n`, 'defaults: 45% weighted, four cells');
+  writeFileSync(join(bound.repo, '.epic-pulse.json'), JSON.stringify({ progress: { inProgress: 50, inReview: 50 } }));
+  assert.equal((await statusLine(bound)).stdout, '#1 ▓▓▓▓▓░░░░░ 20% 1/5 · rev 1 · wip 2\n', 'configured: 50% weighted, five cells');
+});
+
 // The refresh recorded its failure, so a render inside the minute after it
 // starts none: without the record every render started one more.
 async function noRefreshStarts(canary: string): Promise<void> {
