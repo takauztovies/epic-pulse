@@ -47,6 +47,14 @@ export function progressText(epic: JsonEpic): string {
   return `${epic.percent}% · ${epic.counts.done}/${total - epic.counts.dropped}${epic.truncated ? '+' : ''}`;
 }
 
+const BAR_CELLS = 10;
+
+// "██░░░░░░░░": percent in tenths, rounded down so a bar is never full before the epic is done.
+export function barText(percent: number): string {
+  const filled = Math.min(BAR_CELLS, Math.max(0, Math.floor(percent / BAR_CELLS)));
+  return '█'.repeat(filled) + '░'.repeat(BAR_CELLS - filled);
+}
+
 export function countsText(epic: JsonEpic): string {
   return STATUSES.filter((status) => epic.counts[status] > 0)
     .map((status) => `${STATUS_TEXT[status].label} ${epic.counts[status]}`)
