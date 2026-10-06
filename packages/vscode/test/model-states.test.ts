@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { test, type TestContext } from 'node:test';
 import { emptySnapshot, STALE_AFTER_MS, type ErrorCode } from '@epic-pulse/core';
 import { buildModel, type Model } from '../src/model.js';
+import { barText } from '../src/labels.js';
 import { statusBarOf } from '../src/status-model.js';
 import { treeOf } from '../src/tree-model.js';
 import { modelOf, surface } from './model-helpers.js';
@@ -18,8 +19,8 @@ test('a bound session shows its epic as "20% · 1/5" with the pinned epic after 
   const roots = treeOf(model);
   assert.equal(model.state, 'ok');
   assert.deepEqual(roots.map((node) => [node.kind, node.label, node.description]), [
-    ['epic', 'Demo epic: sample onboarding flow', '20% · 1/5'],
-    ['epic', 'Demo checklist epic: docs site', '50% · 2/4'],
+    ['epic', '██░░░░░░░░ 20% Demo epic: sample onboarding flow', '20% · 1/5'],
+    ['epic', '█████░░░░░ 50% Demo checklist epic: docs site', '50% · 2/4'],
   ]);
   const bar = statusBarOf(model);
   assert.deepEqual([bar.visible, bar.text, bar.command], [true, '$(pulse) #1 20% · 1/5 +1', 'epicPulse.epics.focus']);
@@ -98,4 +99,10 @@ test('with no repository in the workspace the status bar stays hidden and the tr
   const model = buildModel({ results: [], now: Date.now() });
   assert.deepEqual(surface(model), ['none', 'notice', 'No epic', 'No git repository in this workspace', '$(pulse) No epic']);
   assert.equal(statusBarOf(model).visible, false);
+});
+
+test('the epic bar fills in tenths, rounding down, so it is never full before the epic is done', () => {
+  assert.deepEqual([0, 9, 10, 19, 50, 99, 100].map(barText), [
+    '░░░░░░░░░░', '░░░░░░░░░░', '█░░░░░░░░░', '█░░░░░░░░░', '█████░░░░░', '█████████░', '██████████',
+  ]);
 });

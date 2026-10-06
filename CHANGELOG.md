@@ -5,6 +5,11 @@ Every notable change to epic-pulse is listed here. Versions follow
 
 ## Unreleased
 
+### Added
+
+- The VS Code epics view shows each epic's progress as a text bar and a percentage in front of its
+  title (`██░░░░░░░░ 20% Epic title`), so a long title no longer pushes the progress out of view.
+
 ### Fixed
 
 - The remote is found again on a repository whose `.git/config` has grown past 64KB from
