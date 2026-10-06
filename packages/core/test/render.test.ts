@@ -23,18 +23,18 @@ function demoView(session: SessionState, now = T0 + 1000): JsonV1 {
 }
 
 test('the demo epic renders as the documented line, with the pinned epic counted', () => {
-  assert.equal(renderStatusLine(demoView(bound(4)), { width: 120 }), '#1 ▓▓░░░░░░░░ 20% 1/5 · rev 1 · wip 2 (+1)');
+  assert.equal(renderStatusLine(demoView(bound(4)), { width: 120 }), '#1 ▓▓▓▓░░░░░░ 20% 1/5 · rev 1 · wip 2 (+1)');
 });
 
 test('a binding still loading is counted after the epic, and goes before anything else is cut', () => {
   const loading = demoView(bound(4, 6));
-  assert.equal(renderStatusLine(loading, { width: 120 }), '#1 ▓▓░░░░░░░░ 20% 1/5 · rev 1 · wip 2 · 1 loading (+1)');
+  assert.equal(renderStatusLine(loading, { width: 120 }), '#1 ▓▓▓▓░░░░░░ 20% 1/5 · rev 1 · wip 2 · 1 loading (+1)');
   assert.equal(renderStatusLine(loading, { width: 50 }), '#1 20% 1/5 · rev 1 · wip 2 · 1 loading (+1)');
   assert.equal(renderStatusLine(loading, { width: 30 }), '#1 20% 1/5 · 1 loading (+1)');
   assert.equal(renderStatusLine(loading, { width: 14 }), '#1 20%');
-  assert.equal(renderStatusLine(demoView(bound(4, 6, 7)), { width: 120 }), '#1 ▓▓░░░░░░░░ 20% 1/5 · rev 1 · wip 2 · 2 loading (+1)');
+  assert.equal(renderStatusLine(demoView(bound(4, 6, 7)), { width: 120 }), '#1 ▓▓▓▓░░░░░░ 20% 1/5 · rev 1 · wip 2 · 2 loading (+1)');
   const stale = demoView(bound(4, 6), T0 + STALE_AFTER_MS + 1);
-  assert.equal(renderStatusLine(stale, { width: 120 }), '#1 ▓▓░░░░░░░░ 20% 1/5 · rev 1 · wip 2 · stale · 1 loading (+1)');
+  assert.equal(renderStatusLine(stale, { width: 120 }), '#1 ▓▓▓▓░░░░░░ 20% 1/5 · rev 1 · wip 2 · stale · 1 loading (+1)');
 });
 
 test('a checkbox epic shows checked over countable, dropped left out', () => {
@@ -43,7 +43,7 @@ test('a checkbox epic shows checked over countable, dropped left out', () => {
 
 test('a stale epic says so, with the reason when a fetch failed', () => {
   const stale = demoView(bound(4), T0 + STALE_AFTER_MS + 1);
-  assert.equal(renderStatusLine(stale, { width: 120 }), '#1 ▓▓░░░░░░░░ 20% 1/5 · rev 1 · wip 2 · stale (+1)');
+  assert.equal(renderStatusLine(stale, { width: 120 }), '#1 ▓▓▓▓░░░░░░ 20% 1/5 · rev 1 · wip 2 · stale (+1)');
   const failed: JsonV1 = { ...stale, epics: stale.epics.map((e) => ({ ...e, error: 'rate_limited' as const })) };
   assert.match(renderStatusLine(failed, { width: 120 }), / · stale \(rate_limited\) \(\+1\)$/);
   assert.match(renderStatusLine(stale, { width: 14 }), /^#1 20% · stale$/);
@@ -63,7 +63,7 @@ test('every other state has its own explicit text', () => {
 
 test('narrow widths drop detail before they cut text, and never exceed the width', () => {
   const line = (width: number) => renderStatusLine(demoView(bound(4)), { width });
-  assert.equal(line(42), '#1 ▓▓░░░░░░░░ 20% 1/5 · rev 1 · wip 2 (+1)');
+  assert.equal(line(42), '#1 ▓▓▓▓░░░░░░ 20% 1/5 · rev 1 · wip 2 (+1)');
   assert.equal(line(41), '#1 20% 1/5 · rev 1 · wip 2 (+1)');
   assert.equal(line(30), '#1 20% 1/5 (+1)');
   assert.equal(line(10), '#1 20%');

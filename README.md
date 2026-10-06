@@ -145,6 +145,11 @@ only limit is a 1.5-second tripwire that catches a render waiting on the network
 A close with no recorded reason (older closes have none) counts as Done: only "not planned" and
 "duplicate" take a sub-issue out of the count.
 
+The percentage is Done over everything except Dropped. The bar next to it also credits work in
+flight: In progress counts a quarter and In review three quarters, so a bar ahead of the percentage
+means work is moving. It is full only when everything is Done. JSON v1 carries both, as `percent`
+and `weightedPercent`.
+
 A pull request counts when it is open, belongs to the issue's own repository (which may not be the
 epic's), and either GitHub links it as closing the issue or its body closes the issue with a keyword.
 

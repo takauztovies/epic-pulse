@@ -29,6 +29,7 @@ test('a session bound to a sub-issue sees its epic with the demo counts, then th
   const result = view({ sessions: [own], pins: [{ ref: demo(8), addedAt: T0 }], scope: { session: own } });
   assert.deepEqual([result.snapshot.state, result.liveSessions, result.epics.map((e) => e.number)], ['ok', 1, [1, 8]]);
   const [epic, checklist] = result.epics;
+  assert.equal(epic?.weightedPercent, 45);
   assert.deepEqual([epic?.percent, epic?.counts], [20, { todo: 1, in_progress: 2, in_review: 1, done: 1, dropped: 1 }]);
   assert.deepEqual(epic?.children.map((c) => [c.number, c.sessionCount]), [[2, 0], [3, 0], [4, 1], [5, 0], [6, 0], [7, 0]]);
   assert.deepEqual([checklist?.kind, checklist?.counts.done, checklist?.counts.dropped, checklist?.percent], ['checklist', 2, 1, 50]);

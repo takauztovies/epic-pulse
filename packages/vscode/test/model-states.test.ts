@@ -19,7 +19,7 @@ test('a bound session shows its epic as "20% · 1/5" with the pinned epic after 
   const roots = treeOf(model);
   assert.equal(model.state, 'ok');
   assert.deepEqual(roots.map((node) => [node.kind, node.label, node.description]), [
-    ['epic', '██░░░░░░░░ 20% Demo epic: sample onboarding flow', '20% · 1/5'],
+    ['epic', '████░░░░░░ 20% Demo epic: sample onboarding flow', '20% · 1/5'],
     ['epic', '█████░░░░░ 50% Demo checklist epic: docs site', '50% · 2/4'],
   ]);
   const bar = statusBarOf(model);
