@@ -59,6 +59,24 @@ export function deriveStatus(node: SubIssueNode, repo: RepoRef): Status {
   return prs.length > 0 || node.assignees.totalCount > 0 ? 'in_progress' : 'todo';
 }
 
+// What an item is worth in the percentages. The `size/` labels this repository
+// already uses; anything else is not a size, and an unlabelled item among sized
+// ones is taken as medium so it is neither free nor dominant.
+const SIZE_POINTS: Readonly<Record<string, number>> = { 'size/xs': 1, 'size/s': 2, 'size/m': 3, 'size/l': 5, 'size/xl': 8 };
+const UNSIZED_POINTS = SIZE_POINTS['size/m']!;
+
+export function isSizeLabel(name: string): boolean {
+  return Object.hasOwn(SIZE_POINTS, name);
+}
+
+// The status counts again, but summed in points instead of items. With no size
+// labels every item is worth the same, so the percentages are the item ratios.
+export function pointsByStatus(children: readonly { readonly status: Status; readonly size?: string | undefined }[]): StatusCounts {
+  const zero: StatusCounts = { todo: 0, in_progress: 0, in_review: 0, done: 0, dropped: 0 };
+  const worth = (size: string | undefined) => (size !== undefined && isSizeLabel(size) ? SIZE_POINTS[size]! : UNSIZED_POINTS);
+  return children.reduce((points, child) => ({ ...points, [child.status]: points[child.status] + worth(child.size) }), zero);
+}
+
 export function countStatuses(children: readonly { readonly status: Status }[]): StatusCounts {
   const zero: StatusCounts = { todo: 0, in_progress: 0, in_review: 0, done: 0, dropped: 0 };
   return children.reduce((counts, child) => ({ ...counts, [child.status]: counts[child.status] + 1 }), zero);

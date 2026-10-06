@@ -3,7 +3,7 @@ import { makeRef, refKey } from './ref.js';
 import type { IssueRef, RepoRef } from './schemas/common.js';
 import type { EpicNode, PhaseAIssue, SubIssueNode } from './schemas/graphql.js';
 import { MAX_CHILDREN, type Child, type EpicEntry, type Snapshot } from './schemas/snapshot.js';
-import { deriveStatus } from './status.js';
+import { deriveStatus, isSizeLabel } from './status.js';
 
 // An epic as fetched, before the refresher stamps it with fetchedAt and error.
 export type EpicData = Omit<EpicEntry, 'fetchedAt' | 'error'>;
@@ -28,12 +28,21 @@ function ownRepo(node: SubIssueNode, epic: IssueRef): RepoRef {
   return own ?? epic;
 }
 
+// The first label that names a known size, lowercased: GitHub label names are
+// case-insensitive, so `Size/XL` and `size/xl` are one size.
+function sizeOf(node: SubIssueNode): string | undefined {
+  const names = (node.labels?.nodes ?? []).flatMap((label) => (label ? [label.name.toLowerCase()] : []));
+  return names.find(isSizeLabel);
+}
+
 function subIssueChild(node: SubIssueNode, epic: IssueRef): Child {
+  const size = sizeOf(node);
   return {
     number: node.number,
     title: node.title.slice(0, 300),
     url: node.url.slice(0, 500),
     status: deriveStatus(node, ownRepo(node, epic)),
+    ...(size === undefined ? {} : { size }),
   };
 }
 

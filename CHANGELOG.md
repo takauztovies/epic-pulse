@@ -7,6 +7,11 @@ Every notable change to epic-pulse is listed here. Versions follow
 
 ### Added
 
+- Size labels weigh the progress: `size/XS`, `S`, `M`, `L` and `XL` are worth 1, 2, 3, 5 and 8, so
+  finishing a large item moves the percentage and the bar more than a small one. An unlabelled item
+  among sized ones counts as medium, and an epic with no size labels reads exactly as before. The
+  `done/total` count stays a count of items. Reading the labels raises the cost of an epic refresh
+  from 3 to 4 points of the hourly budget.
 - The progress bar credits work in flight: In progress counts a quarter and In review three quarters
   of an item, so a bar ahead of the percentage means work is moving, and it is full only when every
   item is Done. The percentage and the `done/total` count are unchanged. JSON v1 gains

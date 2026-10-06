@@ -5,7 +5,7 @@ import type { JsonEpic, JsonV1 } from './schemas/json-v1.js';
 import type { Pin } from './schemas/registry.js';
 import type { Child, EpicEntry, Snapshot } from './schemas/snapshot.js';
 import type { SnapshotRead } from './snapshot.js';
-import { countStatuses, isStale, percentDone, weightedPercentDone } from './status.js';
+import { countStatuses, isStale, percentDone, pointsByStatus, weightedPercentDone } from './status.js';
 
 export interface ViewInput {
   readonly snapshot: SnapshotRead;
@@ -118,13 +118,14 @@ function childKey(child: Child, epic: IssueRef): string | undefined {
 
 function jsonEpic(entry: EpicEntry, bound: readonly ReadonlySet<string>[], now: number): JsonEpic {
   const counts = countStatuses(entry.children);
+  const points = pointsByStatus(entry.children);
   const children = entry.children.map((child) => {
     const key = childKey(child, entry.ref);
     return { ...child, sessionCount: key === undefined ? 0 : bound.filter((keys) => keys.has(key)).length };
   });
   return {
-    number: entry.ref.number, title: entry.title, url: entry.url, kind: entry.kind, counts, percent: percentDone(counts),
-    weightedPercent: weightedPercentDone(counts),
+    number: entry.ref.number, title: entry.title, url: entry.url, kind: entry.kind, counts, percent: percentDone(points),
+    weightedPercent: weightedPercentDone(points),
     children, fetchedAt: iso(entry.fetchedAt), stale: isStale(entry, now), error: entry.error, truncated: entry.truncated,
   };
 }

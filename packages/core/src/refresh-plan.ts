@@ -104,10 +104,11 @@ export function needsFetch(snapshot: Snapshot, epics: readonly IssueRef[], now: 
 }
 
 // GitHub's formula for the Phase B document: each epic asks for 100 sub-issues
-// with three nested connections each, 301 requests; the total over 100,
-// rounded, is the cost, and it is never below 1. The recorded fixture says 3.
+// with four nested connections each, 401 requests; the total over 100,
+// rounded, is the cost, and it is never below 1. The fixtures were recorded
+// before labels were asked for and say 3; the live document costs 4.
 export function phaseBCost(epics: number): number {
-  return Math.max(1, Math.round((epics * 301) / 100));
+  return Math.max(1, Math.round((epics * 401) / 100));
 }
 
 // How many epics the next Phase B request may carry within the hourly budget.

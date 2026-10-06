@@ -96,3 +96,19 @@ test('resolution lookups: distinct epic keys, and refs never resolved', () => {
   assert.deepEqual(epicKeysFor([ref(4), ref(5), ref(7)], snapshot), ['github.com/takauztovies/epic-pulse#1']);
   assert.deepEqual(unresolvedRefs([ref(4), ref(6), ref(7)], snapshot).map((r) => r.number), [6]);
 });
+
+test('a child keeps its size label, case-folded; other labels and no label leave it unsized', () => {
+  const node = epicNode('phase-b-subissues', 1);
+  const labelled = {
+    ...node,
+    subIssues: {
+      ...node.subIssues,
+      nodes: node.subIssues.nodes.map((n) => {
+        const names = n?.number === 2 ? ['bug', 'Size/XL'] : n?.number === 4 ? ['size/huge', 'bug'] : [];
+        return n && { ...n, labels: { nodes: names.map((name) => ({ name })) } };
+      }),
+    },
+  };
+  const children = buildEpic(labelled, ref(1))!.children;
+  assert.deepEqual(children.map((c) => [c.number, c.size]), [[2, 'size/xl'], [3, undefined], [4, undefined], [5, undefined], [6, undefined], [7, undefined]]);
+});

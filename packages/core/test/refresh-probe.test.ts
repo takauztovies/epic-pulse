@@ -59,14 +59,14 @@ async function run(t: TestContext, paths: RegistryPaths, now: number): Promise<{
   return { outcome, charged: lines.map((raw) => (JSON.parse(raw) as { points: number }).points) };
 }
 
-test('a pinned child of an epic is asked about as an epic of its own: one epic, 3 points, for a session pin and a repository pin alike', async (t) => {
+test('a pinned child of an epic is asked about as an epic of its own: one epic, 4 points, for a session pin and a repository pin alike', async (t) => {
   const now = Date.now();
   const bySession = await resolved(t, now);
   await bindVia(bySession, { ref: CHILD, via: 'pin' }, now);
-  assert.deepEqual(await run(t, bySession, now), { outcome: ASKED, charged: [3] });
+  assert.deepEqual(await run(t, bySession, now), { outcome: ASKED, charged: [4] });
   const byRepository = await resolved(t, now);
   assert.ok((await addPin(byRepository, CHILD, now)).ok);
-  assert.deepEqual(await run(t, byRepository, now), { outcome: ASKED, charged: [3] });
+  assert.deepEqual(await run(t, byRepository, now), { outcome: ASKED, charged: [4] });
 });
 
 test('work bound to the child, and a pin already found not to be an epic, ask nothing', async (t) => {
@@ -89,7 +89,7 @@ test('a pin found to be an epic is kept current by the epic cache, two minutes, 
   assert.deepEqual(await run(t, fresh, now), { outcome: NOT_ASKED, charged: [] });
   const due = await resolved(t, now, { isEpic: true, entryFetchedAt: now - EPIC_TTL_MS - 1 });
   await bindVia(due, { ref: CHILD, via: 'pin' }, now);
-  assert.deepEqual(await run(t, due, now), { outcome: ASKED, charged: [3] });
+  assert.deepEqual(await run(t, due, now), { outcome: ASKED, charged: [4] });
 });
 
 // The status line's own session counts however long it has been quiet, its pins
