@@ -20046,9 +20046,10 @@ import { resolve as resolve3 } from "node:path";
 import { lstat, readFile as readFile2, stat as stat2 } from "node:fs/promises";
 import { dirname as dirname3, join as join3, resolve as resolve2 } from "node:path";
 var MAX_GIT_FILE_BYTES = 64 * 1024;
-async function readSmall(path) {
+var MAX_GIT_CONFIG_BYTES = 4 * 1024 * 1024;
+async function readSmall(path, maxBytes = MAX_GIT_FILE_BYTES) {
   try {
-    if ((await stat2(path)).size > MAX_GIT_FILE_BYTES) return void 0;
+    if ((await stat2(path)).size > maxBytes) return void 0;
     return await readFile2(path, "utf8");
   } catch {
     return void 0;
@@ -20133,7 +20134,7 @@ function remoteSections(config2) {
   return [...remotes.values()];
 }
 async function readRemote(commonDir) {
-  const config2 = await readSmall(join3(commonDir, "config")) ?? "";
+  const config2 = await readSmall(join3(commonDir, "config"), MAX_GIT_CONFIG_BYTES) ?? "";
   const remotes = remoteSections(config2).filter((remote) => remote.url !== void 0);
   const named = (name) => remotes.find((remote) => remote.name === name);
   const chosen = remotes.find((remote) => remote.base) ?? named("upstream") ?? named("origin") ?? remotes[0];
