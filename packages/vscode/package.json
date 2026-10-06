@@ -2,7 +2,7 @@
   "name": "epic-pulse",
   "displayName": "Epic Pulse",
   "description": "GitHub epic progress for Claude Code sessions",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "takauztovies",
   "icon": "images/icon.png",
   "license": "MIT",
