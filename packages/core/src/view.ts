@@ -119,16 +119,27 @@ function childKey(child: Child, epic: IssueRef): string | undefined {
   return ref ? refKey(ref) : undefined;
 }
 
-function jsonEpic(entry: EpicEntry, bound: readonly ReadonlySet<string>[], input: { readonly now: number; readonly progress: ProgressConfig }): JsonEpic {
+interface BoundSession {
+  readonly sessionId: string;
+  readonly keys: ReadonlySet<string>;
+}
+
+// The live sessions bound to one child, most recently live session first.
+function childSessionIds(key: string | undefined, bound: readonly BoundSession[]): readonly string[] {
+  return key === undefined ? [] : bound.filter((session) => session.keys.has(key)).map((session) => session.sessionId);
+}
+
+function jsonEpic(entry: EpicEntry, bound: readonly BoundSession[], input: { readonly now: number; readonly progress: ProgressConfig }): JsonEpic {
   const counts = countStatuses(entry.children);
   const points = pointsByStatus(entry.children, input.progress);
   const children = entry.children.map((child) => {
-    const key = childKey(child, entry.ref);
-    return { number: child.number, title: child.title, url: child.url, status: child.status, sessionCount: key === undefined ? 0 : bound.filter((keys) => keys.has(key)).length };
+    const sessionIds = childSessionIds(childKey(child, entry.ref), bound);
+    return { number: child.number, title: child.title, url: child.url, status: child.status, sessionCount: sessionIds.length, sessionIds };
   });
+  const epicSessionIds = [...new Set(children.flatMap((child) => child.sessionIds))];
   return {
     number: entry.ref.number, title: entry.title, url: entry.url, kind: entry.kind, counts, percent: percentDone(points),
-    weightedPercent: weightedPercentDone(points, input.progress),
+    weightedPercent: weightedPercentDone(points, input.progress), sessionIds: epicSessionIds,
     children, fetchedAt: iso(entry.fetchedAt), stale: isStale(entry, input.now), error: entry.error, truncated: entry.truncated,
   };
 }
@@ -138,7 +149,7 @@ export function buildView(input: ViewInput): JsonV1 {
   const live = input.sessions.filter((session) => isLive(session, input.now));
   const refs = scopeRefs(input, live);
   const entries = epicEntries(refs, snapshot, pinnedKeys(input, live));
-  const bound = live.map((session) => new Set(activeBindings(session, input.now).map((binding) => refKey(binding.ref))));
+  const bound = live.map((session) => ({ sessionId: session.id, keys: new Set(activeBindings(session, input.now).map((binding) => refKey(binding.ref))) }));
   const scoped = { input, refs, entries, snapshot };
   return {
     version: 1,

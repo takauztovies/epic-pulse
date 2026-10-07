@@ -1,6 +1,6 @@
 import { STATUSES, type JsonChild, type JsonEpic, type Status } from '@epic-pulse/core';
 import { COMMAND } from './ids.js';
-import { ageText, barText, countsText, progressText, sessionsText, STATE_TEXT, STATUS_TEXT } from './labels.js';
+import { ageText, barText, countsText, epicSessionsText, progressText, sessionsText, STATE_TEXT, STATUS_TEXT } from './labels.js';
 import type { DisplayState, Model } from './model.js';
 
 // The Epics tree as plain data: Epic → status group → issue, with one notice
@@ -20,6 +20,9 @@ interface NodeBase {
   readonly description: string;
   readonly tooltip: string;
   readonly icon: string;
+  // A theme color id (e.g. "charts.green") for the icon, or undefined for the
+  // theme's default. Most nodes have none.
+  readonly iconColor?: string;
   readonly command?: CommandRef;
 }
 
@@ -67,14 +70,15 @@ function issueNode(child: JsonChild, id: string): IssueNode {
   };
 }
 
-// Workflow order, empty groups left out. Work that is moving starts expanded.
+// Workflow order, empty groups left out. Work that is moving, and work that is
+// finished, starts expanded; only Todo and Dropped start collapsed.
 // An issue's id is its position, since a checklist may list one issue twice.
 function groupNodes(epic: JsonEpic): readonly GroupNode[] {
   return STATUSES.flatMap((status) => {
     const children = epic.children.flatMap((child, index) => (child.status === status ? [issueNode(child, `${epic.url}#${index}`)] : []));
     const { label, icon } = STATUS_TEXT[status];
     if (children.length === 0) return [];
-    const expanded = status === 'in_progress' || status === 'in_review';
+    const expanded = status === 'in_progress' || status === 'in_review' || status === 'done';
     return [{ kind: 'group', id: `${epic.url}:${status}`, status, label, description: String(children.length), tooltip: label, icon, expanded, children }];
   });
 }
@@ -86,10 +90,11 @@ function epicNode(epic: JsonEpic, now: number): EpicNode {
     kind: 'epic',
     id: epic.url,
     url: epic.url,
-    label: `${barText(epic.weightedPercent)} ${epic.percent}% ${epic.title}`,
-    description: [progress, ...stale].join(' · '),
-    tooltip: [`#${epic.number} ${epic.title}`, `${progress}: ${countsText(epic)}`, ageText(epic.fetchedAt, now)].join('\n'),
+    label: `#${epic.number} ${barText(epic.percent)} ${epic.percent}% ${epic.title}`,
+    description: [progress, epicSessionsText(epic), ...stale].join(' · '),
+    tooltip: [`#${epic.number} ${epic.title}`, `${progress}: ${countsText(epic)}`, epicSessionsText(epic), ageText(epic.fetchedAt, now)].join('\n'),
     icon: 'milestone',
+    iconColor: epic.percent === 100 ? 'charts.green' : undefined,
     command: openCommand(epic.url),
     children: groupNodes(epic),
   };

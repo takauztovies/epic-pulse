@@ -5,6 +5,8 @@ export const COMMAND = {
   openIssue: 'epicPulse.openIssue',
   signIn: 'epicPulse.signIn',
   showStatus: 'epicPulse.showStatus',
+  track: 'epicPulse.track',
+  untrack: 'epicPulse.untrack',
 } as const;
 
 export const VIEW_ID = 'epicPulse.epics';

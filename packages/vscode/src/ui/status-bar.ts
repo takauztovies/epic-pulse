@@ -37,6 +37,7 @@ export class StatusBar implements vscode.Disposable {
     this.#item.text = view.text;
     this.#item.tooltip = new vscode.MarkdownString(view.tooltip);
     this.#item.command = view.command;
+    this.#item.color = view.color === undefined ? undefined : new vscode.ThemeColor(view.color);
     this.#item.show();
   }
 }

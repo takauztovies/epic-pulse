@@ -12,6 +12,10 @@ export const JsonChildSchema = z
     url: z.string().nullable(),
     status: StatusSchema,
     sessionCount: z.number().int().nonnegative(),
+    // The live sessions bound to this child, most recent binding first.
+    // sessionCount is their length, kept so a reader of only the count need
+    // not change.
+    sessionIds: z.array(z.string()).readonly(),
   })
   .readonly();
 
@@ -25,6 +29,9 @@ export const JsonEpicSchema = z
     percent: z.number().int().min(0).max(100),
     weightedPercent: z.number().int().min(0).max(100),
     children: z.array(JsonChildSchema).readonly(),
+    // Every live session bound to any child of this epic, deduplicated: the
+    // epic-level answer to "which session is working on this".
+    sessionIds: z.array(z.string()).readonly(),
     fetchedAt: z.iso.datetime(),
     stale: z.boolean(),
     error: ErrorCodeSchema.nullable(),
