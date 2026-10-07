@@ -23,7 +23,10 @@ function widthOf(width: number | undefined): number {
   return width !== undefined && Number.isFinite(width) && width >= 1 ? Math.floor(width) : DEFAULT_WIDTH;
 }
 
-// Weighted progress, floored like the percent, so a full bar only ever means a finished epic.
+// Closed work only: floored like the percent, so a full bar only ever means a
+// finished epic. weightedPercent (the repository's configured credit for work
+// in flight) stays in the JSON view; it does not drive this bar, so the bar
+// never looks ahead of what is actually Done.
 function bar(percent: number): string {
   const filled = Math.min(BAR_CELLS, Math.max(0, Math.floor((percent * BAR_CELLS) / 100)));
   return `${'▓'.repeat(filled)}${'░'.repeat(BAR_CELLS - filled)}`;
@@ -53,7 +56,7 @@ function epicLine(epic: JsonEpic, options: { readonly more: number; readonly pen
   const loading = options.pending > 0 ? [`${options.pending} loading`] : [];
   const extra = options.more > 0 ? ` (+${options.more})` : '';
   const head = `#${epic.number} ${epic.percent}% ${fraction(epic)}`;
-  const withBar = `#${epic.number} ${bar(epic.weightedPercent)} ${epic.percent}% ${fraction(epic)}`;
+  const withBar = `#${epic.number} ${bar(epic.percent)} ${epic.percent}% ${fraction(epic)}`;
   return fit([
     [withBar, ...detail, ...stale, ...loading].join(' · ') + extra,
     [head, ...detail, ...stale, ...loading].join(' · ') + extra,

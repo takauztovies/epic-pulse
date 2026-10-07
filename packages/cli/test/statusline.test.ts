@@ -8,7 +8,7 @@ import { cliEnv, demoRepo, registryOf, runCli, sandbox, SESSION, tempDir, waitFo
 
 const OTHER_SESSION = '1a2b3c4d-5e6f-4a1b-9c2d-3e4f5a6b7c8d';
 const CANARY_SESSION = '2b3c4d5e-6f7a-4b1c-8d2e-3f4a5b6c7d8e';
-const EPIC_LINE = '#1 ▓▓▓▓░░░░░░ 20% 1/5 · rev 1 · wip 2';
+const EPIC_LINE = '#1 ▓▓░░░░░░░░ 20% 1/5 · rev 1 · wip 2';
 const ELEVEN_MINUTES = 11 * 60 * 1000;
 const EIGHT_DAYS_S = 8 * 24 * 60 * 60;
 
@@ -67,12 +67,15 @@ test('a fresh snapshot renders the session\'s epic from disk and starts no refre
   assert.equal(existsSync(canary), true);
 });
 
-test('the repository\'s .epic-pulse.json sets what work in flight counts for, so the bar follows it', async (t) => {
+// weightedPercent (what the repository's progress config tunes) is in the JSON
+// view (see json-refresh.test.ts) but no longer drives the status line's bar:
+// the bar counts only Done, so re-weighting in-flight credit must not move it.
+test('the bar counts only Done; the repository\'s .epic-pulse.json can not move it', async (t) => {
   const bound = await boundSession(t);
   await writeSnapshot(bound.paths.snapshotFile, demoSnapshot(Date.now()));
-  assert.equal((await statusLine(bound)).stdout, `${EPIC_LINE}\n`, 'defaults: 45% weighted, four cells');
+  assert.equal((await statusLine(bound)).stdout, `${EPIC_LINE}\n`);
   writeFileSync(join(bound.repo, '.epic-pulse.json'), JSON.stringify({ progress: { inProgress: 50, inReview: 50 } }));
-  assert.equal((await statusLine(bound)).stdout, '#1 ▓▓▓▓▓░░░░░ 20% 1/5 · rev 1 · wip 2\n', 'configured: 50% weighted, five cells');
+  assert.equal((await statusLine(bound)).stdout, `${EPIC_LINE}\n`, 'the bar is unchanged: it never counted work in flight');
 });
 
 // The refresh recorded its failure, so a render inside the minute after it

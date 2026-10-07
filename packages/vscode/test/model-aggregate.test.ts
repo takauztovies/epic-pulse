@@ -61,5 +61,5 @@ test('an issue title stays text in the Markdown tooltip: no link, no emphasis, n
   const line = statusBarOf(model).tooltip.split('\n').find((text) => text.startsWith('**#1** '))?.slice(7).trimEnd() ?? '';
   assert.equal(line.replace(/\\(.)/g, '$1'), title, 'the escaped title still reads as the title');
   assert.doesNotMatch(line.replace(/\\./g, ''), /[[\]()<>*_:.@]/, 'no character Markdown gives a meaning is left bare');
-  assert.equal(treeOf(model)[0]?.label, `████░░░░░░ 20% ${title}`, 'the tree label is plain text: the bar and percent, then the title as it is');
+  assert.equal(treeOf(model)[0]?.label, `#1 ██░░░░░░░░ 20% ${title}`, 'the tree label is plain text: the number, bar and percent, then the title as it is');
 });

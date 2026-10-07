@@ -21827,7 +21827,7 @@ function epicLine(epic, options) {
   const loading = options.pending > 0 ? [`${options.pending} loading`] : [];
   const extra = options.more > 0 ? ` (+${options.more})` : "";
   const head = `#${epic.number} ${epic.percent}% ${fraction(epic)}`;
-  const withBar = `#${epic.number} ${bar(epic.weightedPercent)} ${epic.percent}% ${fraction(epic)}`;
+  const withBar = `#${epic.number} ${bar(epic.percent)} ${epic.percent}% ${fraction(epic)}`;
   return fit([
     [withBar, ...detail, ...stale, ...loading].join(" \xB7 ") + extra,
     [head, ...detail, ...stale, ...loading].join(" \xB7 ") + extra,

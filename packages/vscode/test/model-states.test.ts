@@ -19,8 +19,8 @@ test('a bound session shows its epic as "20% · 1/5" with the pinned epic after 
   const roots = treeOf(model);
   assert.equal(model.state, 'ok');
   assert.deepEqual(roots.map((node) => [node.kind, node.label, node.description]), [
-    ['epic', '████░░░░░░ 20% Demo epic: sample onboarding flow', '20% · 1/5'],
-    ['epic', '█████░░░░░ 50% Demo checklist epic: docs site', '50% · 2/4'],
+    ['epic', '#1 ██░░░░░░░░ 20% Demo epic: sample onboarding flow', '20% · 1/5'],
+    ['epic', '#8 █████░░░░░ 50% Demo checklist epic: docs site', '50% · 2/4'],
   ]);
   const bar = statusBarOf(model);
   assert.deepEqual([bar.visible, bar.text, bar.command], [true, '$(pulse) #1 20% · 1/5 +1', 'epicPulse.epics.focus']);
@@ -33,13 +33,13 @@ test('an epic opens on GitHub and splits into status groups whose issues count t
   assert.ok(epic?.kind === 'epic');
   assert.deepEqual(epic.command, { command: 'epicPulse.openIssue', title: 'Open on GitHub', arguments: [epic.url] });
   assert.equal(epic.url, 'https://github.com/takauztovies/epic-pulse/issues/1');
-  const groups = epic.children.map((group) => [group.label, group.description, group.children.map((issue) => [issue.label.split(' ')[0], issue.description])]);
+  const groups = epic.children.map((group) => [group.label, group.expanded, group.description, group.children.map((issue) => [issue.label.split(' ')[0], issue.description])]);
   assert.deepEqual(groups, [
-    ['Todo', '1', [['#7', '']]],
-    ['In progress', '2', [['#4', '1 session'], ['#6', '']]],
-    ['In review', '1', [['#5', '']]],
-    ['Done', '1', [['#2', '']]],
-    ['Dropped', '1', [['#3', '']]],
+    ['Todo', false, '1', [['#7', '']]],
+    ['In progress', true, '2', [['#4', '1 session'], ['#6', '']]],
+    ['In review', true, '1', [['#5', '']]],
+    ['Done', true, '1', [['#2', '']]],
+    ['Dropped', false, '1', [['#3', '']]],
   ]);
   const four = epic.children[1]?.children[0];
   assert.deepEqual(four?.command?.arguments, ['https://github.com/takauztovies/epic-pulse/issues/4']);
