@@ -107,6 +107,21 @@ test('the epic bar fills in tenths, rounding down, so it is never full before th
   ]);
 });
 
+test('the status bar and the epic icon turn green only once the first epic is entirely done and not stale', async (t) => {
+  const now = Date.now();
+  const repo = await makeRegistry(t, { sessions: [{ id: SESSION_A, binds: [demo(4)] }], snapshot: demoSnapshot(now - 1000) }, now);
+  const model = await modelOf([repo], now);
+  assert.equal(statusBarOf(model).color, undefined, 'the demo epic is only 20% done');
+  const [notYetDone] = treeOf(model);
+  assert.equal(notYetDone?.kind === 'epic' ? notYetDone.iconColor : 'wrong kind', undefined);
+  const done: Model = { ...model, epics: model.epics.map((epic) => ({ ...epic, percent: 100, stale: false })) };
+  assert.equal(statusBarOf(done).color, 'charts.green');
+  const [doneNode] = treeOf(done);
+  assert.equal(doneNode?.kind === 'epic' ? doneNode.iconColor : 'wrong kind', 'charts.green');
+  const staleDone: Model = { ...model, epics: done.epics.map((epic) => ({ ...epic, stale: true })) };
+  assert.equal(statusBarOf(staleDone).color, undefined, 'stale is not the same claim as done');
+});
+
 test('the epic sessions line names which session, not only how many', () => {
   assert.equal(epicSessionsText({ sessionIds: [] }), 'No live session');
   assert.equal(epicSessionsText({ sessionIds: ['0f8e7c1a-2b3d-4e5f-8a9b-0c1d2e3f4a5b'] }), 'Session: 0f8e7c1a');

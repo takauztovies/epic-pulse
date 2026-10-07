@@ -20,6 +20,9 @@ interface NodeBase {
   readonly description: string;
   readonly tooltip: string;
   readonly icon: string;
+  // A theme color id (e.g. "charts.green") for the icon, or undefined for the
+  // theme's default. Most nodes have none.
+  readonly iconColor?: string;
   readonly command?: CommandRef;
 }
 
@@ -91,6 +94,7 @@ function epicNode(epic: JsonEpic, now: number): EpicNode {
     description: [progress, epicSessionsText(epic), ...stale].join(' · '),
     tooltip: [`#${epic.number} ${epic.title}`, `${progress}: ${countsText(epic)}`, epicSessionsText(epic), ageText(epic.fetchedAt, now)].join('\n'),
     icon: 'milestone',
+    iconColor: epic.percent === 100 ? 'charts.green' : undefined,
     command: openCommand(epic.url),
     children: groupNodes(epic),
   };

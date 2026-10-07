@@ -17,7 +17,7 @@ function treeItem(node: TreeNode): vscode.TreeItem {
   item.id = node.id;
   item.description = node.description;
   item.tooltip = node.tooltip;
-  item.iconPath = new vscode.ThemeIcon(node.icon);
+  item.iconPath = new vscode.ThemeIcon(node.icon, node.iconColor === undefined ? undefined : new vscode.ThemeColor(node.iconColor));
   item.command = command(node.command);
   item.contextValue = node.kind;
   return item;
