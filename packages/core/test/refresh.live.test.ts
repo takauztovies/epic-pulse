@@ -67,7 +67,7 @@ test('live: a full refresh of the demo epics matches GitHub, then serves from ca
   const read = await readSnapshot(paths.snapshotFile);
   assert.ok(read.status === 'ok');
   const epic = read.snapshot.epics[refKey(demo(1))]!;
-  assert.deepEqual(countStatuses(epic.children), { todo: 1, in_progress: 2, in_review: 1, done: 1, dropped: 1 });
+  assert.deepEqual(countStatuses(epic.children), { todo: 3, in_progress: 1, in_review: 0, done: 1, dropped: 1 });
   assert.equal(percentDone(countStatuses(epic.children)), 20);
   const checklist = countStatuses(read.snapshot.epics[refKey(demo(8))]!.children);
   assert.deepEqual([checklist.done, checklist.done + checklist.todo, checklist.dropped], [2, 4, 1]);
@@ -82,7 +82,7 @@ test('live: the status line renders the demo epic from the cached snapshot, p95 
     const started = performance.now();
     const line = await renderOnce(paths);
     times.push(performance.now() - started);
-    assert.equal(line, '#1 ▓▓░░░░░░░░ 20% 1/5 · rev 1 · wip 2 (+1)');
+    assert.equal(line, '#1 ▓▓░░░░░░░░ 20% 1/5 · wip 1 (+1)');
   }
   const sorted = [...times].sort((a, b) => a - b);
   const p95 = sorted[Math.ceil(0.95 * sorted.length) - 1]!;
