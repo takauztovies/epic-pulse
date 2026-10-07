@@ -152,7 +152,7 @@ jobs:
             echo "::notice::NPM_TOKEN is not set, so this publishes through npm trusted publishing (OIDC)."
             npm install --global npm@^11.5.1
           fi
-          npm publish "release/epic-pulse-$VERSION.tgz" --provenance --access public
+          npm publish "./release/epic-pulse-$VERSION.tgz" --provenance --access public
 
       - name: VS Code Marketplace
         env:
