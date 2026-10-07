@@ -84,12 +84,27 @@
         "command": "epicPulse.showStatus",
         "title": "Show status details",
         "category": "Epic Pulse"
+      },
+      {
+        "command": "epicPulse.track",
+        "title": "Track an Epic or Issue…",
+        "category": "Epic Pulse",
+        "icon": "$(add)"
+      },
+      {
+        "command": "epicPulse.untrack",
+        "title": "Stop Tracking",
+        "category": "Epic Pulse"
       }
     ],
     "menus": {
       "commandPalette": [
         {
           "command": "epicPulse.openIssue",
+          "when": "false"
+        },
+        {
+          "command": "epicPulse.untrack",
           "when": "false"
         }
       ],
@@ -100,12 +115,24 @@
           "group": "navigation"
         },
         {
+          "command": "epicPulse.track",
+          "when": "view == epicPulse.epics",
+          "group": "navigation"
+        },
+        {
           "command": "epicPulse.showStatus",
           "when": "view == epicPulse.epics"
         },
         {
           "command": "epicPulse.signIn",
           "when": "view == epicPulse.epics"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "epicPulse.untrack",
+          "when": "view == epicPulse.epics && viewItem == epic",
+          "group": "inline"
         }
       ]
     },
