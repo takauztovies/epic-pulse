@@ -1,6 +1,6 @@
 import { STATUSES, type JsonChild, type JsonEpic, type Status } from '@epic-pulse/core';
 import { COMMAND } from './ids.js';
-import { ageText, barText, countsText, progressText, sessionsText, STATE_TEXT, STATUS_TEXT } from './labels.js';
+import { ageText, barText, countsText, epicSessionsText, progressText, sessionsText, STATE_TEXT, STATUS_TEXT } from './labels.js';
 import type { DisplayState, Model } from './model.js';
 
 // The Epics tree as plain data: Epic → status group → issue, with one notice
@@ -88,8 +88,8 @@ function epicNode(epic: JsonEpic, now: number): EpicNode {
     id: epic.url,
     url: epic.url,
     label: `#${epic.number} ${barText(epic.percent)} ${epic.percent}% ${epic.title}`,
-    description: [progress, ...stale].join(' · '),
-    tooltip: [`#${epic.number} ${epic.title}`, `${progress}: ${countsText(epic)}`, ageText(epic.fetchedAt, now)].join('\n'),
+    description: [progress, epicSessionsText(epic), ...stale].join(' · '),
+    tooltip: [`#${epic.number} ${epic.title}`, `${progress}: ${countsText(epic)}`, epicSessionsText(epic), ageText(epic.fetchedAt, now)].join('\n'),
     icon: 'milestone',
     command: openCommand(epic.url),
     children: groupNodes(epic),

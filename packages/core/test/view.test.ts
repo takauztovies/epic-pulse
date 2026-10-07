@@ -41,8 +41,14 @@ test('without a scope the view covers every live session and counts them per chi
   const sessions = [session(A, [[4, 'gh']]), session(B, [[4, 'branch'], [5, 'gh']]), session(B.replace('1', '9'), [[5, 'gh']], 'end')];
   const result = view({ sessions });
   assert.equal(result.liveSessions, 2);
-  const counts = new Map(result.epics[0]!.children.map((c) => [c.number, c.sessionCount] as const));
+  const epic = result.epics[0]!;
+  const counts = new Map(epic.children.map((c) => [c.number, c.sessionCount] as const));
   assert.deepEqual([counts.get(4), counts.get(5), counts.get(6)], [2, 1, 0]);
+  const ids = new Map(epic.children.map((c) => [c.number, c.sessionIds] as const));
+  assert.deepEqual([ids.get(4), ids.get(5), ids.get(6)], [[A, B], [B], []]);
+  // The epic's own answer is every child's sessions, deduplicated: B is on
+  // two children but appears once.
+  assert.deepEqual(epic.sessionIds, [A, B]);
 });
 
 test('the most recent binding comes first, and an expired one drops out', () => {
@@ -167,5 +173,5 @@ test('the repository progress config changes the percentages, and a child in the
   const progress = { ...DEFAULT_PROGRESS, sizes: { 'est:4': 4 }, unsized: 1, inProgress: 50, inReview: 50 };
   const result = buildView({ snapshot, sessions: [own], pins: [], now: T0 + 1000, scope: { session: own }, progress }).epics[0];
   assert.equal(result?.percent, 4 * 100 / (4 + 1 + 1 + 1 + 1) | 0);
-  assert.deepEqual(Object.keys(result?.children[0] ?? {}).sort(), ['number', 'sessionCount', 'status', 'title', 'url']);
+  assert.deepEqual(Object.keys(result?.children[0] ?? {}).sort(), ['number', 'sessionCount', 'sessionIds', 'status', 'title', 'url']);
 });

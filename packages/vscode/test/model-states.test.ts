@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { test, type TestContext } from 'node:test';
 import { emptySnapshot, STALE_AFTER_MS, type ErrorCode } from '@epic-pulse/core';
 import { buildModel, type Model } from '../src/model.js';
-import { barText } from '../src/labels.js';
+import { barText, epicSessionsText } from '../src/labels.js';
 import { statusBarOf } from '../src/status-model.js';
 import { treeOf } from '../src/tree-model.js';
 import { modelOf, surface } from './model-helpers.js';
@@ -19,8 +19,8 @@ test('a bound session shows its epic as "20% · 1/5" with the pinned epic after 
   const roots = treeOf(model);
   assert.equal(model.state, 'ok');
   assert.deepEqual(roots.map((node) => [node.kind, node.label, node.description]), [
-    ['epic', '#1 ██░░░░░░░░ 20% Demo epic: sample onboarding flow', '20% · 1/5'],
-    ['epic', '#8 █████░░░░░ 50% Demo checklist epic: docs site', '50% · 2/4'],
+    ['epic', '#1 ██░░░░░░░░ 20% Demo epic: sample onboarding flow', '20% · 1/5 · Session: 0f8e7c1a'],
+    ['epic', '#8 █████░░░░░ 50% Demo checklist epic: docs site', '50% · 2/4 · No live session'],
   ]);
   const bar = statusBarOf(model);
   assert.deepEqual([bar.visible, bar.text, bar.command], [true, '$(pulse) #1 20% · 1/5 +1', 'epicPulse.epics.focus']);
@@ -51,7 +51,7 @@ test('stale data stays on screen, marked on the epic, in the status bar and in a
   const repo = await makeRegistry(t, { sessions: [{ id: SESSION_A, binds: [demo(4)] }], snapshot: old }, now);
   const model = await modelOf([repo], now);
   assert.deepEqual(surface(model), ['stale', 'notice', 'Stale', 'updated 11 min ago', '$(pulse) #1 20% · 1/5 $(warning)']);
-  assert.equal(treeOf(model)[1]?.description, '20% · 1/5 · stale');
+  assert.equal(treeOf(model)[1]?.description, '20% · 1/5 · Session: 0f8e7c1a · stale');
 });
 
 test('none: the hook has written here, but no live session has an issue bound', async (t) => {
@@ -105,4 +105,10 @@ test('the epic bar fills in tenths, rounding down, so it is never full before th
   assert.deepEqual([0, 9, 10, 19, 50, 99, 100].map(barText), [
     '░░░░░░░░░░', '░░░░░░░░░░', '█░░░░░░░░░', '█░░░░░░░░░', '█████░░░░░', '█████████░', '██████████',
   ]);
+});
+
+test('the epic sessions line names which session, not only how many', () => {
+  assert.equal(epicSessionsText({ sessionIds: [] }), 'No live session');
+  assert.equal(epicSessionsText({ sessionIds: ['0f8e7c1a-2b3d-4e5f-8a9b-0c1d2e3f4a5b'] }), 'Session: 0f8e7c1a');
+  assert.equal(epicSessionsText({ sessionIds: ['0f8e7c1a-...', '1a2b3c4d-...'] }), 'Sessions: 0f8e7c1a, 1a2b3c4d');
 });

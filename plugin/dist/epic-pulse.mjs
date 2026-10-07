@@ -21853,7 +21853,11 @@ var JsonChildSchema = external_exports.object({
   title: external_exports.string(),
   url: external_exports.string().nullable(),
   status: StatusSchema,
-  sessionCount: external_exports.number().int().nonnegative()
+  sessionCount: external_exports.number().int().nonnegative(),
+  // The live sessions bound to this child, most recent binding first.
+  // sessionCount is their length, kept so a reader of only the count need
+  // not change.
+  sessionIds: external_exports.array(external_exports.string()).readonly()
 }).readonly();
 var JsonEpicSchema = external_exports.object({
   number: IssueNumberSchema,
@@ -21864,6 +21868,9 @@ var JsonEpicSchema = external_exports.object({
   percent: external_exports.number().int().min(0).max(100),
   weightedPercent: external_exports.number().int().min(0).max(100),
   children: external_exports.array(JsonChildSchema).readonly(),
+  // Every live session bound to any child of this epic, deduplicated: the
+  // epic-level answer to "which session is working on this".
+  sessionIds: external_exports.array(external_exports.string()).readonly(),
   fetchedAt: external_exports.iso.datetime(),
   stale: external_exports.boolean(),
   error: ErrorCodeSchema.nullable(),
@@ -21969,13 +21976,17 @@ function childKey(child, epic) {
   const ref = target && own2 ? makeRef({ host: own2.host ?? epic.host, owner: own2.owner, repo: own2.repo, number: target.number }) : child.number === null ? void 0 : makeRef({ ...epic, number: child.number });
   return ref ? refKey(ref) : void 0;
 }
+function childSessionIds(key, bound) {
+  return key === void 0 ? [] : bound.filter((session) => session.keys.has(key)).map((session) => session.sessionId);
+}
 function jsonEpic(entry, bound, input2) {
   const counts = countStatuses(entry.children);
   const points = pointsByStatus(entry.children, input2.progress);
   const children = entry.children.map((child) => {
-    const key = childKey(child, entry.ref);
-    return { number: child.number, title: child.title, url: child.url, status: child.status, sessionCount: key === void 0 ? 0 : bound.filter((keys) => keys.has(key)).length };
+    const sessionIds = childSessionIds(childKey(child, entry.ref), bound);
+    return { number: child.number, title: child.title, url: child.url, status: child.status, sessionCount: sessionIds.length, sessionIds };
   });
+  const epicSessionIds = [...new Set(children.flatMap((child) => child.sessionIds))];
   return {
     number: entry.ref.number,
     title: entry.title,
@@ -21984,6 +21995,7 @@ function jsonEpic(entry, bound, input2) {
     counts,
     percent: percentDone(points),
     weightedPercent: weightedPercentDone(points, input2.progress),
+    sessionIds: epicSessionIds,
     children,
     fetchedAt: iso(entry.fetchedAt),
     stale: isStale(entry, input2.now),
@@ -21996,7 +22008,7 @@ function buildView(input2) {
   const live = input2.sessions.filter((session) => isLive(session, input2.now));
   const refs = scopeRefs(input2, live);
   const entries = epicEntries(refs, snapshot, pinnedKeys(input2, live));
-  const bound = live.map((session) => new Set(activeBindings(session, input2.now).map((binding) => refKey(binding.ref))));
+  const bound = live.map((session) => ({ sessionId: session.id, keys: new Set(activeBindings(session, input2.now).map((binding) => refKey(binding.ref))) }));
   const scoped = { input: input2, refs, entries, snapshot };
   return {
     version: 1,

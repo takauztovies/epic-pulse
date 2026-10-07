@@ -1,6 +1,6 @@
 import type { JsonEpic } from '@epic-pulse/core';
 import { COMMAND, FOCUS_VIEW } from './ids.js';
-import { ageText, countsText, progressText, STATE_TEXT } from './labels.js';
+import { ageText, countsText, epicSessionsText, progressText, STATE_TEXT } from './labels.js';
 import { escapeMarkdown } from './markdown.js';
 import type { Model } from './model.js';
 
@@ -49,7 +49,7 @@ function stateBlock(model: Model): string {
 
 function epicBlock(epic: JsonEpic): string {
   const line = [progressText(epic), countsText(epic), ...staleMarks(epic)].join(' · ');
-  return `**#${epic.number}** ${escapeMarkdown(epic.title)}  \n${line}`;
+  return `**#${epic.number}** ${escapeMarkdown(epic.title)}  \n${line}  \n${epicSessionsText(epic)}`;
 }
 
 // A click signs in when that is what is missing; otherwise it opens the tree.

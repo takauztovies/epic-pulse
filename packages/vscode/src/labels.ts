@@ -65,6 +65,20 @@ export function sessionsText(count: number): string {
   return count === 1 ? '1 session' : `${count} sessions`;
 }
 
+// The first 8 characters of a session id: enough to tell sessions apart in a
+// tooltip line, short enough that it reads as a label and not a UUID dump.
+function shortSessionId(id: string): string {
+  return id.slice(0, 8);
+}
+
+// The epic-level answer to "which session is this": every live session bound
+// to any of its children, so a multi-root window's merged view still says
+// which one to go back to, not only how many there are.
+export function epicSessionsText(epic: Pick<JsonEpic, 'sessionIds'>): string {
+  if (epic.sessionIds.length === 0) return 'No live session';
+  return `${epic.sessionIds.length === 1 ? 'Session' : 'Sessions'}: ${epic.sessionIds.map(shortSessionId).join(', ')}`;
+}
+
 export function ageText(fetchedAt: string | null, now: number): string {
   if (fetchedAt === null) return 'not refreshed yet';
   const seconds = Math.max(0, Math.round((now - Date.parse(fetchedAt)) / 1000));
