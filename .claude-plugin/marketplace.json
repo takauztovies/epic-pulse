@@ -14,10 +14,10 @@
         "source": "git-subdir",
         "url": "https://github.com/takauztovies/epic-pulse.git",
         "path": "plugin",
-        "ref": "v0.2.0"
+        "ref": "v0.3.0"
       },
       "description": "Shows how far the GitHub epics behind a Claude Code session have got: percent done and sub-issues by status.",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "license": "MIT",
       "homepage": "https://github.com/takauztovies/epic-pulse"
     }
