@@ -66,6 +66,10 @@ function issueNode(child: JsonChild, id: string): IssueNode {
     description: sessions.join(''),
     tooltip: [label, STATUS_TEXT[child.status].label, ...sessions].join('\n'),
     icon: child.status === 'done' || child.status === 'dropped' ? 'issue-closed' : 'issues',
+    // A live session on it right now, regardless of status: green marks
+    // "someone is here", distinct from the Todo/In progress/.../Done group
+    // it's already sorted into by workflow state.
+    iconColor: child.sessionCount > 0 ? 'charts.green' : undefined,
     ...(child.url === null ? {} : { command: openCommand(child.url) }),
   };
 }
