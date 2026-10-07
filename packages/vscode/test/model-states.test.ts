@@ -33,13 +33,13 @@ test('an epic opens on GitHub and splits into status groups whose issues count t
   assert.ok(epic?.kind === 'epic');
   assert.deepEqual(epic.command, { command: 'epicPulse.openIssue', title: 'Open on GitHub', arguments: [epic.url] });
   assert.equal(epic.url, 'https://github.com/takauztovies/epic-pulse/issues/1');
-  const groups = epic.children.map((group) => [group.label, group.expanded, group.description, group.children.map((issue) => [issue.label.split(' ')[0], issue.description])]);
+  const groups = epic.children.map((group) => [group.label, group.expanded, group.description, group.children.map((issue) => [issue.label.split(' ')[0], issue.description, issue.iconColor])]);
   assert.deepEqual(groups, [
-    ['Todo', false, '1', [['#7', '']]],
-    ['In progress', true, '2', [['#4', '1 session'], ['#6', '']]],
-    ['In review', true, '1', [['#5', '']]],
-    ['Done', true, '1', [['#2', '']]],
-    ['Dropped', false, '1', [['#3', '']]],
+    ['Todo', false, '1', [['#7', '', undefined]]],
+    ['In progress', true, '2', [['#4', '1 session', 'charts.green'], ['#6', '', undefined]]],
+    ['In review', true, '1', [['#5', '', undefined]]],
+    ['Done', true, '1', [['#2', '', undefined]]],
+    ['Dropped', false, '1', [['#3', '', undefined]]],
   ]);
   const four = epic.children[1]?.children[0];
   assert.deepEqual(four?.command?.arguments, ['https://github.com/takauztovies/epic-pulse/issues/4']);
