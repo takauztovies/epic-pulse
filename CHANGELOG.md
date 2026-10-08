@@ -5,6 +5,8 @@ Every notable change to epic-pulse is listed here. Versions follow
 
 ## Unreleased
 
+## 0.3.3
+
 ### Added
 
 - An **Overview** panel in the VS Code sidebar: a card per epic with a coloured progress bar (blue,
