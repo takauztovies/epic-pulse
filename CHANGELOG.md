@@ -5,6 +5,8 @@ Every notable change to epic-pulse is listed here. Versions follow
 
 ## Unreleased
 
+## 0.3.4
+
 ### Added
 
 - The hover on an epic is now a briefing: the first lines of its description, its open pull requests,
