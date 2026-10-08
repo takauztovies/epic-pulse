@@ -58,6 +58,11 @@
     "views": {
       "epicPulse": [
         {
+          "type": "webview",
+          "id": "epicPulse.overview",
+          "name": "Overview"
+        },
+        {
           "id": "epicPulse.epics",
           "name": "Epics"
         }

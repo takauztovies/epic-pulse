@@ -11,6 +11,9 @@ then the title. Its description adds `1/5`, the first eight characters of each l
 
 ## Using the view
 
+- **Overview** (above the tree) shows a card per epic: a coloured progress bar with the percentage, and
+  all five statuses with their counts, zeros included. The tree lists all five groups under every
+  epic too.
 - **Click a row** that a live Claude Code session is on to open that session (a list when several
   are). A row with no live session opens the issue on GitHub. A session started in another folder or
   worktree may open as a new conversation here.

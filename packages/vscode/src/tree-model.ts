@@ -62,6 +62,11 @@ function clickCommand(url: string | null, sessionIds: readonly string[]): Comman
   return url === null ? undefined : openCommand(url);
 }
 
+// What a click on an epic does, for the tree and for the Overview panel.
+export function epicClickCommand(epic: JsonEpic): CommandRef | undefined {
+  return clickCommand(epic.url, epic.sessionIds);
+}
+
 function spreadCommand(command: CommandRef | undefined): { readonly command?: CommandRef } {
   return command === undefined ? {} : { command };
 }
@@ -85,14 +90,13 @@ function issueNode(child: JsonChild, id: string): IssueNode {
   };
 }
 
-// Workflow order, empty groups left out. Work that is moving, and work that is
+// Workflow order, every status shown even with none, so an epic always reads the same. Work that is moving, and work that is
 // finished, starts expanded; only Todo and Dropped start collapsed.
 // An issue's id is its position, since a checklist may list one issue twice.
 function groupNodes(epic: JsonEpic): readonly GroupNode[] {
   return STATUSES.flatMap((status) => {
     const children = epic.children.flatMap((child, index) => (child.status === status ? [issueNode(child, `${epic.url}#${index}`)] : []));
     const { label, icon } = STATUS_TEXT[status];
-    if (children.length === 0) return [];
     const expanded = status === 'in_progress' || status === 'in_review' || status === 'done';
     return [{ kind: 'group', id: `${epic.url}:${status}`, status, label, description: String(children.length), tooltip: label, icon, expanded, children }];
   });

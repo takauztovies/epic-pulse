@@ -7,6 +7,17 @@ Every notable change to epic-pulse is listed here. Versions follow
 
 ### Added
 
+- An **Overview** panel in the VS Code sidebar: a card per epic with a coloured progress bar (blue,
+  green at 100%) and every status with its count, zeros included. A click does what a click on the
+  tree row does.
+
+### Changed
+
+- The Epics view lists all five status groups under every epic, with their count, even when a group is
+  empty.
+
+### Added
+
 - Clicking a row in the VS Code view that a live Claude Code session is on opens that session, through
   the Claude Code extension's `vscode://anthropic.claude-code/open` handler; a quick pick when several
   are on it. A row with none still opens GitHub, and **Open on GitHub** moves to the row's context menu.
