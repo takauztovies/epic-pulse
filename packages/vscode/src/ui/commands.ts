@@ -5,7 +5,7 @@ import { issueLink } from '../links.js';
 import { signedOutHosts } from '../model.js';
 import type { Poller } from '../poller.js';
 import type { RepoTarget } from '../repos.js';
-import { sessionUriParts } from '../sessions.js';
+import { intakeUriParts, sessionUriParts } from '../sessions.js';
 import { trackIn, untrackEverywhere } from '../track.js';
 import type { TreeNode } from '../tree-model.js';
 import { signIn } from './auth.js';
@@ -97,6 +97,18 @@ async function openOnGitHub(node: TreeNode, log: vscode.LogOutputChannel): Promi
   if (node.kind === 'epic' || node.kind === 'issue') await openIssue(node.url, log);
 }
 
+// Opens a new Claude Code tab with the intake skill's prompt for this epic.
+// The skill comes with the epic-pulse plugin; without it Claude Code does not
+// know the command.
+async function startIntake(node: TreeNode, log: vscode.LogOutputChannel): Promise<void> {
+  const parts = node.kind === 'epic' ? intakeUriParts(node.url) : undefined;
+  if (parts === undefined) {
+    log.warn('startIntake refused: not an epic with a valid issue URL');
+    return;
+  }
+  await vscode.env.openExternal(vscode.Uri.from(parts));
+}
+
 export function registerCommands(deps: CommandDeps): readonly vscode.Disposable[] {
   return [
     vscode.commands.registerCommand(COMMAND.refresh, () => deps.poller.trigger()),
@@ -105,6 +117,7 @@ export function registerCommands(deps: CommandDeps): readonly vscode.Disposable[
     vscode.commands.registerCommand(COMMAND.showStatus, () => showStatus(deps)),
     vscode.commands.registerCommand(COMMAND.openSession, (value: unknown) => openSession(value, deps.log)),
     vscode.commands.registerCommand(COMMAND.openOnGitHub, (node: TreeNode) => openOnGitHub(node, deps.log)),
+    vscode.commands.registerCommand(COMMAND.startIntake, (node: TreeNode) => startIntake(node, deps.log)),
     vscode.commands.registerCommand(COMMAND.track, () => track(deps)),
     vscode.commands.registerCommand(COMMAND.untrack, (node: TreeNode) => untrack(node, deps)),
   ];
