@@ -4,7 +4,7 @@ import { applyEpics } from '../src/refresh-apply.js';
 import { parsePhaseB } from '../src/queries.js';
 import { refKey } from '../src/ref.js';
 import { emptySnapshot } from '../src/snapshot.js';
-import { SUMMARY_MAX, summaryOf } from '../src/summary.js';
+import { SUMMARY_MAX, SUMMARY_SCAN_MAX, summaryOf } from '../src/summary.js';
 import { buildView } from '../src/view.js';
 import { loadFixture } from './helpers.js';
 import { demo } from './snapshot-helpers.js';
@@ -56,4 +56,21 @@ test('a summary is the readable opening of a description, never markup, links or
   const long = `${'word '.repeat(100)}end`;
   const cut = summaryOf(long)!;
   assert.ok(cut.length <= SUMMARY_MAX + 1 && cut.endsWith('…') && !cut.includes('wor…'), cut);
+});
+
+// GitHub's issue body limit. Each of these made one pattern rescan to the end
+// from every character: about two seconds each at this size, per epic, per refresh.
+test('a description built to make the cleaning patterns rescan can not stall a refresh', () => {
+  const size = 65_536;
+  const hostile = ['[', '<', '<!--', '![', '[a](', '<a '].map((piece) => piece.repeat(Math.ceil(size / piece.length)).slice(0, size));
+  const started = performance.now();
+  for (const body of hostile) summaryOf(body);
+  assert.ok(performance.now() - started < 500, `${Math.round(performance.now() - started)} ms for ${hostile.length} hostile bodies`);
+});
+
+test('a description is read from its start only, and one that starts with prose still gets its summary', () => {
+  assert.equal(summaryOf(`${'a '.repeat(SUMMARY_SCAN_MAX)}tail`)?.endsWith('…'), true);
+  assert.equal(summaryOf(`${' '.repeat(SUMMARY_SCAN_MAX)}hidden`), undefined, 'nothing readable in the part that is read');
+  const opening = summaryOf(`Opening words.${'['.repeat(70_000)}`);
+  assert.equal(opening?.startsWith('Opening words.') && opening.endsWith('…') && opening.length <= SUMMARY_MAX + 1, true, opening);
 });
