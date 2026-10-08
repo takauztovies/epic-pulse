@@ -5,6 +5,43 @@ Every notable change to epic-pulse is listed here. Versions follow
 
 ## Unreleased
 
+### Added
+
+- Clicking a row in the VS Code view that a live Claude Code session is on opens that session, through
+  the Claude Code extension's `vscode://anthropic.claude-code/open` handler; a quick pick when several
+  are on it. A row with none still opens GitHub, and **Open on GitHub** moves to the row's context menu.
+- `/epic-pulse:intake <epic>`, and **Start Working on This Epic…** on an epic row in VS Code (a new
+  Claude Code tab running the skill). It pins the epic, reads it and its sub-issues, places it in its
+  program (parent epic, siblings, architecture notes, the code it touches), proposes slices that each
+  say what in the wider architecture they use or change, and waits for a choice before editing anything.
+- `docs/MANUAL.md`, a walkthrough of the VS Code view, tracking, the sessions and intake.
+
+## 0.3.1
+
+0.3.0 was tagged but never published (its npm step failed, below), so 0.3.1 is the first release of
+everything in it.
+
+### Added
+
+- **Epic Pulse: Track an Epic or Issue…** and **Stop Tracking** in VS Code, on top of the repository
+  pins (`pins.json`) the CLI already wrote: a tracked epic shows without a live session and persists
+  until untracked.
+- `JsonEpic` and `JsonChild` carry `sessionIds`, the live sessions bound to them, beside
+  `sessionCount`. The tree row and tooltips and the status bar tooltip name them (`Session: 0f8e7c1a`).
+- An issue's icon is green while a live session is on it; an epic's icon and the status bar turn green
+  at 100% done, with fresh data.
+
+### Changed
+
+- The progress bar in the status line and the VS Code view counts closed work only, so it can no longer
+  fill ahead of the percentage printed beside it. `weightedPercent` stays in `epic-pulse json`.
+- The Done group starts expanded, and an epic row always carries its number.
+
+### Fixed
+
+- The release workflow's npm step passed `release/epic-pulse-X.tgz` to `npm publish`, which npm reads
+  as a GitHub shorthand; it now passes `./release/...`. The step had never run before.
+
 ## 0.2.0
 
 ### Added

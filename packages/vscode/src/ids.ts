@@ -7,6 +7,9 @@ export const COMMAND = {
   showStatus: 'epicPulse.showStatus',
   track: 'epicPulse.track',
   untrack: 'epicPulse.untrack',
+  openSession: 'epicPulse.openSession',
+  openOnGitHub: 'epicPulse.openOnGitHub',
+  startIntake: 'epicPulse.startIntake',
 } as const;
 
 export const VIEW_ID = 'epicPulse.epics';
