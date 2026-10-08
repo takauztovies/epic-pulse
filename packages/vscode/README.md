@@ -85,7 +85,7 @@ Only when none of these yields a token GitHub accepts does the view offer **Sign
 
 ## Privacy
 
-- **Network.** Only the GitHub GraphQL API of the host your issues live on: `api.github.com`, or
+- **Network.** Only the GitHub GraphQL API of the host your issues live on (and, for a repository that declares Jira, a read-only search of the Jira site you named in `JIRA_SITE`, with your own credentials and never a GitHub sign-in): `api.github.com`, or
   your Enterprise server. No telemetry and no other service.
 - **Your token** is held in memory for one refresh. It is never written to disk, logged or put in an
   error. A token from VS Code goes only to the host it belongs to: the GitHub sign-in's to
@@ -128,7 +128,7 @@ GitHub.
 
 - VS Code 1.90 or newer, on a trusted folder on disk: Restricted Mode and virtual workspaces are not
   supported.
-- A git repository whose issues are on GitHub.
+- A git repository whose issues are on GitHub, or whose work is in Jira Cloud (declare it in `.epic-pulse.json` and set `JIRA_SITE`, `JIRA_EMAIL` and `JIRA_API_TOKEN` where VS Code starts; see the [manual](https://github.com/takauztovies/epic-pulse/blob/main/docs/MANUAL.md)).
 - The epic-pulse Claude Code plugin, for sessions to bind on their own.
 
 ## Licence

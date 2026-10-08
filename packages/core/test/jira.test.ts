@@ -65,6 +65,23 @@ test('a description in Atlassian Document Format reads as its text, and code is 
   assert.doesNotThrow(() => adfText(deep));
 });
 
+// 100,000 tiny nodes took 14 seconds when the output was re-measured at every
+// node; found by the commit security review. The walk is now bounded by the
+// nodes it visits as well as the characters it keeps.
+test('a description built from very many tiny nodes can not stall a refresh', () => {
+  const paragraph = (count: number, text: string) => ({ type: 'paragraph', content: Array.from({ length: count }, () => ({ type: 'text', text })) });
+  const documents = [
+    { type: 'doc', content: [paragraph(100_000, '')] },
+    { type: 'doc', content: [paragraph(300_000, 'a')] },
+    { type: 'doc', content: Array.from({ length: 100_000 }, () => ({ type: 'rule' })) },
+  ];
+  const started = performance.now();
+  const lengths = documents.map((doc) => adfText(doc).length);
+  assert.ok(performance.now() - started < 300, `${Math.round(performance.now() - started)} ms for ${documents.length} hostile descriptions`);
+  assert.deepEqual(lengths.map((length) => length <= 4000), [true, true, true]);
+  assert.equal(adfText({ type: 'doc', content: [paragraph(10, 'ab')] }).startsWith('ababab'), true, 'an ordinary description is read whole');
+});
+
 // Credentials go only to a site the user named in their own environment: an
 // Atlassian token works on every site its account reaches, and a repository's
 // .epic-pulse.json (untrusted) names the site the keys belong to.

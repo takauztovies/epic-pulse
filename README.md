@@ -210,6 +210,11 @@ a field that is wrong falls back to its default without voiding the others.
     "inProgress": 25,
     "inReview": 75,
     "sizes": { "size/xs": 1, "size/s": 2, "size/m": 3, "size/l": 5, "size/xl": 8 }
+  },
+  "jira": {
+    "site": "acme.atlassian.net",
+    "projects": ["PROJ"],
+    "statusMap": { "in qa": "in_review" }
   }
 }
 ```
@@ -228,13 +233,51 @@ a field that is wrong falls back to its default without voiding the others.
   lower median of the sizes, which is medium in the default table. A field that is wrong keeps its
   default. The file is read from the folder you work in, by the status line, `epic-pulse json` and the
   VS Code view alike.
+- `jira`: this repository's work is tracked in Jira Cloud (see "Jira"). `site` is the host, `projects`
+  the project keys (2 to 10 capitals, digits or underscores, up to 20) whose keys epic-pulse should
+  recognise, `statusMap` maps a status name (any case, up to 60) to `todo`, `in_progress`,
+  `in_review`, `done` or `dropped` over what Jira's status category says, and `droppedResolutions`
+  (optional) lists the resolution names that mean the work was decided against; left out, it is
+  Won't Do, Won't Fix, Duplicate, Declined, Rejected, Cannot Reproduce, Invalid and Obsolete. Without
+  a valid `site` and at least one project the block is ignored.
+
+## Jira
+
+Jira Cloud works beside GitHub, per repository. An epic is a Jira Epic (or any issue with children), its
+issues are the children of `parent = EPIC-1`, and the percentage, the bar, the hover and the views are
+the same.
+
+1. Declare it in the repository's `.epic-pulse.json`: the `jira` block above.
+2. Give epic-pulse credentials, in **your own environment** (not in the repository):
+   `JIRA_SITE=acme.atlassian.net` (comma-separated for several), `JIRA_EMAIL` and `JIRA_API_TOKEN`,
+   an [Atlassian API token](https://id.atlassian.com/manage-profile/security/api-tokens). Set them
+   where VS Code and Claude Code start, for the extension and the status line to see them. A token
+   can expire: give it an expiry you will remember, and create it for an account that can read the
+   projects.
+3. Sessions bind to a Jira issue when a **branch name** (`feature/PROJ-12-login`), a **commit
+   message** (`PROJ-12 add login`) or `epic-pulse track PROJ-12` names a key of a declared project.
+   Other `ABC-123` look-alikes (`UTF-8`, `SHA-256`) are never read as issues.
+
+**Statuses** follow Jira's own status categories: To Do is todo, In Progress is in progress, Done is
+done, unless the resolution is one of the dropped ones (then dropped). An In Progress status with
+"review" in its name is in review, and `statusMap` overrides any status by name. Jira has no pull
+request link here, so a Jira issue shows no open-pull-request count. An assignee is shown by display
+name.
+
+**Limits.** An issue's epic is its parent: a sub-task's parent is the story, not that story's epic. A
+very large epic keeps its first 500 children (marked `+`). Credentials are sent only to a site you
+list in `JIRA_SITE`, never to one a repository names: an Atlassian token works on every site its
+account reaches, and `.epic-pulse.json` is untrusted. If a site is declared but not in `JIRA_SITE`,
+its refresh says `no_token`. Jira answers an expired or wrong token with an empty result in some
+cases, which shows as "no epic": check the token's expiry first.
 
 ## Privacy and security
 
-**What leaves your machine.** Only GraphQL queries to the GitHub API of the host the issues live on:
-`api.github.com`, `api.<name>.ghe.com` or your GitHub Enterprise Server's `/api/graphql`. Every query
-is a read: epic-pulse sends no mutation. There is no telemetry and no other service. The hook never
-uses the network at all; only the refresher does.
+**What leaves your machine.** Two things, both reads. GraphQL queries to the GitHub API of the host
+the issues live on: `api.github.com`, `api.<name>.ghe.com` or your GitHub Enterprise Server's
+`/api/graphql`. And, only for a repository that declares Jira and only to a site you listed in
+`JIRA_SITE`, a search of that site's `/rest/api/3/search/jql`. epic-pulse sends no mutation. There is no
+telemetry and no other service. The hook never uses the network at all; only the refresher does.
 
 **Your token.** For github.com it comes from `GH_TOKEN`, then `GITHUB_TOKEN`, then `gh auth token`,
 and a github.com token is never sent to another host. Any other host is named by repository data (a
@@ -252,6 +295,11 @@ if you trust it:
 
 The token is held in memory for one refresh and never written to disk, logged or put into an error
 message; `doctor` shows only where it came from.
+
+**Your Jira credentials** are `JIRA_EMAIL` and `JIRA_API_TOKEN`, sent as HTTP Basic to a site named in
+`JIRA_SITE` and to no other: never to a site that only a repository (`.epic-pulse.json`, a URL, a
+branch) names, because an Atlassian token works for every site its account can reach. They are held in
+memory for one refresh, like a GitHub token, and the transport refuses to follow a redirect.
 
 **Which scope.** epic-pulse reads issues and pull requests. The token `gh auth login` creates works.
 A classic token needs the `repo` scope for private repositories, because GitHub has no read-only
@@ -280,7 +328,7 @@ While you work, epic-pulse writes these files and no others:
 | --- | --- | --- |
 | `sessions/<session-id>.jsonl` | the hook | one line per call: the event, a timestamp and the issue references bound or unbound. Never a command, a file path or file contents. Deleted after a week untouched. |
 | `pins.json` | `epic-pulse track --repo` | the repository's pinned issue references and when they were pinned |
-| `snapshot.json` | the refresher | what GitHub returned: epic and sub-issue numbers, titles, URLs and statuses, labels, up to three assignee logins per issue, how many open pull requests will close it, when it was opened and closed, the first lines of an epic's description (cut at 280 characters, without markup or links), when they were fetched, this repository's points for the hour, the token's rate-limit counters and the code of the last failure |
+| `snapshot.json` | the refresher | what GitHub or Jira returned: epic and sub-issue numbers (Jira: keys), titles, URLs and statuses, labels, up to three assignees per issue (GitHub logins, Jira display names), how many open pull requests will close it, when it was opened and closed, the first lines of an epic's description (cut at 280 characters, without markup or links), when they were fetched, this repository's points for the hour, the token's rate-limit counters and the code of the last failure |
 | `time.json` | the refresher | how long sessions worked on each issue: per issue reference, active seconds, the last time and session id it was worked on, and per session how far its file has been counted. References, numbers and ids only. Kept after the session files are deleted. |
 | `hook.log`, `hook.log.1` | the hook | an error code and a timestamp per failed call; past 64 KiB it moves to `hook.log.1` |
 | `refresh.lock` | the refresher | a process id and a random token, while a refresh runs |

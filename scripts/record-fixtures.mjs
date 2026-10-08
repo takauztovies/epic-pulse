@@ -4,6 +4,7 @@
 // the product sends.
 //
 //   pnpm record-fixtures        (token from GH_TOKEN, GITHUB_TOKEN or `gh auth login`)
+//   pnpm record-fixtures jira   (Jira Cloud demo project: see record-jira-fixtures.mjs)
 //
 // Only status, body and two rate-limit headers are stored. Request headers,
 // including the Authorization header, never reach disk.
@@ -54,6 +55,10 @@ async function record(recording, token) {
 }
 
 async function main() {
+  if (process.argv[2] === 'jira') {
+    const { recordJira } = await import('./record-jira-fixtures.mjs');
+    return recordJira(process.env);
+  }
   const resolved = await resolveToken(HOST, process.env);
   if (!resolved) throw new Error('no token: set GH_TOKEN or run `gh auth login`');
   await mkdir(OUT, { recursive: true });
