@@ -5,6 +5,8 @@ Every notable change to epic-pulse is listed here. Versions follow
 
 ## Unreleased
 
+## 0.3.3
+
 ### Added
 
 - Clicking a row in the VS Code view that a live Claude Code session is on opens that session, through
