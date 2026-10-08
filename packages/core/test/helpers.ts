@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { RawResponse } from '../src/github.js';
 
 const FIXTURES = fileURLToPath(new URL('../../../fixtures/graphql/', import.meta.url));
+const JIRA_FIXTURES = fileURLToPath(new URL('../../../fixtures/jira/', import.meta.url));
 
 const RecordingSchema = z.object({
   status: z.number(),
@@ -23,4 +24,10 @@ export function loadFixture(name: string): RawResponse {
     remaining: recording.remaining ?? undefined,
     retryAfter: recording.retryAfter,
   };
+}
+
+// Jira recordings: the same shape, from fixtures/jira.
+export function loadJiraFixture(name: string): RawResponse {
+  const recording = RecordingSchema.parse(JSON.parse(readFileSync(`${JIRA_FIXTURES}${name}.json`, 'utf8')));
+  return { status: recording.status, body: recording.body, remaining: recording.remaining ?? undefined, retryAfter: recording.retryAfter };
 }

@@ -1,6 +1,6 @@
 import { readdir, stat } from 'node:fs/promises';
 import {
-  buildView, gatherRefs, loadProgressFor, pathsFor, pinsOf, readLiveSessions, readPins, readSnapshot, readTime, refresh,
+  buildView, gatherRefs, loadJiraFor, loadProgressFor, pathsFor, pinsOf, readLiveSessions, readPins, readSnapshot, readTime, refresh,
   type JsonV1, type RefreshOutcome, type RegistryPaths,
 } from '@epic-pulse/core';
 import { tokenUse, type Grant, type TokenUse } from './grant.js';
@@ -58,18 +58,21 @@ export async function inspectRepo(repo: RepoTarget, now: number): Promise<RepoSt
 // Epics are fetched from their issue's host, so they add none.
 async function registryHosts(paths: RegistryPaths, now: number): Promise<ReadonlySet<string>> {
   const [sessions, pins] = await Promise.all([readLiveSessions(paths, now), readPins(paths)]);
-  return new Set(gatherRefs(sessions, pinsOf(pins), now).map((ref) => ref.host));
+  // GitHub hosts only: they are what a VS Code sign-in can serve. A Jira site is
+  // reached with JIRA_* in the environment, never with a GitHub sign-in.
+  return new Set(gatherRefs(sessions, pinsOf(pins), now).filter((ref) => ref.kind !== 'jira').map((ref) => ref.host));
 }
 
 // `refresh` throws only when the registry can not be written. That is reported
 // as `failed`, and the view is still read from what is there. The grant goes
 // to core as it is, keyed by host: core offers each token to its own host
 // only, so another host in the registry needs no special case.
-async function runRefresh(dir: string, options: PollOptions): Promise<Pick<RepoResult, 'refresh' | 'token' | 'hosts'>> {
+async function runRefresh(repo: RepoTarget, options: PollOptions): Promise<Pick<RepoResult, 'refresh' | 'token' | 'hosts'>> {
+  const { dir } = repo;
   const hosts = await registryHosts(pathsFor(dir), options.now);
   const named = { token: tokenUse(options.grant, hosts), hosts: [...hosts] };
   try {
-    return { refresh: await refresh({ dir, now: options.now, env: options.env, tokens: options.grant }), ...named };
+    return { refresh: await refresh({ dir, now: options.now, env: options.env, tokens: options.grant, jira: await loadJiraFor(repo.folder) }), ...named };
   } catch {
     return { refresh: { status: 'failed' }, ...named };
   }
@@ -80,7 +83,7 @@ async function runRefresh(dir: string, options: PollOptions): Promise<Pick<RepoR
 // the editor opens, including those that never use epic-pulse.
 export async function pollRepo(repo: RepoTarget, options: PollOptions): Promise<RepoResult> {
   const skipped = { refresh: { status: 'skipped' }, token: 'none', hosts: [] } as const;
-  const ran = (await isDirectory(repo.dir)) ? await runRefresh(repo.dir, options) : skipped;
+  const ran = (await isDirectory(repo.dir)) ? await runRefresh(repo, options) : skipped;
   return { repo, ...ran, ...(await inspectRepo(repo, options.now)) };
 }
 

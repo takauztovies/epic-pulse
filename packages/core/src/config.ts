@@ -64,6 +64,12 @@ export async function loadProgressFor(dir: string): Promise<ProgressConfig> {
   return worktree ? (await loadConfig(worktree.root)).progress : DEFAULT_PROGRESS;
 }
 
+// The repository's jira block, found from any directory inside it.
+export async function loadJiraFor(dir: string): Promise<JiraConfig | undefined> {
+  const worktree = await findWorktree(dir);
+  return worktree ? (await loadConfig(worktree.root)).jira : undefined;
+}
+
 export async function loadConfig(root: string): Promise<Config> {
   const file = join(root, CONFIG_FILE);
   try {

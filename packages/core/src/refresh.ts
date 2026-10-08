@@ -1,3 +1,4 @@
+import type { JiraConfig } from './jira-config.js';
 import { providerFor } from './provider.js';
 import { acquireLock, releaseLock, type Lock } from './lock.js';
 import { pathsFor, userCacheDir, type RegistryPaths } from './paths.js';
@@ -25,6 +26,10 @@ export interface RefreshOptions {
   // A host's own entry comes before the environment and `gh`; no other host
   // ever sees it. In memory only, like every token.
   readonly tokens?: Readonly<Record<string, string>>;
+  // The repository's jira block from .epic-pulse.json, if any: how Jira's
+  // statuses map onto the five. The caller reads it; the refresher never opens
+  // the working tree.
+  readonly jira?: JiraConfig | undefined;
 }
 
 export type RefreshOutcome =
@@ -107,8 +112,9 @@ function pendingRefs(run: Run, refs: readonly IssueRef[]): readonly IssueRef[] {
 async function tokensFor(run: Run, refs: readonly IssueRef[], options: RefreshOptions): Promise<ReadonlyMap<string, string>> {
   if (overBudget(run, PHASE_A_COST)) return new Map();
   const given = new Map(Object.entries(options.tokens ?? {}));
-  const hosts = [...new Set(pendingRefs(run, refs).map((ref) => ref.host))];
-  const found = await Promise.all(hosts.map(async (host) => [host, given.get(host) ?? (await providerFor().token(host, options.env))] as const));
+  const pending = pendingRefs(run, refs);
+  const hosts = [...new Map(pending.map((ref) => [ref.host, ref] as const)).values()];
+  const found = await Promise.all(hosts.map(async (ref) => [ref.host, given.get(ref.host) ?? (await providerFor(ref).token(ref.host, options.env))] as const));
   return new Map(found.flatMap(([host, token]) => (token === undefined ? [] : [[host, token] as const])));
 }
 
@@ -168,7 +174,7 @@ async function refreshLocked(options: RefreshOptions, lock: Lock): Promise<Refre
   if (waitsItsTurn(start, refs)) return { status: 'paced', until: now + usage.waitMs };
   const started = performance.now();
   const clock = () => now + Math.round(performance.now() - started);
-  const ctx: Context = { tokens: await tokensFor(start, refs, options), lock, clock, ledger: usage.ledger };
+  const ctx: Context = { tokens: await tokensFor(start, refs, options), lock, clock, ledger: usage.ledger, settings: { jira: options.jira } };
   const run = await runPhaseB(await runPhaseA(start, refs, ctx), refs, ctx);
   const next = finalSnapshot(run, refs);
   if (run.requests > 0 || !unchanged(before, next, refs)) await writeSnapshot(paths.snapshotFile, { ...next, updatedAt: now });

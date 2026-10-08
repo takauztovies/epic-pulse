@@ -1,0 +1,28 @@
+{
+  "recordedAt": "2026-10-08T00:00:00.000Z",
+  "unverified": true,
+  "note": "a child, an epic with no parent, and a missing issue. UNVERIFIED: written by hand from Atlassian's REST v3 documentation, not recorded from a Jira site. Replace with `pnpm record-fixtures jira` (needs JIRA_SITE, JIRA_EMAIL, JIRA_API_TOKEN and the demo project) before release; release.mjs --check refuses to ship while this flag is set.",
+  "status": 200,
+  "remaining": null,
+  "retryAfter": false,
+  "body": {
+    "issues": [
+      {
+        "key": "EPD-4",
+        "fields": {
+          "summary": "Profile form",
+          "parent": {
+            "key": "EPD-1"
+          }
+        }
+      },
+      {
+        "key": "EPD-1",
+        "fields": {
+          "summary": "Demo epic: sample onboarding flow"
+        }
+      }
+    ],
+    "isLast": true
+  }
+}

@@ -48,11 +48,14 @@ function linkDependencies(dir: string): void {
 // not. The throwaway main is the sources only, so every test starts from the
 // same base wherever it runs.
 const RELEASE_BUILT = 'plugin/dist/';
+// The Jira fixtures are checked by a release test of their own; the manifest tests
+// run without them so they are about manifests only.
+const JIRA_FIXTURES = 'fixtures/jira/';
 
-export function releaseRepo(t: TestContext): string {
+export function releaseRepo(t: TestContext, options: { readonly withJiraFixtures?: boolean } = {}): string {
   const dir = tempDir(t, 'ep-release-');
   const listed = git(ROOT, ['ls-files', '-z', '--cached', '--others', '--exclude-standard']).split('\0').filter(Boolean);
-  const sources = listed.filter((name) => !name.startsWith(RELEASE_BUILT) && existsSync(join(ROOT, name)));
+  const sources = listed.filter((name) => !name.startsWith(RELEASE_BUILT) && (options.withJiraFixtures === true || !name.startsWith(JIRA_FIXTURES)) && existsSync(join(ROOT, name)));
   for (const file of sources) {
     mkdirSync(dirname(join(dir, file)), { recursive: true });
     copyFileSync(join(ROOT, file), join(dir, file));

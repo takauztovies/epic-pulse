@@ -44,7 +44,8 @@ export function repoState(result: RepoResult): StateKind {
 // not obviously the cure, and the code says what went wrong.
 function isSignedOut(result: RepoResult): boolean {
   const { state, error } = result.view.snapshot;
-  return result.token === 'none' && (state === 'error' || state === 'stale') && error !== null && TOKEN_ERRORS.has(error);
+  // Only a registry with a GitHub host can be signed out of GitHub: a Jira-only one has none.
+  return result.token === 'none' && result.hosts.length > 0 && (state === 'error' || state === 'stale') && error !== null && TOKEN_ERRORS.has(error);
 }
 
 // The hosts of the repositories a sign-in would cure: what the Sign in action

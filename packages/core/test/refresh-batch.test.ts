@@ -21,7 +21,7 @@ const status = (code: number, remaining?: number): RawResponse => ({ status: cod
 test('a Phase A request GitHub refuses for good is cached as no epic with its code, for 30 minutes', () => {
   const refusals = [[loadFixture('error-undefined-field'), 'unsupported'], [status(404), 'not_found'], [status(403, 4000), 'forbidden']] as const;
   for (const [response, code] of refusals) {
-    const next = answered(sent, PHASE_A, response);
+    const next = answered(sent, PHASE_A, { res: response });
     assert.deepEqual([next.failure?.code, next.snapshot.issues[refKey(demo(4))]], [code, { epic: null, resolvedAt: T0, error: code }], code);
     assert.deepEqual(needsResolution(next.snapshot, PHASE_A.refs, T0 + RESOLUTION_TTL_MS - 1), [], code);
     assert.equal(needsResolution(next.snapshot, PHASE_A.refs, T0 + RESOLUTION_TTL_MS).length, 2, code);
@@ -32,7 +32,7 @@ test('a Phase A request GitHub refuses for good is cached as no epic with its co
 test('a Phase A refusal that a token or time can cure caches nothing', () => {
   const curable = [[loadFixture('error-bad-credentials'), 'unauthorized'], [status(403, 0), 'rate_limited'], [status(502), 'network']] as const;
   for (const [response, code] of curable) {
-    const next = answered(sent, PHASE_A, response);
+    const next = answered(sent, PHASE_A, { res: response });
     assert.deepEqual([next.failure?.code, next.snapshot.issues], [code, {}], code);
   }
 });
@@ -48,8 +48,8 @@ function withoutRateLimit(name: string): RawResponse {
 test('an answer without a rate limit is used, charged the estimate, and leaves the known limit alone', () => {
   const limit = { remaining: 4000, resetAt: T0 + 60_000 };
   const before: Run = { ...sent, snapshot: { ...emptySnapshot(T0), rateLimit: limit } };
-  const a = answered(before, { ...PHASE_A, refs: [demo(4)] }, withoutRateLimit('phase-a'));
+  const a = answered(before, { ...PHASE_A, refs: [demo(4)] }, { res: withoutRateLimit('phase-a') });
   assert.deepEqual([a.failure, a.points, a.snapshot.usage.points, a.snapshot.rateLimit, a.snapshot.issues[refKey(demo(4))]?.epic?.number], [null, 1, 1, limit, 1]);
-  const b = answered(before, { ...PHASE_A, phase: 'B', refs: [demo(1)] }, withoutRateLimit('phase-b-subissues'));
+  const b = answered(before, { ...PHASE_A, phase: 'B', refs: [demo(1)] }, { res: withoutRateLimit('phase-b-subissues') });
   assert.deepEqual([b.failure, b.points, b.snapshot.usage.points, b.snapshot.rateLimit, b.snapshot.epics[refKey(demo(1))]?.children.length], [null, 4, 4, limit, 6]);
 });

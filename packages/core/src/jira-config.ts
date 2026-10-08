@@ -58,3 +58,22 @@ export function parseJira(value: unknown): JiraConfig | undefined {
   if (!HostSchema.safeParse(site).success || projects.length === 0) return undefined;
   return { site, projects, statusMap: statusMapOf(value['statusMap']), droppedResolutions: droppedOf(value['droppedResolutions']) };
 }
+
+// A refresh the status line starts runs in a neutral directory, so it is handed
+// the repository's jira block through the environment, as JSON, and checks it
+// again: nothing it reads is trusted for being in its own environment.
+export const JIRA_CONFIG_ENV = 'EPIC_PULSE_JIRA';
+
+export function jiraToEnv(jira: JiraConfig | undefined): Record<string, string> {
+  return jira ? { [JIRA_CONFIG_ENV]: JSON.stringify(jira) } : {};
+}
+
+export function jiraFromEnv(env: NodeJS.ProcessEnv): JiraConfig | undefined {
+  const text = env[JIRA_CONFIG_ENV];
+  if (text === undefined || text.length > 64 * 1024) return undefined;
+  try {
+    return parseJira(JSON.parse(text));
+  } catch {
+    return undefined;
+  }
+}
