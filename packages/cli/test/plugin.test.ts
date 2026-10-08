@@ -95,3 +95,14 @@ test('the track skill runs the one command line the hook turns into a session pi
   const lines = parseLines(readFileSync(sessionFile(registryOf(repo), SESSION)!, 'utf8'));
   assert.deepEqual(lines.flatMap((line) => line.binds.map((bind) => `${bind.via}:${refKey(bind.ref)}`)), [`pin:${refKey(demo(8))}`]);
 });
+
+test('the intake skill reads and plans, and may only run the commands it needs', () => {
+  const skill = readFileSync(join(PLUGIN, 'skills', 'intake', 'SKILL.md'), 'utf8').replace(/\r\n/g, '\n');
+  assert.match(skill, /^---\nname: intake\ndescription: .+\nargument-hint: .+\nallowed-tools: .+\n---\n/);
+  const allowed = /^allowed-tools: (.+)$/m.exec(skill)?.[1]?.split(', ');
+  assert.deepEqual(allowed, ['Bash(epic-pulse track:*)', 'Bash(epic-pulse refresh:*)', 'Bash(epic-pulse json:*)', 'Bash(gh issue view:*)', 'Bash(gh issue list:*)']);
+  assert.match(skill, /```sh\n\s*epic-pulse track \$ARGUMENTS\n\s*```/);
+  assert.match(skill, /Place the epic in its program/);
+  assert.match(skill, /Never propose a slice as a detached feature/);
+  assert.match(skill, /Never close, edit, label or comment on an issue/);
+});

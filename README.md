@@ -27,7 +27,7 @@ There are three channels. They share one program and the same data, so use any o
 
 The plugin's hooks run `node`, so Node 22 or newer must be on the `PATH` Claude Code sees. It also
 puts the `epic-pulse` command on the Bash tool's `PATH` inside sessions, and adds the
-`/epic-pulse:track` skill. The marketplace installs the plugin from the latest release tag, not from
+`/epic-pulse:track` and `/epic-pulse:intake` skills. The marketplace installs the plugin from the latest release tag, not from
 `main`, so an update reaches you only with a release.
 
 **npm.** The same bundle as a command for every terminal:
@@ -43,7 +43,19 @@ setting up the status line, `doctor`, `json` and repository pins.
 [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=takauztovies.epic-pulse)
 or [Open VSX](https://open-vsx.org/extension/takauztovies/epic-pulse), or run
 `code --install-extension takauztovies.epic-pulse`. It shows the current epic in the status bar and
-every epic, by status, in an **Epics** view. Its own README covers its settings and sign-in.
+every epic, by status, in an **Epics** view, where a click opens the Claude Code session working on an
+issue, the **+** button tracks an epic by hand, and a right-click can start a new session on an epic
+nobody is on yet. The [manual](docs/MANUAL.md) walks through all of it; the extension's own README
+covers its settings and sign-in.
+
+## Starting an epic nobody is on
+
+`/epic-pulse:intake <epic>`, or **Start Working on This Epic…** on an epic row in VS Code, takes on an
+epic properly. It pins the epic to the session, reads it and its sub-issues, then places it in its
+program: the parent or main epic, the sibling epics, the repository's architecture notes and the code
+it touches. It reports how the epic fits and proposes slices, each saying what in the wider
+architecture it uses or changes, and waits for you to pick one before anything is edited. It never
+closes, edits, labels or comments on an issue. See the [manual](docs/MANUAL.md).
 
 ## Set up the status line
 

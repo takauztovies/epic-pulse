@@ -4,8 +4,26 @@ See how far the GitHub epics behind your Claude Code sessions have got, without 
 
 Epic Pulse puts the epic your sessions are working on in the status bar, as `#1 20% · 1/5`, and lists
 every epic in an **Epics** view in the activity bar: its progress, its sub-issues grouped by status
-(Todo, In progress, In review, Done, Dropped), and how many live sessions are on each issue. Click an
-epic or an issue to open it on GitHub.
+(Todo, In progress, In review, Done, Dropped), and which live sessions are on each. A row reads
+`#1 ██░░░░░░░░ 20% Epic title`: the epic's number, a bar and percentage that count closed work only,
+then the title. Its description adds `1/5`, the first eight characters of each live session id
+(`Session: 0f8e7c1a`, or `No live session`) and `stale` when the data is old.
+
+## Using the view
+
+- **Click a row** that a live Claude Code session is on to open that session (a list when several
+  are). A row with no live session opens the issue on GitHub. A session started in another folder or
+  worktree may open as a new conversation here.
+- **Right-click** an epic or issue for **Open on GitHub**, and an epic for **Start Working on This
+  Epic…**, which opens a new Claude Code tab running `/epic-pulse:intake` on it (needs the plugin).
+- **+** in the view title (**Epic Pulse: Track an Epic or Issue…**) tracks an epic or issue by number,
+  `owner/repo#N` or URL. It is a repository pin, saved until you click the **Stop Tracking** icon on
+  its row.
+- **Green**: an issue icon is green while a live session is on it; an epic's icon and the status bar
+  are green once it is 100% done.
+- The groups In progress, In review and Done start expanded; Todo and Dropped start collapsed.
+
+The full walkthrough is in the [manual](https://github.com/takauztovies/epic-pulse/blob/main/docs/MANUAL.md).
 
 Progress is done / (total − dropped): an issue closed as *not planned* or as a *duplicate* leaves the
 count. An epic that tracks its work in a task list instead of sub-issues counts its checked boxes.
