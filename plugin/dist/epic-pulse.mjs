@@ -49,9 +49,9 @@ function ok(value) {
 function fail(error62) {
   return { ok: false, error: error62 };
 }
-function parseJson(text) {
+function parseJson(text2) {
   try {
-    return JSON.parse(text);
+    return JSON.parse(text2);
   } catch {
     return void 0;
   }
@@ -1244,18 +1244,18 @@ function finalizeIssue(iss, ctx, config2) {
   }
   const schemaError = iss.schema !== iss.inst ? iss.schema?._zod.def?.error : void 0;
   const message = iss.message ? iss.message : unwrapMessage(iss.inst?._zod.def?.error?.(iss)) ?? unwrapMessage(schemaError?.(iss)) ?? unwrapMessage(ctx?.error?.(iss)) ?? unwrapMessage(config2.customError?.(iss)) ?? unwrapMessage(config2.localeError?.(iss)) ?? "Invalid input";
-  const full = {};
+  const full2 = {};
   for (const k of Object.keys(iss)) {
     if (k === "inst" || k === "schema" || k === "continue" || k === "input" || k === "__proto__")
       continue;
-    full[k] = iss[k];
+    full2[k] = iss[k];
   }
-  full.path ?? (full.path = []);
-  full.message = message;
+  full2.path ?? (full2.path = []);
+  full2.message = message;
   if (ctx?.reportInput) {
-    full.input = iss.input;
+    full2.input = iss.input;
   }
-  return full;
+  return full2;
 }
 function getSizableOrigin(input2) {
   if (input2 instanceof Set)
@@ -1902,18 +1902,18 @@ var validateAsync = async (schema, value, _ctx) => {
   return result.issues.length === 0;
 };
 var _encode = (_Err) => {
-  const parse4 = _parse(_Err);
+  const parse5 = _parse(_Err);
   const fn = (schema, value, _ctx, _params) => {
     const ctx = _ctx ? { ..._ctx, direction: "backward" } : { direction: "backward" };
-    return parse4(schema, value, ctx, finalizeParams(fn, _params));
+    return parse5(schema, value, ctx, finalizeParams(fn, _params));
   };
   return fn;
 };
 var encode = /* @__PURE__ */ _encode($ZodRealError);
 var _decode = (_Err) => {
-  const parse4 = _parse(_Err);
+  const parse5 = _parse(_Err);
   const fn = (schema, value, _ctx, _params) => {
-    return parse4(schema, value, _ctx, finalizeParams(fn, _params));
+    return parse5(schema, value, _ctx, finalizeParams(fn, _params));
   };
   return fn;
 };
@@ -4038,7 +4038,7 @@ function handleIntersectionResults(result, left, right) {
   const unrecKeys = /* @__PURE__ */ new Map();
   let unrecIssue;
   const keyIssues = /* @__PURE__ */ new Map();
-  const collect = (iss, side) => {
+  const collect2 = (iss, side) => {
     let keys;
     if (iss.code === "unrecognized_keys" && !iss.path?.length) {
       unrecIssue ?? (unrecIssue = iss);
@@ -4059,11 +4059,11 @@ function handleIntersectionResults(result, left, right) {
     return true;
   };
   for (const iss of left.issues) {
-    if (!collect(iss, "l"))
+    if (!collect2(iss, "l"))
       result.issues.push(iss);
   }
   for (const iss of right.issues) {
-    if (!collect(iss, "r"))
+    if (!collect2(iss, "r"))
       result.issues.push(iss);
   }
   const bothKeys = [...unrecKeys].filter(([, f]) => f.l && f.r).map(([k]) => k);
@@ -9366,8 +9366,8 @@ function ko_default() {
 }
 
 // node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/lt.js
-var capitalizeFirstCharacter = (text) => {
-  return text.charAt(0).toUpperCase() + text.slice(1);
+var capitalizeFirstCharacter = (text2) => {
+  return text2.charAt(0).toUpperCase() + text2.slice(1);
 };
 function getUnitTypeFromNumber(number4) {
   const abs = Math.abs(number4);
@@ -19736,7 +19736,8 @@ var RawConfigSchema = external_exports.looseObject({
   branchIssuePattern: external_exports.string().optional().catch(void 0),
   ignorePaths: external_exports.array(external_exports.unknown()).optional().catch(void 0),
   ignoreMainCheckout: external_exports.boolean().optional().catch(void 0),
-  progress: external_exports.unknown().optional()
+  progress: external_exports.unknown().optional(),
+  jira: external_exports.unknown().optional()
 });
 
 // packages/core/src/branch-pattern.ts
@@ -19849,8 +19850,10 @@ var HostSchema = external_exports.string().min(1).max(255).regex(/^[a-z0-9](?:[a
 var OwnerSchema = external_exports.string().regex(/^[a-z0-9][a-z0-9._-]{0,99}$/);
 var RepoSchema = external_exports.string().regex(/^[a-z0-9._-]{1,100}$/).refine((name) => name !== "." && name !== "..");
 var IssueNumberSchema = external_exports.number().int().positive().max(2147483647);
-var RepoRefSchema = external_exports.object({ host: HostSchema, owner: OwnerSchema, repo: RepoSchema }).readonly();
-var IssueRefSchema = external_exports.object({ host: HostSchema, owner: OwnerSchema, repo: RepoSchema, number: IssueNumberSchema }).readonly();
+var REF_KINDS = ["github", "jira"];
+var RefKindSchema = external_exports.enum(REF_KINDS);
+var RepoRefSchema = external_exports.object({ kind: RefKindSchema.optional(), host: HostSchema, owner: OwnerSchema, repo: RepoSchema }).readonly();
+var IssueRefSchema = external_exports.object({ kind: RefKindSchema.optional(), host: HostSchema, owner: OwnerSchema, repo: RepoSchema, number: IssueNumberSchema }).readonly();
 var STATUSES = ["todo", "in_progress", "in_review", "done", "dropped"];
 var StatusSchema = external_exports.enum(STATUSES);
 var StatusCountsSchema = external_exports.object({
@@ -19881,8 +19884,12 @@ var BindViaSchema = external_exports.enum(BIND_VIAS);
 
 // packages/core/src/ref.ts
 var DEFAULT_HOST = "github.com";
+function kindOf(ref) {
+  return ref.kind ?? "github";
+}
 function makeRef(parts) {
   const parsed = IssueRefSchema.safeParse({
+    ...parts.kind === "jira" ? { kind: "jira" } : {},
     host: parts.host.toLowerCase(),
     owner: parts.owner.toLowerCase(),
     repo: parts.repo.toLowerCase(),
@@ -19890,26 +19897,39 @@ function makeRef(parts) {
   });
   return parsed.success ? parsed.data : void 0;
 }
+function makeJiraRef(parts) {
+  return makeRef({ kind: "jira", host: parts.host, owner: parts.project, repo: parts.project, number: parts.number });
+}
 function repoKey(ref) {
-  return `${ref.host}/${ref.owner}/${ref.repo}`;
+  return kindOf(ref) === "jira" ? `jira:${ref.host}/${ref.owner}` : `${ref.host}/${ref.owner}/${ref.repo}`;
 }
 function refKey(ref) {
-  return `${repoKey(ref)}#${ref.number}`;
+  return kindOf(ref) === "jira" ? `${repoKey(ref)}-${ref.number}` : `${repoKey(ref)}#${ref.number}`;
+}
+function displayKey(ref) {
+  return kindOf(ref) === "jira" ? `${ref.owner.toUpperCase()}-${ref.number}` : `#${ref.number}`;
 }
 function issueUrl(ref) {
+  if (kindOf(ref) === "jira") return `https://${ref.host}/browse/${displayKey(ref)}`;
   return `https://${ref.host}/${ref.owner}/${ref.repo}/issues/${ref.number}`;
 }
 var URL_TARGET = /^https?:\/\/([^/\s]+)\/([^/\s]+)\/([^/\s]+)\/(?:issues|pull)\/(\d+)(?:[/?#].*)?$/i;
 var SLUG_TARGET = /^([\w.-]+)\/([\w.-]+)#(\d+)$/;
 var NUMBER_TARGET = /^#?(\d+)$/;
-function parseIssueTarget(text) {
-  const value = text.trim();
+var JIRA_KEY = /^([A-Za-z][A-Za-z0-9_]{1,9})-(\d+)$/;
+var JIRA_URL = /^https?:\/\/([^/\s]+)\/browse\/([A-Za-z][A-Za-z0-9_]{1,9})-(\d+)(?:[/?#].*)?$/i;
+function parseIssueTarget(text2) {
+  const value = text2.trim();
   const byUrl = URL_TARGET.exec(value);
   if (byUrl) {
     return { number: Number(byUrl[4]), repo: { host: byUrl[1].toLowerCase(), owner: byUrl[2], repo: byUrl[3] } };
   }
+  const byJiraUrl = JIRA_URL.exec(value);
+  if (byJiraUrl) return { number: Number(byJiraUrl[3]), jira: { host: byJiraUrl[1].toLowerCase(), project: byJiraUrl[2] } };
   const bySlug = SLUG_TARGET.exec(value);
   if (bySlug) return { number: Number(bySlug[3]), repo: { owner: bySlug[1], repo: bySlug[2] } };
+  const byKey = JIRA_KEY.exec(value);
+  if (byKey) return { number: Number(byKey[2]), jira: { project: byKey[1] } };
   const byNumber = NUMBER_TARGET.exec(value);
   return byNumber ? { number: Number(byNumber[1]) } : void 0;
 }
@@ -19952,8 +19972,8 @@ function parseChecklist(body) {
   return lines.flatMap((line) => {
     const match = ITEM.exec(line);
     if (!match) return [];
-    const text = match[2].trim();
-    return [{ text, checked: match[1] !== " ", struck: STRUCK.test(text) }];
+    const text2 = match[2].trim();
+    return [{ text: text2, checked: match[1] !== " ", struck: STRUCK.test(text2) }];
   });
 }
 function statusOf(item) {
@@ -19965,9 +19985,9 @@ var REF_AT_START = [
   /^()([\w.-]+)\/([\w.-]+)#(\d+)/,
   /^()()()#(\d+)/
 ];
-function startRef(text, epic) {
+function startRef(text2, epic) {
   for (const pattern of REF_AT_START) {
-    const m = pattern.exec(text);
+    const m = pattern.exec(text2);
     if (m) {
       return makeRef({
         host: m[1] || epic.host,
@@ -20053,11 +20073,11 @@ async function readBranch(info) {
 }
 var SCP_LIKE = /^(?:[^@/\s]+@)?([^:/\s]{2,}):(?!\/\/)(\S+)$/;
 var URL_PROTOCOLS = /* @__PURE__ */ new Set(["https:", "http:", "ssh:", "git:", "git+ssh:", "ssh+git:"]);
-function splitUrl(text) {
-  const scp = SCP_LIKE.exec(text);
+function splitUrl(text2) {
+  const scp = SCP_LIKE.exec(text2);
   if (scp) return { host: scp[1], path: scp[2] };
   try {
-    const url2 = new URL(text);
+    const url2 = new URL(text2);
     if (!URL_PROTOCOLS.has(url2.protocol)) return void 0;
     const host = url2.protocol.startsWith("http") ? url2.host : url2.hostname;
     return { host, path: decodeURIComponent(url2.pathname) };
@@ -20095,6 +20115,55 @@ async function readRemote(commonDir) {
   return chosen?.url ? parseRemoteUrl(chosen.url) : void 0;
 }
 
+// packages/core/src/jira-config.ts
+var JIRA_LIMITS = { maxProjects: 20, maxStatusMap: 60, maxDropped: 20, maxNameLength: 80 };
+var DEFAULT_DROPPED = ["won't do", "won't fix", "duplicate", "declined", "rejected", "cannot reproduce", "invalid", "obsolete"];
+var PROJECT_KEY = /^[A-Z][A-Z0-9_]{1,9}$/;
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function projectsOf(value) {
+  const keys = (Array.isArray(value) ? value : []).flatMap((entry) => {
+    const key = typeof entry === "string" ? entry.trim().toUpperCase() : "";
+    return PROJECT_KEY.test(key) ? [key] : [];
+  });
+  return [...new Set(keys)].slice(0, JIRA_LIMITS.maxProjects);
+}
+function statusMapOf(value) {
+  if (!isRecord(value)) return {};
+  const entries = Object.entries(value).flatMap(([name, lane]) => {
+    const key = name.trim().toLowerCase();
+    const known = STATUSES.includes(lane) ? lane : void 0;
+    return key.length > 0 && key.length <= JIRA_LIMITS.maxNameLength && known ? [[key, known]] : [];
+  });
+  return Object.fromEntries(entries.slice(0, JIRA_LIMITS.maxStatusMap));
+}
+function droppedOf(value) {
+  if (!Array.isArray(value)) return DEFAULT_DROPPED;
+  const names = value.flatMap((entry) => typeof entry === "string" && entry.trim().length > 0 && entry.length <= JIRA_LIMITS.maxNameLength ? [entry.trim().toLowerCase()] : []);
+  return names.length === 0 ? DEFAULT_DROPPED : [...new Set(names)].slice(0, JIRA_LIMITS.maxDropped);
+}
+function parseJira(value) {
+  if (!isRecord(value) || typeof value["site"] !== "string") return void 0;
+  const site = value["site"].trim().toLowerCase();
+  const projects = projectsOf(value["projects"]);
+  if (!HostSchema.safeParse(site).success || projects.length === 0) return void 0;
+  return { site, projects, statusMap: statusMapOf(value["statusMap"]), droppedResolutions: droppedOf(value["droppedResolutions"]) };
+}
+var JIRA_CONFIG_ENV = "EPIC_PULSE_JIRA";
+function jiraToEnv(jira) {
+  return jira ? { [JIRA_CONFIG_ENV]: JSON.stringify(jira) } : {};
+}
+function jiraFromEnv(env) {
+  const text2 = env[JIRA_CONFIG_ENV];
+  if (text2 === void 0 || text2.length > 64 * 1024) return void 0;
+  try {
+    return parseJira(JSON.parse(text2));
+  } catch {
+    return void 0;
+  }
+}
+
 // packages/core/src/progress-config.ts
 var PROGRESS_LIMITS = { maxSizes: 30, maxLabelLength: 60, maxPoints: 1e3 };
 var DEFAULT_SIZES = { "size/xs": 1, "size/s": 2, "size/m": 3, "size/l": 5, "size/xl": 8 };
@@ -20103,7 +20172,7 @@ function medianOf(sizes) {
   return sorted[Math.floor((sorted.length - 1) / 2)] ?? 1;
 }
 var DEFAULT_PROGRESS = { inProgress: 25, inReview: 75, sizes: DEFAULT_SIZES, unsized: medianOf(DEFAULT_SIZES) };
-function isRecord(value) {
+function isRecord2(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function integerIn(value, min, max) {
@@ -20115,7 +20184,7 @@ function weightsOf(raw) {
   return inProgress <= inReview ? { inProgress, inReview } : { inProgress: DEFAULT_PROGRESS.inProgress, inReview: DEFAULT_PROGRESS.inReview };
 }
 function sizesOf(value) {
-  if (!isRecord(value)) return DEFAULT_SIZES;
+  if (!isRecord2(value)) return DEFAULT_SIZES;
   const entries = Object.entries(value).flatMap(([name, points]) => {
     const key = name.trim().toLowerCase();
     const worth = integerIn(points, 1, PROGRESS_LIMITS.maxPoints);
@@ -20124,7 +20193,7 @@ function sizesOf(value) {
   return entries.length === 0 ? DEFAULT_SIZES : Object.fromEntries(entries.slice(0, PROGRESS_LIMITS.maxSizes));
 }
 function parseProgress(value) {
-  if (!isRecord(value)) return DEFAULT_PROGRESS;
+  if (!isRecord2(value)) return DEFAULT_PROGRESS;
   const sizes = sizesOf(value["sizes"]);
   return { ...weightsOf(value), sizes, unsized: integerIn(value["unsized"], 1, PROGRESS_LIMITS.maxPoints) ?? medianOf(sizes) };
 }
@@ -20151,18 +20220,24 @@ function ignorePathsOf(entries) {
 function parseConfig(value) {
   const raw = RawConfigSchema.safeParse(value);
   if (!raw.success) return DEFAULT_CONFIG;
+  const jira = parseJira(raw.data.jira);
   const source = raw.data.branchIssuePattern;
   const compiled = source === void 0 ? void 0 : compileBranchPattern(source);
   return {
     branchIssuePattern: compiled?.ok ? compiled.value : DEFAULT_BRANCH_PATTERN,
     ignorePaths: ignorePathsOf(raw.data.ignorePaths),
     ignoreMainCheckout: raw.data.ignoreMainCheckout ?? false,
-    progress: parseProgress(raw.data.progress)
+    progress: parseProgress(raw.data.progress),
+    ...jira ? { jira } : {}
   };
 }
 async function loadProgressFor(dir) {
   const worktree = await findWorktree(dir);
   return worktree ? (await loadConfig(worktree.root)).progress : DEFAULT_PROGRESS;
+}
+async function loadJiraFor(dir) {
+  const worktree = await findWorktree(dir);
+  return worktree ? (await loadConfig(worktree.root)).jira : void 0;
 }
 async function loadConfig(root) {
   const file2 = join3(root, CONFIG_FILE);
@@ -20269,7 +20344,7 @@ function envHint(prefix, dir) {
   return repo ? { repo } : void 0;
 }
 function repoHint(flags, fallback) {
-  const value = flags.values.filter(([flag]) => REPO_FLAGS.includes(flag)).at(-1)?.[1];
+  const value = flags.values.filter(([flag2]) => REPO_FLAGS.includes(flag2)).at(-1)?.[1];
   if (value === void 0) return fallback;
   const repo = parseRepoFlag(value);
   return repo ? { repo } : void 0;
@@ -20287,8 +20362,8 @@ function ghIssueSignals(args, fallback) {
   const flags = parseFlags(rest, /* @__PURE__ */ new Set([...REPO_FLAGS, ...MUTATING_ISSUE_VERBS[verb] ?? []]));
   const hint = repoHint(flags, fallback);
   if (!hint) return [];
-  return flags.positionals.flatMap((text) => {
-    const target = parseIssueTarget(text);
+  return flags.positionals.flatMap((text2) => {
+    const target = parseIssueTarget(text2);
     return target ? [{ kind: "bind", via: "gh", target, hint }] : [];
   });
 }
@@ -20297,8 +20372,8 @@ function ghPrSignals(args, fallback) {
   if (verb !== "create") return [];
   const flags = parseFlags(rest, PR_CREATE_VALUE_FLAGS);
   const hint = repoHint(flags, fallback);
-  const bodies = flags.values.filter(([flag]) => flag === "-b" || flag === "--body").map(([, text]) => text);
-  return hint ? bodies.map((text) => ({ kind: "closing", text, hint })) : [];
+  const bodies = flags.values.filter(([flag2]) => flag2 === "-b" || flag2 === "--body").map(([, text2]) => text2);
+  return hint ? bodies.map((text2) => ({ kind: "closing", text: text2, hint })) : [];
 }
 function commitMessages(args) {
   const messages = [];
@@ -20321,7 +20396,7 @@ function gitSignals(args, dir) {
     else if (/^--(?:git-dir|work-tree)(?:=|$)/.test(arg)) return [];
     else if (!arg.startsWith("-")) {
       if (arg !== "commit") return [];
-      return commitMessages(args.slice(i + 1)).map((text) => ({ kind: "closing", text, hint: { dir: current } }));
+      return commitMessages(args.slice(i + 1)).map((text2) => ({ kind: "closing", text: text2, hint: { dir: current } }));
     }
   }
   return [];
@@ -20358,6 +20433,24 @@ function commandSignals(words, dir) {
 
 // packages/core/src/extract-paths.ts
 import { isAbsolute } from "node:path";
+
+// packages/core/src/jira-keys.ts
+var MAX_TEXT = 4e3;
+var MAX_NUMBER_DIGITS = 9;
+function escapeRegExp(text2) {
+  return text2.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
+}
+function jiraKeysIn(text2, jira) {
+  const projects = jira.projects.map(escapeRegExp).join("|");
+  const pattern = new RegExp(`(?<![A-Za-z0-9_])(${projects})-(\\d{1,${MAX_NUMBER_DIGITS}})(?![0-9A-Za-z_])`, "gi");
+  const found = [...text2.slice(0, MAX_TEXT).matchAll(pattern)].flatMap((match) => {
+    const ref = makeJiraRef({ host: jira.site, project: match[1] ?? "", number: Number(match[2]) });
+    return ref ? [ref] : [];
+  });
+  return found.filter((ref, index) => found.findIndex((other) => other.owner === ref.owner && other.number === ref.number) === index);
+}
+
+// packages/core/src/extract-paths.ts
 async function contextFor(info) {
   const [config2, branch, remote] = await Promise.all([loadConfig(info.root), readBranch(info), readRemote(info.commonDir)]);
   return { info, config: config2, branch, remote };
@@ -20378,6 +20471,8 @@ function branchRef(path, context) {
   const { info, config: config2, branch, remote } = context;
   if (config2.ignoreMainCheckout && info.isMain) return void 0;
   if (isIgnoredPath(config2, info.root, path)) return void 0;
+  const key = branch === void 0 || !config2.jira ? void 0 : jiraKeysIn(branch, config2.jira)[0];
+  if (key) return key;
   const number4 = branch === void 0 ? void 0 : branchIssueNumber(branch, config2.branchIssuePattern);
   return number4 !== void 0 && remote ? makeRef({ ...remote, number: number4 }) : void 0;
 }
@@ -20419,14 +20514,14 @@ function quotedPiece(src, i) {
   return { text: char, end: i + 1, bare: "" };
 }
 function doubleQuoted(src, start) {
-  let text = "";
+  let text2 = "";
   let i = start + 1;
   while (i < src.length && src[i] !== '"') {
     const piece = quotedPiece(src, i);
-    text += piece.text;
+    text2 += piece.text;
     i = piece.end;
   }
-  return { text, end: Math.min(i + 1, src.length), bare: "" };
+  return { text: text2, end: Math.min(i + 1, src.length), bare: "" };
 }
 function readPiece(src, i) {
   const char = src[i];
@@ -20438,16 +20533,16 @@ function readPiece(src, i) {
   return { text: char, end: i + 1, bare: char };
 }
 function readWord(src, start) {
-  let text = "";
+  let text2 = "";
   let bare = "";
   let i = start;
   while (i < src.length && !WORD_END.test(src[i])) {
     const piece = readPiece(src, i);
-    text += piece.text;
+    text2 += piece.text;
     bare += piece.bare;
     i = piece.end;
   }
-  return { text, end: i, bare };
+  return { text: text2, end: i, bare };
 }
 function heredocAt(src, i) {
   if (!src.startsWith("<<", i) || src.startsWith("<<<", i)) return void 0;
@@ -20627,22 +20722,31 @@ function hookEvent(name) {
   if (name === "SessionStart") return "start";
   return name === "SessionEnd" ? "end" : "tool";
 }
-function closingRefs(text, base) {
-  return [...text.matchAll(CLOSING)].flatMap((match) => {
+function closingRefs(text2, base) {
+  return [...text2.matchAll(CLOSING)].flatMap((match) => {
     const [owner, repo] = (match[1] ?? match[2] ?? `${base.owner}/${base.repo}`).split("/");
     const ref = owner && repo ? makeRef({ host: base.host, owner, repo, number: Number(match[3]) }) : void 0;
     return ref ? [ref] : [];
   });
 }
-function targetRef(target, base) {
+function jiraTargetRef(target, number4, jira) {
+  const host = target.host ?? jira?.site;
+  return host ? makeJiraRef({ host, project: target.project, number: number4 }) : void 0;
+}
+function targetRef(target, base, jira) {
+  if (target.jira) return jiraTargetRef(target.jira, target.number, jira);
   const own2 = target.repo;
   const repo = own2 ? { host: own2.host ?? base?.host ?? DEFAULT_HOST, owner: own2.owner, repo: own2.repo } : base;
   return repo ? makeRef({ ...repo, number: target.number }) : void 0;
 }
 function signalActions(signal, contexts) {
   const base = "repo" in signal.hint ? signal.hint.repo : contexts.get(signal.hint.dir)?.remote;
-  if (signal.kind === "closing") return base ? closingRefs(signal.text, base).map((ref2) => ({ op: "bind", ref: ref2, via: "closing" })) : [];
-  const ref = targetRef(signal.target, base);
+  const jira = "dir" in signal.hint ? contexts.get(signal.hint.dir)?.config.jira : void 0;
+  if (signal.kind === "closing") {
+    const keys = jira ? jiraKeysIn(signal.text, jira) : [];
+    return [...base ? closingRefs(signal.text, base) : [], ...keys].map((ref2) => ({ op: "bind", ref: ref2, via: "closing" }));
+  }
+  const ref = targetRef(signal.target, base, jira);
   if (!ref) return [];
   return [signal.kind === "unbind" ? { op: "unbind", ref } : { op: "bind", ref, via: signal.via }];
 }
@@ -20741,8 +20845,8 @@ function shown(entry) {
   const clean = [...entry].map((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127 ? "?" : char).join("");
   return clean.length > MAX_SHOWN ? `${clean.slice(0, MAX_SHOWN)}...` : clean;
 }
-function parseHostList(text) {
-  const entries = (text ?? "").split(",").map((entry) => entry.trim()).filter((entry) => entry !== "");
+function parseHostList(text2) {
+  const entries = (text2 ?? "").split(",").map((entry) => entry.trim()).filter((entry) => entry !== "");
   const checked = entries.map((entry) => ({ entry, host: entry.toLowerCase() }));
   return {
     hosts: checked.filter(({ host }) => HostSchema.safeParse(host).success).map(({ host }) => host),
@@ -20810,11 +20914,11 @@ async function postGraphql(options) {
     body: JSON.stringify({ query: options.query, variables: options.variables })
   });
   const length = Number(res.headers.get("content-length") ?? 0);
-  const text = length > MAX_RESPONSE_BYTES ? "" : await res.text();
+  const text2 = length > MAX_RESPONSE_BYTES ? "" : await res.text();
   const remaining = res.headers.get("x-ratelimit-remaining");
   return {
     status: res.status,
-    body: parseJson(text),
+    body: parseJson(text2),
     remaining: remaining === null ? void 0 : Number(remaining),
     retryAfter: res.headers.has("retry-after")
   };
@@ -21194,19 +21298,19 @@ async function appendRegistryLine(paths, sessionId, line) {
   if (!file2) return fail("invalid_session");
   const parsed = RegistryLineSchema.safeParse(line);
   if (!parsed.success) return fail("invalid_line");
-  const text = `${JSON.stringify(parsed.data)}
+  const text2 = `${JSON.stringify(parsed.data)}
 `;
-  if (Buffer.byteLength(text) > MAX_LINE_BYTES) return fail("line_too_large");
+  if (Buffer.byteLength(text2) > MAX_LINE_BYTES) return fail("line_too_large");
   try {
     await ensureDir(paths.sessionsDir);
-    await appendFile(file2, text, { mode: 384 });
+    await appendFile(file2, text2, { mode: 384 });
     return ok(void 0);
   } catch {
     return fail("io");
   }
 }
-function parseLines(text) {
-  return text.split("\n").flatMap((raw) => {
+function parseLines(text2) {
+  return text2.split("\n").flatMap((raw) => {
     const parsed = RegistryLineSchema.safeParse(parseJson(raw));
     return parsed.success ? [parsed.data] : [];
   });
@@ -21258,8 +21362,8 @@ async function readTail(file2) {
 async function readSession(paths, sessionId) {
   const file2 = sessionFile(paths, sessionId);
   if (!file2) return void 0;
-  const text = await readTail(file2).catch(() => "");
-  return foldSession(sessionId, parseLines(text));
+  const text2 = await readTail(file2).catch(() => "");
+  return foldSession(sessionId, parseLines(text2));
 }
 async function sessionFiles(paths) {
   const names = await readdir(paths.sessionsDir).catch(() => []);
@@ -21364,6 +21468,9 @@ function chunk(items, size) {
 var EpicKindSchema = external_exports.enum(["subissues", "checklist"]);
 var ChildSchema = external_exports.object({
   number: IssueNumberSchema.nullable(),
+  // A Jira issue's own key (PROJ-5): a child may be in another project than its epic,
+  // so the number alone does not say. Absent on GitHub, where a child is #number.
+  key: external_exports.string().max(40).optional(),
   title: external_exports.string().max(300),
   url: external_exports.string().max(500).nullable(),
   status: StatusSchema,
@@ -21409,10 +21516,10 @@ var SUMMARY_MAX = 280;
 var SUMMARY_SCAN_MAX = 4e3;
 function summaryOf(body) {
   const lines = body.slice(0, SUMMARY_SCAN_MAX).replace(/<!--[\s\S]*?-->/g, " ").replace(/```[\s\S]*?```/g, " ").replace(/!\[[^\]]*\]\([^)]*\)/g, " ").replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, "").replace(/\*\*|__|`/g, "").split(/\r?\n/).map((line) => line.replace(/^\s*(?:#{1,6}\s+|[-*+]\s+\[[ xX]\]\s*|[-*+]\s+|>\s*)/, "").trim()).filter((line) => line.length > 0);
-  const text = lines.join(" ").replace(/\s+/g, " ").trim();
-  if (text.length === 0) return void 0;
-  if (text.length <= SUMMARY_MAX) return text;
-  const cut = text.slice(0, SUMMARY_MAX);
+  const text2 = lines.join(" ").replace(/\s+/g, " ").trim();
+  if (text2.length === 0) return void 0;
+  if (text2.length <= SUMMARY_MAX) return text2;
+  const cut = text2.slice(0, SUMMARY_MAX);
   return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), SUMMARY_MAX / 2))}\u2026`;
 }
 
@@ -21422,7 +21529,7 @@ function epicRefFor(ref, node2) {
   if (node2.parent === null) return ref;
   const [owner, repo] = node2.parent.repository.nameWithOwner.split("/");
   if (!owner || !repo) return null;
-  return makeRef({ host: ref.host, owner, repo, number: node2.parent.number }) ?? null;
+  return makeRef({ kind: ref.kind, host: ref.host, owner, repo, number: node2.parent.number }) ?? null;
 }
 function ownRepo(node2, epic) {
   const [owner, repo] = node2.repository.nameWithOwner.split("/");
@@ -21436,8 +21543,8 @@ function labelsOf(node2) {
 function assigneesOf(node2) {
   return (node2.assignees.nodes ?? []).flatMap((user) => user ? [user.login.slice(0, 40)] : []).slice(0, 3);
 }
-function timeOf(text) {
-  const ms = text ? Date.parse(text) : Number.NaN;
+function timeOf(text2) {
+  const ms = text2 ? Date.parse(text2) : Number.NaN;
   return Number.isFinite(ms) && ms >= 0 ? ms : void 0;
 }
 function subIssueChild(node2, epic) {
@@ -21496,7 +21603,10 @@ function withOwnAnswer(key, resolution, answered2) {
   return { ...resolution, isEpic: own2 };
 }
 function applyEpics(snapshot, answers, now) {
-  const built = answers.map(([ref, node2]) => [refKey(ref), node2 ? buildEpic(node2, ref) : null]);
+  return applyBuiltEpics(snapshot, answers.map(([ref, node2]) => [ref, node2 ? buildEpic(node2, ref) : null]), now);
+}
+function applyBuiltEpics(snapshot, answers, now) {
+  const built = answers.map(([ref, data]) => [refKey(ref), data]);
   const gone = new Set(built.flatMap(([key, data]) => data ? [] : [key]));
   const answered2 = new Map(built.map(([key, data]) => [key, data !== null]));
   const fetched = built.flatMap(([key, data]) => data ? [[key, { ...data, fetchedAt: now, error: null }]] : []);
@@ -21559,9 +21669,259 @@ var GITHUB = {
   parse: parse3
 };
 
+// packages/core/src/jira.ts
+var MAX_RESPONSE_BYTES2 = 16 * 1024 * 1024;
+function jiraSites(env) {
+  const named = (env["JIRA_SITE"] ?? "").split(",").map((entry) => entry.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/+$/, ""));
+  return new Set(named.filter((host) => HostSchema.safeParse(host).success));
+}
+function jiraCredentials(host, env) {
+  const email3 = (env["JIRA_EMAIL"] ?? "").trim();
+  const token = (env["JIRA_API_TOKEN"] ?? "").trim();
+  if (!jiraSites(env).has(host.toLowerCase()) || email3 === "" || token === "") return void 0;
+  return Buffer.from(`${email3}:${token}`).toString("base64");
+}
+var SEARCH_PATH = "/rest/api/3/search/jql";
+async function searchJira(options) {
+  const res = await fetch(`https://${options.host}${SEARCH_PATH}`, {
+    method: "POST",
+    redirect: "error",
+    // an API endpoint never redirects; refuse rather than follow with credentials
+    signal: AbortSignal.timeout(options.timeoutMs ?? 15e3),
+    headers: {
+      authorization: `Basic ${options.credentials}`,
+      accept: "application/json",
+      "content-type": "application/json",
+      "user-agent": "epic-pulse"
+    },
+    body: JSON.stringify({
+      jql: options.jql,
+      fields: options.fields,
+      maxResults: options.maxResults,
+      ...options.nextPageToken === void 0 ? {} : { nextPageToken: options.nextPageToken }
+    })
+  });
+  const length = Number(res.headers.get("content-length") ?? 0);
+  const text2 = length > MAX_RESPONSE_BYTES2 ? "" : await res.text();
+  return { status: res.status, body: parseJson(text2), remaining: void 0, retryAfter: res.headers.has("retry-after") };
+}
+
+// packages/core/src/jira-adf.ts
+var MAX_DEPTH = 20;
+var MAX_CHARS = 4e3;
+var MAX_NODES = 5e3;
+var BLOCKS = /* @__PURE__ */ new Set(["paragraph", "heading", "listItem", "bulletList", "orderedList", "blockquote", "codeBlock", "rule", "panel", "tableRow", "hardBreak"]);
+function isNode(value) {
+  return typeof value === "object" && value !== null;
+}
+function full(walk) {
+  return walk.length > MAX_CHARS || walk.nodes >= MAX_NODES;
+}
+function add(walk, text2) {
+  walk.out.push(text2);
+  walk.length += text2.length;
+}
+function collect(node2, depth, walk) {
+  if (!isNode(node2) || depth > MAX_DEPTH || full(walk)) return;
+  walk.nodes += 1;
+  if (node2.type === "codeBlock") return;
+  if (typeof node2.text === "string") add(walk, node2.text);
+  if (Array.isArray(node2.content)) {
+    for (const child of node2.content) {
+      if (full(walk)) break;
+      collect(child, depth + 1, walk);
+    }
+  }
+  if (typeof node2.type === "string" && BLOCKS.has(node2.type)) add(walk, "\n");
+}
+function adfText(description) {
+  if (typeof description === "string") return description.slice(0, MAX_CHARS);
+  const walk = { out: [], length: 0, nodes: 0 };
+  collect(description, 0, walk);
+  return walk.out.join("").slice(0, MAX_CHARS);
+}
+
+// packages/core/src/jira-status.ts
+function deriveJiraStatus(facts, config2) {
+  const name = (facts.statusName ?? "").trim().toLowerCase();
+  const mapped = config2?.statusMap[name];
+  if (mapped) return mapped;
+  if (facts.categoryKey === "done") {
+    const dropped = config2?.droppedResolutions ?? DEFAULT_DROPPED;
+    return dropped.includes((facts.resolution ?? "").trim().toLowerCase()) ? "dropped" : "done";
+  }
+  if (facts.categoryKey === "indeterminate") return /review/.test(name) ? "in_review" : "in_progress";
+  return "todo";
+}
+
+// packages/core/src/jira-epic.ts
+var same = (issue2, ref) => issue2.key.toUpperCase() === displayKey(ref);
+function timeOf2(text2) {
+  const ms = text2 === void 0 ? Number.NaN : Date.parse(text2);
+  return Number.isFinite(ms) && ms >= 0 ? ms : void 0;
+}
+function parentOf(ref, issue2) {
+  const parts = JIRA_KEY.exec(issue2.fields?.parent?.key ?? "");
+  return parts ? makeJiraRef({ host: ref.host, project: parts[1] ?? "", number: Number(parts[2]) }) : void 0;
+}
+function resolutionAnswers(refs, search) {
+  return refs.map((ref) => {
+    const issue2 = search.issues.find((candidate) => same(candidate, ref));
+    if (!issue2) return [ref, null];
+    const parent = parentOf(ref, issue2);
+    const node2 = {
+      number: ref.number,
+      url: issueUrl(ref),
+      parent: parent ? { number: parent.number, url: issueUrl(parent), repository: { nameWithOwner: `${parent.owner}/${parent.repo}` } } : null
+    };
+    return [ref, node2];
+  });
+}
+function childOf(issue2, host, config2) {
+  const parts = JIRA_KEY.exec(issue2.key);
+  const ref = parts ? makeJiraRef({ host, project: parts[1] ?? "", number: Number(parts[2]) }) : void 0;
+  if (!ref) return void 0;
+  const fields = issue2.fields;
+  const status = deriveJiraStatus({ statusName: fields?.status?.name, categoryKey: fields?.status?.statusCategory?.key, resolution: fields?.resolution?.name }, config2);
+  const labels = (fields?.labels ?? []).map((label) => label.toLowerCase()).filter((label) => label.length <= 60).slice(0, 20);
+  const assignee = fields?.assignee?.displayName?.slice(0, 40);
+  const closedAt = status === "done" ? timeOf2(fields?.resolutiondate) : void 0;
+  return {
+    number: ref.number,
+    key: displayKey(ref),
+    title: (fields?.summary ?? issue2.key).slice(0, 300),
+    url: issueUrl(ref).slice(0, 500),
+    status,
+    ...labels.length === 0 ? {} : { labels },
+    ...assignee ? { assignees: [assignee] } : {},
+    ...closedAt === void 0 ? {} : { closedAt }
+  };
+}
+function epicOf(ref, found, config2) {
+  const { epic } = found;
+  const children = found.children.issues.flatMap((issue2) => childOf(issue2, ref.host, config2) ?? []);
+  if (children.length === 0) return null;
+  const summary = summaryOf(adfText(epic.fields?.description));
+  const createdAt = timeOf2(epic.fields?.created);
+  return {
+    ref,
+    title: (epic.fields?.summary ?? epic.key).slice(0, 300),
+    url: issueUrl(ref).slice(0, 500),
+    kind: "subissues",
+    children: children.slice(0, MAX_CHILDREN),
+    truncated: !found.children.complete || children.length > MAX_CHILDREN,
+    ...summary === void 0 ? {} : { summary },
+    ...createdAt === void 0 ? {} : { createdAt }
+  };
+}
+function epicAnswers(refs, data, config2) {
+  return refs.map((ref) => {
+    const epic = data.epics.issues.find((candidate) => same(candidate, ref));
+    const children = data.children[displayKey(ref)];
+    return [ref, epic && children ? epicOf(ref, { epic, children }, config2) : null];
+  });
+}
+
+// packages/core/src/schemas/jira.ts
+var text = external_exports.string().optional().catch(void 0);
+var flag = external_exports.boolean().optional().catch(void 0);
+var StatusSchema2 = external_exports.looseObject({
+  name: text,
+  statusCategory: external_exports.looseObject({ key: text }).optional().catch(void 0)
+});
+var ParentSchema = external_exports.looseObject({ key: text });
+var JiraFieldsSchema = external_exports.looseObject({
+  summary: text,
+  // Atlassian Document Format (an object) on v3, nothing on an empty description.
+  description: external_exports.unknown().optional(),
+  created: text,
+  resolutiondate: text,
+  labels: external_exports.array(external_exports.string()).optional().catch(void 0),
+  assignee: external_exports.looseObject({ displayName: text }).nullable().optional().catch(void 0),
+  status: StatusSchema2.optional().catch(void 0),
+  resolution: external_exports.looseObject({ name: text }).nullable().optional().catch(void 0),
+  parent: ParentSchema.nullable().optional().catch(void 0)
+});
+var JiraIssueSchema = external_exports.looseObject({ key: external_exports.string(), fields: JiraFieldsSchema.optional().catch(void 0) });
+var JiraSearchSchema = external_exports.looseObject({
+  issues: external_exports.array(JiraIssueSchema),
+  isLast: flag,
+  nextPageToken: text
+});
+var JiraPhaseASchema = JiraSearchSchema;
+var JiraPhaseBSchema = external_exports.object({
+  epics: JiraSearchSchema,
+  children: external_exports.record(external_exports.string(), external_exports.object({ issues: external_exports.array(JiraIssueSchema), complete: external_exports.boolean() }))
+});
+
+// packages/core/src/provider-jira.ts
+var RESOLVE_FIELDS = ["summary", "parent"];
+var EPIC_FIELDS = ["summary", "description", "created"];
+var CHILD_FIELDS = ["summary", "status", "resolution", "resolutiondate", "assignee", "labels"];
+var PAGE_SIZE = 100;
+var MAX_PAGES = 5;
+function keysOf(refs) {
+  return refs.map(displayKey).filter((key) => JIRA_KEY.test(key));
+}
+var inList = (field, keys) => `${field} in (${keys.join(",")})`;
+async function childrenOf(host, credentials, key) {
+  const issues = [];
+  let token;
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const res = await searchJira({ host, credentials, jql: `parent = ${key}`, fields: CHILD_FIELDS, maxResults: PAGE_SIZE, nextPageToken: token });
+    const parsed = JiraPhaseASchema.safeParse(res.body);
+    if (res.status !== 200 || !parsed.success) return fail(res);
+    issues.push(...parsed.data.issues);
+    token = parsed.data.nextPageToken;
+    if (parsed.data.isLast === true || token === void 0) return ok({ issues, complete: true });
+  }
+  return ok({ issues, complete: false });
+}
+async function sendB(credentials, batch, keys) {
+  const epics = await searchJira({ host: batch.repo.host, credentials, jql: inList("key", keys), fields: EPIC_FIELDS, maxResults: keys.length });
+  if (epics.status !== 200) return epics;
+  const children = {};
+  for (const key of keys) {
+    const found = await childrenOf(batch.repo.host, credentials, key);
+    if (!found.ok) return found.error;
+    children[key] = found.value;
+  }
+  return { status: 200, body: { epics: epics.body, children }, remaining: void 0, retryAfter: false };
+}
+async function send2(credentials, batch) {
+  const keys = keysOf(batch.refs);
+  if (keys.length === 0) return fail({ code: "invalid_response", detail: "no_valid_key" });
+  try {
+    if (batch.phase === "B") return ok(await sendB(credentials, batch, keys));
+    return ok(await searchJira({ host: batch.repo.host, credentials, jql: inList("key", keys), fields: RESOLVE_FIELDS, maxResults: keys.length }));
+  } catch (error62) {
+    return fail(describeFetchError(error62));
+  }
+}
+function parse4(batch, res, settings) {
+  const code = classifyHttp(res);
+  if (code) return fail({ code, detail: `http_${res.status}` });
+  if (batch.phase === "A") {
+    const parsed2 = JiraPhaseASchema.safeParse(res.body);
+    if (!parsed2.success) return fail({ code: "invalid_response", detail: "jira_shape" });
+    const answers2 = resolutionAnswers(batch.refs, parsed2.data);
+    return ok({ rate: null, apply: (snapshot, now) => applyResolutions(snapshot, answers2, now) });
+  }
+  const parsed = JiraPhaseBSchema.safeParse(res.body);
+  if (!parsed.success) return fail({ code: "invalid_response", detail: "jira_shape" });
+  const answers = epicAnswers(batch.refs, parsed.data, settings.jira);
+  return ok({ rate: null, apply: (snapshot, now) => applyBuiltEpics(snapshot, answers, now) });
+}
+var JIRA = {
+  kind: "jira",
+  token: (host, env) => Promise.resolve(jiraCredentials(host, env)),
+  send: send2,
+  parse: parse4
+};
+
 // packages/core/src/provider.ts
-function providerFor() {
-  return GITHUB;
+function providerFor(repo) {
+  return kindOf(repo) === "jira" ? JIRA : GITHUB;
 }
 
 // packages/core/src/usage-ledger.ts
@@ -21596,8 +21956,8 @@ function total(lines) {
 function spentIn(lines, now) {
   return total(lines.filter((line) => inWindow(line, now)));
 }
-function parseUsage(text) {
-  return text.split("\n").flatMap((raw) => {
+function parseUsage(text2) {
+  return text2.split("\n").flatMap((raw) => {
     const parsed = UsageLineSchema.safeParse(parseJson(raw));
     return parsed.success ? [parsed.data] : [];
   });
@@ -21699,8 +22059,8 @@ function charged(run4, batch, answer) {
   if (rate === null) return { ...run4, snapshot: chargePoints(snapshot, costOf(batch)), points: run4.points + costOf(batch) };
   return { ...run4, snapshot: chargeRate(snapshot, rate), points: run4.points + rate.cost };
 }
-function answered(run4, batch, res) {
-  const parsed = providerFor().parse(batch, res);
+function answered(run4, batch, answer) {
+  const parsed = providerFor(batch.repo).parse(batch, answer.res, answer.settings ?? {});
   if (!parsed.ok) return rejected(run4, batch, parsed.error);
   return charged(run4, batch, { rate: parsed.value.rate, snapshot: parsed.value.apply(run4.snapshot, run4.now) });
 }
@@ -21709,10 +22069,10 @@ async function runBatch(run4, batch, ctx) {
   if (!token.ok) return failed(run4, batch, token.error);
   const reserved = await reserve(run4, batch, ctx);
   if (reserved.failure) return failed(reserved.run, batch, reserved.failure);
-  const sent = await providerFor().send(token.value, batch);
+  const sent = await providerFor(batch.repo).send(token.value, batch);
   await touchLock(ctx.lock, ctx.clock());
   const counted = { ...reserved.run, requests: reserved.run.requests + 1 };
-  const next = sent.ok ? answered(counted, batch, sent.value) : failed(counted, batch, sent.error);
+  const next = sent.ok ? answered(counted, batch, { res: sent.value, settings: ctx.settings }) : failed(counted, batch, sent.error);
   return topUp(next, { host: batch.repo.host, points: next.points - counted.points - costOf(batch) }, ctx);
 }
 
@@ -21736,18 +22096,18 @@ function nextFocus(focus, line) {
 function creditsFor(lines, from) {
   const ordered = [...lines].sort((a, b) => a.ts - b.ts);
   const credits = /* @__PURE__ */ new Map();
-  const add = (key, ms, lastTs) => {
+  const add2 = (key, ms, lastTs) => {
     const before = credits.get(key);
     credits.set(key, { ms: (before?.ms ?? 0) + ms, lastTs: Math.max(before?.lastTs ?? 0, lastTs) });
   };
   let focus = NO_FOCUS;
   ordered.forEach((line, index) => {
     focus = nextFocus(focus, line);
-    for (const bind of line.binds) if (line.ts >= from) add(refKey(bind.ref), 0, line.ts);
+    for (const bind of line.binds) if (line.ts >= from) add2(refKey(bind.ref), 0, line.ts);
     const next = ordered[index + 1];
     const gap = next ? next.ts - line.ts : 0;
     if (!next || line.ts < from || gap > IDLE_CAP_MS || focus.keys.length === 0) return;
-    for (const key of focus.keys) add(key, Math.floor(gap / focus.keys.length), next.ts);
+    for (const key of focus.keys) add2(key, Math.floor(gap / focus.keys.length), next.ts);
   });
   return credits;
 }
@@ -21899,8 +22259,9 @@ function pendingRefs(run4, refs) {
 async function tokensFor(run4, refs, options) {
   if (overBudget(run4, PHASE_A_COST)) return /* @__PURE__ */ new Map();
   const given = new Map(Object.entries(options.tokens ?? {}));
-  const hosts = [...new Set(pendingRefs(run4, refs).map((ref) => ref.host))];
-  const found = await Promise.all(hosts.map(async (host) => [host, given.get(host) ?? await providerFor().token(host, options.env)]));
+  const pending = pendingRefs(run4, refs);
+  const hosts = [...new Map(pending.map((ref) => [ref.host, ref])).values()];
+  const found = await Promise.all(hosts.map(async (ref) => [ref.host, given.get(ref.host) ?? await providerFor(ref).token(ref.host, options.env)]));
   return new Map(found.flatMap(([host, token]) => token === void 0 ? [] : [[host, token]]));
 }
 async function openUsage(options) {
@@ -21946,7 +22307,7 @@ async function refreshLocked(options, lock) {
   if (waitsItsTurn(start, refs)) return { status: "paced", until: now + usage.waitMs };
   const started = performance.now();
   const clock = () => now + Math.round(performance.now() - started);
-  const ctx = { tokens: await tokensFor(start, refs, options), lock, clock, ledger: usage.ledger };
+  const ctx = { tokens: await tokensFor(start, refs, options), lock, clock, ledger: usage.ledger, settings: { jira: options.jira } };
   const run4 = await runPhaseB(await runPhaseA(start, refs, ctx), refs, ctx);
   const next = finalSnapshot(run4, refs);
   if (run4.requests > 0 || !unchanged(before, next, refs)) await writeSnapshot(paths.snapshotFile, { ...next, updatedAt: now });
@@ -21996,13 +22357,13 @@ function epicLine(epic, options) {
   const stale = epic.stale ? [epic.error === null ? "stale" : `stale (${epic.error})`] : [];
   const loading = options.pending > 0 ? [`${options.pending} loading`] : [];
   const extra = options.more > 0 ? ` (+${options.more})` : "";
-  const head = `#${epic.number} ${epic.percent}% ${fraction(epic)}`;
-  const withBar = `#${epic.number} ${bar(epic.percent)} ${epic.percent}% ${fraction(epic)}`;
+  const head = `${epic.key} ${epic.percent}% ${fraction(epic)}`;
+  const withBar = `${epic.key} ${bar(epic.percent)} ${epic.percent}% ${fraction(epic)}`;
   return fit([
     [withBar, ...detail, ...stale, ...loading].join(" \xB7 ") + extra,
     [head, ...detail, ...stale, ...loading].join(" \xB7 ") + extra,
     [head, ...stale, ...loading].join(" \xB7 ") + extra,
-    [`#${epic.number} ${epic.percent}%`, ...stale].join(" \xB7 ")
+    [`${epic.key} ${epic.percent}%`, ...stale].join(" \xB7 ")
   ], options.width);
 }
 function stateText(view) {
@@ -22020,6 +22381,8 @@ function renderStatusLine(view, options = {}) {
 // packages/core/src/schemas/json-v1.ts
 var JsonChildSchema = external_exports.object({
   number: IssueNumberSchema.nullable(),
+  // What to call it: `#12`, or `PROJ-12` on Jira; null for a plain checklist line.
+  key: external_exports.string().nullable(),
   title: external_exports.string(),
   url: external_exports.string().nullable(),
   status: StatusSchema,
@@ -22039,6 +22402,8 @@ var JsonChildSchema = external_exports.object({
 }).readonly();
 var JsonEpicSchema = external_exports.object({
   number: IssueNumberSchema,
+  // What to call it: `#1`, or `PROJ-1` on Jira.
+  key: external_exports.string(),
   title: external_exports.string(),
   url: external_exports.string(),
   kind: EpicKindSchema,
@@ -22088,7 +22453,7 @@ var SettingsFileSchema = external_exports.looseObject({ statusLine: external_exp
 var StatusLineSettingSchema = external_exports.looseObject({ type: external_exports.string().optional(), command: external_exports.string() });
 
 // packages/core/src/settings-merge.ts
-function isRecord2(value) {
+function isRecord3(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function diffLine(sign, value) {
@@ -22096,7 +22461,7 @@ function diffLine(sign, value) {
 }
 function mergeStatusLine(existingText, desired) {
   const current = existingText === void 0 ? {} : parseJson(existingText);
-  if (!SettingsFileSchema.safeParse(current).success || !isRecord2(current)) return { action: "abort" };
+  if (!SettingsFileSchema.safeParse(current).success || !isRecord3(current)) return { action: "abort" };
   const existing = current["statusLine"];
   if (existing === void 0 || existing === null) {
     const nextText = `${JSON.stringify({ ...current, statusLine: desired }, null, 2)}
@@ -22162,6 +22527,11 @@ function stateOf(scoped) {
   return error62 ? "error" : "loading";
 }
 function childKey(child, epic) {
+  if (kindOf(epic) === "jira") {
+    const parts = child.key === void 0 ? null : JIRA_KEY.exec(child.key);
+    const own3 = parts ? makeJiraRef({ host: epic.host, project: parts[1] ?? "", number: Number(parts[2]) }) : void 0;
+    return own3 ? refKey(own3) : void 0;
+  }
   const target = child.url === null ? void 0 : parseIssueTarget(child.url);
   const own2 = target?.repo;
   const ref = target && own2 ? makeRef({ host: own2.host ?? epic.host, owner: own2.owner, repo: own2.repo, number: target.number }) : child.number === null ? void 0 : makeRef({ ...epic, number: child.number });
@@ -22201,11 +22571,12 @@ function jsonEpic(entry, bound, input2) {
     const sessionIds = childSessionIds(childKey(child, entry.ref), bound);
     const key = childKey(child, entry.ref);
     const time3 = key === void 0 ? void 0 : input2.time?.refs[key];
-    return { number: child.number, title: child.title, url: child.url, status: child.status, sessionCount: sessionIds.length, sessionIds, assignees: [...child.assignees ?? []], openPullRequests: child.openPrs ?? 0, ...activityOf([time3]) };
+    return { number: child.number, key: child.key ?? (child.number === null ? null : `#${child.number}`), title: child.title, url: child.url, status: child.status, sessionCount: sessionIds.length, sessionIds, assignees: [...child.assignees ?? []], openPullRequests: child.openPrs ?? 0, ...activityOf([time3]) };
   });
   const epicSessionIds = [...new Set(children.flatMap((child) => child.sessionIds))];
   return {
     number: entry.ref.number,
+    key: displayKey(entry.ref),
     title: entry.title,
     url: entry.url,
     kind: entry.kind,
@@ -22325,8 +22696,8 @@ async function logHookError(dir, code, now) {
 `, { mode: 384 });
 }
 async function lastHookError(dir) {
-  const text = await readFile7(join9(dir, HOOK_LOG), "utf8").catch(() => "");
-  const lines = text.split("\n").filter(Boolean).reverse();
+  const text2 = await readFile7(join9(dir, HOOK_LOG), "utf8").catch(() => "");
+  const lines = text2.split("\n").filter(Boolean).reverse();
   for (const line of lines) {
     const parsed = LogLineSchema.safeParse(parseJson(line));
     if (parsed.success) return parsed.data;
@@ -22412,8 +22783,8 @@ async function registryChecks(cwd, env, now) {
 }
 async function statusLineCheck(scope, env, cwd) {
   const file2 = settingsFile(scope, env, cwd);
-  const text = await readFile9(file2, "utf8").catch((error62) => errnoOf(error62) === "ENOENT" ? void 0 : null);
-  const state = text === null ? "the file can not be read" : STATUS_LINE_STATES[mergeStatusLine(text, desiredStatusLine(scope, env)).action];
+  const text2 = await readFile9(file2, "utf8").catch((error62) => errnoOf(error62) === "ENOENT" ? void 0 : null);
+  const state = text2 === null ? "the file can not be read" : STATUS_LINE_STATES[mergeStatusLine(text2, desiredStatusLine(scope, env)).action];
   return [`statusLine (${scope})`, `${state}: ${file2}`];
 }
 async function runtimeCheck(env) {
@@ -22647,7 +23018,8 @@ async function runRefresh(args, env) {
   if (!parseCommandArgs(args, {})) return usageError("refresh");
   const dir = await registryDirFor(process.cwd(), env);
   if (dir === void 0) return failWith(NOT_A_REPO);
-  const outcome = await refresh({ dir, now: Date.now(), env });
+  const jira = jiraFromEnv(env) ?? await loadJiraFor(process.cwd());
+  const outcome = await refresh({ dir, now: Date.now(), env, jira });
   if (outcome.status === "paced") return waitingItsTurn(dir, outcome.until);
   if (outcome.status === "busy") {
     printLine("epic-pulse: another refresh is running; leaving it to finish.");
@@ -22688,8 +23060,9 @@ function spawnDetached(file2, args, env) {
   } catch {
   }
 }
-function spawnRefresh(dir, env, session) {
-  spawnDetached(process.execPath, [bundlePath(), "refresh"], { ...env, EPIC_PULSE_DIR: dir, [REFRESH_SESSION_ENV]: session ?? "" });
+function spawnRefresh(dir, env, extra = {}) {
+  const handedOver = { ...env, EPIC_PULSE_DIR: dir, [REFRESH_SESSION_ENV]: extra.session ?? "", ...jiraToEnv(extra.jira) };
+  spawnDetached(process.execPath, [bundlePath(), "refresh"], handedOver);
 }
 
 // packages/cli/src/statusline.ts
@@ -22715,26 +23088,28 @@ async function render(env, now) {
     return { line: renderStatusLine(buildView({ snapshot: { status: "missing" }, sessions: [], pins: [], now })), refresh: void 0 };
   }
   const paths = pathsFor(registry2);
-  const [session, snapshot, read, attempt, progress] = await Promise.all([
+  const [session, snapshot, read, attempt, progress, jira] = await Promise.all([
     origin.sessionId === void 0 ? void 0 : readSession(paths, origin.sessionId),
     readSnapshot(paths.snapshotFile),
     readPins(paths),
     readAttempt(registry2),
-    loadProgressFor(origin.dir)
+    loadProgressFor(origin.dir),
+    loadJiraFor(origin.dir)
   ]);
   const pins = pinsOf(read);
   const view = buildView({ snapshot, sessions: session ? [session] : [], pins, now, scope: { session }, progress });
   const due = session !== void 0 && refreshDue({ snapshot, session, pins, now, attempt });
-  return { line: renderStatusLine(view), refresh: due ? { dir: registry2, session: session.id } : void 0 };
+  return { line: renderStatusLine(view), refresh: due ? { dir: registry2, session: session.id, jira } : void 0 };
 }
 async function runStatusline(env) {
   const rendered = await render(env, Date.now()).catch(() => ({ line: renderStatusLine(BROKEN), refresh: void 0 }));
   printLine(rendered.line);
-  if (rendered.refresh !== void 0) spawnRefresh(rendered.refresh.dir, env, rendered.refresh.session);
+  if (rendered.refresh !== void 0) spawnRefresh(rendered.refresh.dir, env, { session: rendered.refresh.session, jira: rendered.refresh.jira });
   return 0;
 }
 
 // packages/cli/src/track.ts
+var NO_JIRA_SITE = 'no Jira site is declared; add a "jira" block with "site" and "projects" to .epic-pulse.json, or give the issue URL';
 var PIN_ERRORS = {
   corrupt: "pins.json can not be read, so it was left unchanged",
   full: "this repository already has the maximum of 200 pins",
@@ -22742,6 +23117,10 @@ var PIN_ERRORS = {
 };
 async function refFor(target, cwd) {
   const worktree = await findWorktree(cwd);
+  if (target.jira) {
+    const host = target.jira.host ?? (worktree ? (await loadConfig(worktree.root)).jira?.site : void 0);
+    return host ? makeJiraRef({ host, project: target.jira.project, number: target.number }) : void 0;
+  }
   const base = worktree ? await readRemote(worktree.commonDir) : void 0;
   const own2 = target.repo;
   const repo = own2 ? { host: own2.host ?? base?.host ?? DEFAULT_HOST, owner: own2.owner, repo: own2.repo } : base;
@@ -22768,7 +23147,7 @@ async function sessionOnly(verb, word, env) {
   return 0;
 }
 function changed(verb, ref, didChange) {
-  const key = refKey(ref);
+  const key = ref.kind === "jira" ? displayKey(ref) : refKey(ref);
   if (verb === "track") return didChange ? `epic-pulse: pinned ${key} for this repository.` : `epic-pulse: ${key} was already pinned.`;
   return didChange ? `epic-pulse: unpinned ${key}.` : `epic-pulse: ${key} was not pinned.`;
 }
@@ -22777,7 +23156,7 @@ async function repoPin(verb, target, env) {
   const dir = await registryDirFor(cwd, env);
   if (dir === void 0) return failWith(NOT_A_REPO);
   const ref = await refFor(target, cwd);
-  if (!ref) return failWith("this repository has no GitHub remote; name one as owner/repo#N");
+  if (!ref) return failWith(target.jira ? NO_JIRA_SITE : "this repository has no GitHub remote; name one as owner/repo#N");
   const paths = pathsFor(dir);
   const result = verb === "track" ? await addPin(paths, ref, Date.now()) : await removePin(paths, ref);
   if (!result.ok) return failWith(PIN_ERRORS[result.error]);
