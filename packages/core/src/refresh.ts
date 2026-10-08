@@ -8,6 +8,7 @@ import {
   chunk, epicRefsOf, epicsToWatch, gatherRefs, groupByRepo, needsFetch, needsResolution, PHASE_A_BATCH, PHASE_A_COST,
   phaseBBatchSize, pinnedRefs, rollUsage, withSession, type RepoGroup,
 } from './refresh-plan.js';
+import { updateTime } from './time-store.js';
 import { pruneSessions, readLiveSessions, readSession, type SessionState } from './registry.js';
 import { unfetchedEpics, unresolvedRefs } from './resolve.js';
 import type { ErrorCode, IssueRef } from './schemas/common.js';
@@ -171,6 +172,7 @@ async function refreshLocked(options: RefreshOptions, lock: Lock): Promise<Refre
   const run = await runPhaseB(await runPhaseA(start, refs, ctx), refs, ctx);
   const next = finalSnapshot(run, refs);
   if (run.requests > 0 || !unchanged(before, next, refs)) await writeSnapshot(paths.snapshotFile, { ...next, updatedAt: now });
+  await updateTime(paths);
   await pruneSessions(paths, now);
   return { status: 'done', requests: run.requests, points: run.points, error: run.failure?.code ?? null };
 }

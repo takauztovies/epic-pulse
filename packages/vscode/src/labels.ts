@@ -85,3 +85,36 @@ export function ageText(fetchedAt: string | null, now: number): string {
   if (seconds < 60) return 'updated just now';
   return seconds < 3600 ? `updated ${Math.floor(seconds / 60)} min ago` : `updated ${Math.floor(seconds / 3600)} h ago`;
 }
+
+// "3 h 20 min": session time as people say it. Under a minute is "under 1 min"
+// and nothing at all is "none yet", so a zero is never mistaken for a missing figure.
+export function durationText(seconds: number): string {
+  if (seconds <= 0) return 'none yet';
+  if (seconds < 60) return 'under 1 min';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} h ${minutes % 60} min`;
+  return `${Math.floor(hours / 24)} d ${hours % 24} h`;
+}
+
+function agoText(iso: string, now: number): string {
+  const seconds = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
+  if (seconds < 60) return 'just now';
+  return seconds < 3600 ? `${Math.floor(seconds / 60)} min ago` : seconds < 86400 ? `${Math.floor(seconds / 3600)} h ago` : `${Math.floor(seconds / 86400)} d ago`;
+}
+
+interface Activity {
+  readonly activeSeconds: number;
+  readonly lastActivityAt: string | null;
+  readonly lastSessionId: string | null;
+}
+
+// The hover lines for time: what sessions spent on it, and the last time one
+// was on it, in which session.
+export function activityLines(item: Activity, now: number): readonly string[] {
+  const time = `Session time: ${durationText(item.activeSeconds)}`;
+  if (item.lastActivityAt === null) return [time];
+  const session = item.lastSessionId === null ? '' : ` (session ${shortSessionId(item.lastSessionId)})`;
+  return [time, `Last active ${agoText(item.lastActivityAt, now)}${session}`];
+}

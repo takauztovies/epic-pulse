@@ -266,6 +266,7 @@ While you work, epic-pulse writes these files and no others:
 <git-common-dir>/epic-pulse/sessions/<session-id>.jsonl
 <git-common-dir>/epic-pulse/pins.json
 <git-common-dir>/epic-pulse/snapshot.json
+<git-common-dir>/epic-pulse/time.json
 <git-common-dir>/epic-pulse/hook.log
 <git-common-dir>/epic-pulse/hook.log.1
 <git-common-dir>/epic-pulse/refresh.lock
@@ -280,6 +281,7 @@ While you work, epic-pulse writes these files and no others:
 | `sessions/<session-id>.jsonl` | the hook | one line per call: the event, a timestamp and the issue references bound or unbound. Never a command, a file path or file contents. Deleted after a week untouched. |
 | `pins.json` | `epic-pulse track --repo` | the repository's pinned issue references and when they were pinned |
 | `snapshot.json` | the refresher | what GitHub returned: epic and sub-issue numbers, titles, URLs and statuses, when they were fetched, this repository's points for the hour, the token's rate-limit counters and the code of the last failure |
+| `time.json` | the refresher | how long sessions worked on each issue: per issue reference, active seconds, the last time and session id it was worked on, and per session how far its file has been counted. References, numbers and ids only. Kept after the session files are deleted. |
 | `hook.log`, `hook.log.1` | the hook | an error code and a timestamp per failed call; past 64 KiB it moves to `hook.log.1` |
 | `refresh.lock` | the refresher | a process id and a random token, while a refresh runs |
 | `refresh-attempt.json` | `epic-pulse refresh`, which the status line starts | when the last refresh ended and the code it stopped with; after a failure the status line starts the next one a minute later |

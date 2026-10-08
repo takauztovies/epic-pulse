@@ -84,7 +84,24 @@ GitHub itself, so they change when the issue, its assignee or its pull request d
 | A **green epic icon**, and a green status bar | The epic is 100% done and its data is fresh. |
 | Everything else | The theme's own colour. |
 
-Hover a row for its tooltip: counts per status, the sessions, and when it was last refreshed.
+Hover a row for its tooltip: counts per status, the sessions, **session time**, when a session was
+last on it, and when it was last refreshed.
+
+### Session time
+
+Hover an epic or an issue to see `Session time: 3 h 20 min` and `Last active 12 min ago (session
+0f8e7c1a)`. It is how long Claude Code sessions actively worked on it, not your own hours:
+
+- Between two calls a session makes, the time goes to the issue the session is working on. A gap
+  longer than 10 minutes counts as idle and adds nothing.
+- A session on two issues at once splits the time between them, so nothing is counted twice, and an
+  epic's time is its own plus all its issues'.
+- A session stops counting when it unbinds the issue, ends, or its binding lapses after six hours (a
+  pin never lapses).
+- Totals are saved per issue in `time.json` in the repository's git directory, so they survive after
+  the session files are deleted. They hold issue references and numbers only.
+- Time counts from the version that introduced it; earlier sessions that are already gone are not
+  reconstructed.
 
 ## 4. Everyday tasks
 

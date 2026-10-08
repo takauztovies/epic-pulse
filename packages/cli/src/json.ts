@@ -1,4 +1,4 @@
-import { buildView, loadProgressFor, pathsFor, pinsOf, readLiveSessions, readPins, readSnapshot, registryDirFor } from '@epic-pulse/core';
+import { buildView, loadProgressFor, pathsFor, pinsOf, readLiveSessions, readPins, readSnapshot, readTime, registryDirFor } from '@epic-pulse/core';
 import { parseCommandArgs } from './args.js';
 import { failWith, NOT_A_REPO, printLine, usageError } from './io.js';
 
@@ -13,9 +13,9 @@ export async function runJson(args: readonly string[], env: NodeJS.ProcessEnv): 
   if (dir === undefined) return failWith(NOT_A_REPO);
   const paths = pathsFor(dir);
   const now = Date.now();
-  const [sessions, snapshot, pins, progress] = await Promise.all([
-    readLiveSessions(paths, now), readSnapshot(paths.snapshotFile), readPins(paths), loadProgressFor(cwd),
+  const [sessions, snapshot, pins, progress, time] = await Promise.all([
+    readLiveSessions(paths, now), readSnapshot(paths.snapshotFile), readPins(paths), loadProgressFor(cwd), readTime(paths),
   ]);
-  printLine(JSON.stringify(buildView({ snapshot, sessions, pins: pinsOf(pins), now, progress }), null, 2));
+  printLine(JSON.stringify(buildView({ snapshot, sessions, pins: pinsOf(pins), now, progress, time }), null, 2));
   return 0;
 }

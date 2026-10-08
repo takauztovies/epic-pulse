@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { test, type TestContext } from 'node:test';
 import { emptySnapshot, STALE_AFTER_MS, type ErrorCode } from '@epic-pulse/core';
 import { buildModel, type Model } from '../src/model.js';
-import { barText, epicSessionsText } from '../src/labels.js';
+import { activityLines, barText, durationText, epicSessionsText } from '../src/labels.js';
 import { statusBarOf } from '../src/status-model.js';
 import { treeOf } from '../src/tree-model.js';
 import { modelOf, surface } from './model-helpers.js';
@@ -138,4 +138,18 @@ test('the epic sessions line names which session, not only how many', () => {
   assert.equal(epicSessionsText({ sessionIds: [] }), 'No live session');
   assert.equal(epicSessionsText({ sessionIds: ['0f8e7c1a-2b3d-4e5f-8a9b-0c1d2e3f4a5b'] }), 'Session: 0f8e7c1a');
   assert.equal(epicSessionsText({ sessionIds: ['0f8e7c1a-...', '1a2b3c4d-...'] }), 'Sessions: 0f8e7c1a, 1a2b3c4d');
+});
+
+test('session time reads as people say it, and a zero is never mistaken for a missing figure', () => {
+  assert.deepEqual([0, 30, 60, 3599, 3600, 12_000, 90_000, 200_000].map(durationText), [
+    'none yet', 'under 1 min', '1 min', '59 min', '1 h 0 min', '3 h 20 min', '1 d 1 h', '2 d 7 h',
+  ]);
+});
+
+test('the hover says what sessions spent and when one was last on it', () => {
+  const now = Date.parse('2026-10-08T12:00:00.000Z');
+  const idle = { activeSeconds: 0, lastActivityAt: null, lastSessionId: null };
+  assert.deepEqual(activityLines(idle, now), ['Session time: none yet']);
+  const busy = { activeSeconds: 7500, lastActivityAt: '2026-10-08T11:48:00.000Z', lastSessionId: '0f8e7c1a-2b3d-4e5f-8a9b-0c1d2e3f4a5b' };
+  assert.deepEqual(activityLines(busy, now), ['Session time: 2 h 5 min', 'Last active 12 min ago (session 0f8e7c1a)']);
 });

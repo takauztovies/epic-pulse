@@ -11,6 +11,7 @@ export interface RegistryPaths {
   readonly sessionsDir: string;
   readonly pinsFile: string;
   readonly snapshotFile: string;
+  readonly timeFile: string;
   readonly lockFile: string;
 }
 
@@ -20,6 +21,7 @@ export function pathsFor(dir: string): RegistryPaths {
     sessionsDir: join(dir, 'sessions'),
     pinsFile: join(dir, 'pins.json'),
     snapshotFile: join(dir, 'snapshot.json'),
+    timeFile: join(dir, 'time.json'),
     lockFile: join(dir, 'refresh.lock'),
   };
 }

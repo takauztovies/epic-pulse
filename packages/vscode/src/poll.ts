@@ -1,6 +1,6 @@
 import { readdir, stat } from 'node:fs/promises';
 import {
-  buildView, gatherRefs, loadProgressFor, pathsFor, pinsOf, readLiveSessions, readPins, readSnapshot, refresh,
+  buildView, gatherRefs, loadProgressFor, pathsFor, pinsOf, readLiveSessions, readPins, readSnapshot, readTime, refresh,
   type JsonV1, type RefreshOutcome, type RegistryPaths,
 } from '@epic-pulse/core';
 import { tokenUse, type Grant, type TokenUse } from './grant.js';
@@ -48,10 +48,10 @@ async function hookSeen(paths: RegistryPaths): Promise<boolean> {
 // covering every live session of the repository and its pins.
 export async function inspectRepo(repo: RepoTarget, now: number): Promise<RepoState> {
   const paths = pathsFor(repo.dir);
-  const [sessions, snapshot, pins, seen, progress] = await Promise.all([
-    readLiveSessions(paths, now), readSnapshot(paths.snapshotFile), readPins(paths), hookSeen(paths), loadProgressFor(repo.folder),
+  const [sessions, snapshot, pins, seen, progress, time] = await Promise.all([
+    readLiveSessions(paths, now), readSnapshot(paths.snapshotFile), readPins(paths), hookSeen(paths), loadProgressFor(repo.folder), readTime(paths),
   ]);
-  return { view: buildView({ snapshot, sessions, pins: pinsOf(pins), now, progress }), hookSeen: seen };
+  return { view: buildView({ snapshot, sessions, pins: pinsOf(pins), now, progress, time }), hookSeen: seen };
 }
 
 // Every host the refresh could contact: those of the issues it keeps current.

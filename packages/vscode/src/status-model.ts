@@ -1,6 +1,6 @@
 import type { JsonEpic } from '@epic-pulse/core';
 import { COMMAND, FOCUS_VIEW } from './ids.js';
-import { ageText, countsText, epicSessionsText, progressText, STATE_TEXT } from './labels.js';
+import { activityLines, ageText, countsText, epicSessionsText, progressText, STATE_TEXT } from './labels.js';
 import { escapeMarkdown } from './markdown.js';
 import type { Model } from './model.js';
 
@@ -50,9 +50,9 @@ function stateBlock(model: Model): string {
   return `**${label}**: ${detail}${code}${action}`;
 }
 
-function epicBlock(epic: JsonEpic): string {
+function epicBlock(epic: JsonEpic, now: number): string {
   const line = [progressText(epic), countsText(epic), ...staleMarks(epic)].join(' · ');
-  return `**#${epic.number}** ${escapeMarkdown(epic.title)}  \n${line}  \n${epicSessionsText(epic)}`;
+  return `**#${epic.number}** ${escapeMarkdown(epic.title)}  \n${line}  \n${[epicSessionsText(epic), ...activityLines(epic, now)].join('  \n')}`;
 }
 
 // A click signs in when that is what is missing; otherwise it opens the tree.
@@ -65,7 +65,7 @@ function colorOf(model: Model): string | undefined {
 }
 
 export function statusBarOf(model: Model): StatusBarView {
-  const blocks = [header(model), stateBlock(model), ...model.epics.map(epicBlock)];
+  const blocks = [header(model), stateBlock(model), ...model.epics.map((epic) => epicBlock(epic, model.now))];
   return {
     visible: model.repoCount > 0,
     text: model.epics.length > 0 ? epicText(model) : stateText(model),

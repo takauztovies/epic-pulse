@@ -24,6 +24,8 @@ then the title. Its description adds `1/5`, the first eight characters of each l
   its row.
 - **Green**: an issue icon is green while a live session is on it; an epic's icon and the status bar
   are green once it is 100% done.
+- **Hover** an epic or issue for its **session time** (how long Claude Code sessions actively worked on
+  it, idle gaps over ten minutes not counted) and when a session was last on it.
 - The groups In progress, In review and Done start expanded; Todo and Dropped start collapsed.
 
 The full walkthrough is in the [manual](https://github.com/takauztovies/epic-pulse/blob/main/docs/MANUAL.md).

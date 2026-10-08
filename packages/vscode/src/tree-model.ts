@@ -1,6 +1,6 @@
 import { STATUSES, type JsonChild, type JsonEpic, type Status } from '@epic-pulse/core';
 import { COMMAND } from './ids.js';
-import { ageText, barText, countsText, epicSessionsText, progressText, sessionsText, STATE_TEXT, STATUS_TEXT } from './labels.js';
+import { activityLines, ageText, barText, countsText, epicSessionsText, progressText, sessionsText, STATE_TEXT, STATUS_TEXT } from './labels.js';
 import type { DisplayState, Model } from './model.js';
 
 // The Epics tree as plain data: Epic → status group → issue, with one notice
@@ -71,7 +71,7 @@ function spreadCommand(command: CommandRef | undefined): { readonly command?: Co
   return command === undefined ? {} : { command };
 }
 
-function issueNode(child: JsonChild, id: string): IssueNode {
+function issueNode(child: JsonChild, id: string, now: number): IssueNode {
   const label = child.number === null ? child.title : `#${child.number} ${child.title}`;
   const sessions = child.sessionCount > 0 ? [sessionsText(child.sessionCount)] : [];
   return {
@@ -80,7 +80,7 @@ function issueNode(child: JsonChild, id: string): IssueNode {
     label,
     url: child.url,
     description: sessions.join(''),
-    tooltip: [label, STATUS_TEXT[child.status].label, ...sessions].join('\n'),
+    tooltip: [label, STATUS_TEXT[child.status].label, ...sessions, ...activityLines(child, now)].join('\n'),
     icon: child.status === 'done' || child.status === 'dropped' ? 'issue-closed' : 'issues',
     // A live session on it right now, regardless of status: green marks
     // "someone is here", distinct from the Todo/In progress/.../Done group
@@ -93,9 +93,9 @@ function issueNode(child: JsonChild, id: string): IssueNode {
 // Workflow order, every status shown even with none, so an epic always reads the same. Work that is moving, and work that is
 // finished, starts expanded; only Todo and Dropped start collapsed.
 // An issue's id is its position, since a checklist may list one issue twice.
-function groupNodes(epic: JsonEpic): readonly GroupNode[] {
+function groupNodes(epic: JsonEpic, now: number): readonly GroupNode[] {
   return STATUSES.flatMap((status) => {
-    const children = epic.children.flatMap((child, index) => (child.status === status ? [issueNode(child, `${epic.url}#${index}`)] : []));
+    const children = epic.children.flatMap((child, index) => (child.status === status ? [issueNode(child, `${epic.url}#${index}`, now)] : []));
     const { label, icon } = STATUS_TEXT[status];
     const expanded = status === 'in_progress' || status === 'in_review' || status === 'done';
     return [{ kind: 'group', id: `${epic.url}:${status}`, status, label, description: String(children.length), tooltip: label, icon, expanded, children }];
@@ -111,11 +111,11 @@ function epicNode(epic: JsonEpic, now: number): EpicNode {
     url: epic.url,
     label: `#${epic.number} ${barText(epic.percent)} ${epic.percent}% ${epic.title}`,
     description: [progress, epicSessionsText(epic), ...stale].join(' · '),
-    tooltip: [`#${epic.number} ${epic.title}`, `${progress}: ${countsText(epic)}`, epicSessionsText(epic), ageText(epic.fetchedAt, now)].join('\n'),
+    tooltip: [`#${epic.number} ${epic.title}`, `${progress}: ${countsText(epic)}`, epicSessionsText(epic), ...activityLines(epic, now), ageText(epic.fetchedAt, now)].join('\n'),
     icon: 'milestone',
     iconColor: epic.percent === 100 ? 'charts.green' : undefined,
     ...spreadCommand(clickCommand(epic.url, epic.sessionIds)),
-    children: groupNodes(epic),
+    children: groupNodes(epic, now),
   };
 }
 
