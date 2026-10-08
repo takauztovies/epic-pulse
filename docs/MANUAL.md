@@ -201,6 +201,8 @@ narrow the bar goes first, then the counts. Like the views it counts Done only.
 
 ## 7. Jira
 
+**Experimental.** Jira support has not yet been run against a real Jira site: it was written and tested against Atlassian's documentation, and its test data is hand-written. Expect rough edges (statuses, paging, an expired token reading as "no epic"), and report what you see. GitHub is unaffected: nothing changes for a repository without a `jira` block.
+
 A repository whose work is in Jira Cloud is set up once, and then looks the same as a GitHub one, with
 Jira keys (`PROJ-12`) instead of `#12`.
 

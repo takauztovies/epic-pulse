@@ -128,7 +128,7 @@ GitHub.
 
 - VS Code 1.90 or newer, on a trusted folder on disk: Restricted Mode and virtual workspaces are not
   supported.
-- A git repository whose issues are on GitHub, or whose work is in Jira Cloud (declare it in `.epic-pulse.json` and set `JIRA_SITE`, `JIRA_EMAIL` and `JIRA_API_TOKEN` where VS Code starts; see the [manual](https://github.com/takauztovies/epic-pulse/blob/main/docs/MANUAL.md)).
+- A git repository whose issues are on GitHub, or whose work is in Jira Cloud (experimental, not yet run against a real Jira site; declare it in `.epic-pulse.json` and set `JIRA_SITE`, `JIRA_EMAIL` and `JIRA_API_TOKEN` where VS Code starts; see the [manual](https://github.com/takauztovies/epic-pulse/blob/main/docs/MANUAL.md)).
 - The epic-pulse Claude Code plugin, for sessions to bind on their own.
 
 ## Licence
