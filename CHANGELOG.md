@@ -5,6 +5,14 @@ Every notable change to epic-pulse is listed here. Versions follow
 
 ## Unreleased
 
+## 0.3.5
+
+### Fixed
+
+- Clicking an epic or an issue with a live Claude Code session did nothing: the click handed VS Code
+  the session ids as separate arguments, so the handler received a bare id instead of the list and
+  refused it. It now opens the session.
+
 ### Added
 
 - **Jira Cloud**, per repository: declare a `jira` block (`site`, `projects`, optional `statusMap`) in
