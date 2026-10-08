@@ -13,6 +13,7 @@ export const COMMAND = {
 } as const;
 
 export const VIEW_ID = 'epicPulse.epics';
+export const OVERVIEW_ID = 'epicPulse.overview';
 
 // VS Code registers `<view id>.focus` for every contributed view.
 export const FOCUS_VIEW = `${VIEW_ID}.focus`;

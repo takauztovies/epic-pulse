@@ -31,7 +31,22 @@ Open a folder that is a git repository whose issues are on GitHub, and open the 
 the activity bar. If it says **Hook inactive**, no session has reported to this repository yet: check
 that the plugin is enabled and that Node 22 or newer is on Claude Code's `PATH`.
 
-## 3. Reading the Epics view
+## 3. The Overview panel and the Epics view
+
+Above the Epics view sits **Overview**: one card per epic with a coloured progress bar, the percentage
+at the right, and every status with its count, zeros included:
+
+```
+#1 Demo epic: sample onboarding flow                    20%
+▇▇▇▇░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+● Todo 1   ● In progress 2   ● In review 1   ● Done 1   ● Dropped 1
+1/5 · 20% · Session: 0f8e7c1a
+```
+
+The bar is blue and turns green at 100%; it counts closed work only. Click a card's title for what a
+click does in the tree (open the live session, or the issue on GitHub).
+
+### The Epics view
 
 Each epic is a row:
 
@@ -48,7 +63,7 @@ Each epic is a row:
   of its issues, or **No live session**.
 - **`stale`**: the data is over ten minutes old, or from before a failed refresh. It stays on screen.
 
-Under an epic, its issues are grouped by status, in workflow order, empty groups left out:
+Under an epic, its issues are grouped by status, in workflow order. All five groups are always there, with their count, so an empty one reads `0`:
 
 | Group | An issue is here when |
 | --- | --- |

@@ -1,7 +1,7 @@
 import { parseHostList } from '@epic-pulse/core';
 import * as vscode from 'vscode';
 import { errorLabel, outcomeLine, type DetailsInput } from '../details.js';
-import { CONFIG_SECTION, VIEW_ID } from '../ids.js';
+import { CONFIG_SECTION, OVERVIEW_ID, VIEW_ID } from '../ids.js';
 import { buildModel } from '../model.js';
 import { pollAll, readAll, type RepoResult } from '../poll.js';
 import { Poller, type PollMode } from '../poller.js';
@@ -12,6 +12,7 @@ import { treeOf } from '../tree-model.js';
 import { PROVIDERS, readAuth } from './auth.js';
 import { registerCommands } from './commands.js';
 import { StatusBar } from './status-bar.js';
+import { Overview } from './overview.js';
 import { EpicTree } from './tree.js';
 
 function readSettings(): Settings {
@@ -31,6 +32,7 @@ function folderPaths(): readonly string[] {
 export class Controller {
   readonly #log = vscode.window.createOutputChannel('Epic Pulse', { log: true });
   readonly #tree = new EpicTree();
+  readonly #overview = new Overview();
   #settings = readSettings();
   readonly #statusBar = new StatusBar(this.#settings.statusBarEnabled);
   readonly #poller: Poller;
@@ -48,8 +50,9 @@ export class Controller {
       onError: (error) => this.#log.error(`poll failed: ${errorLabel(error)}`),
     });
     const view = vscode.window.createTreeView(VIEW_ID, { treeDataProvider: this.#tree, showCollapseAll: true });
+    const overview = vscode.window.registerWebviewViewProvider(OVERVIEW_ID, this.#overview);
     const commands = registerCommands({ poller: this.#poller, log: this.#log, latest: () => this.#latest });
-    context.subscriptions.push(this.#log, this.#tree, view, this.#statusBar, ...commands, ...this.#listeners());
+    context.subscriptions.push(this.#log, this.#tree, view, overview, this.#statusBar, ...commands, ...this.#listeners());
     context.subscriptions.push({ dispose: () => void this.dispose() });
     void this.#poller.trigger();
   }
@@ -65,6 +68,7 @@ export class Controller {
     this.#latest = next;
     const model = buildModel(next);
     this.#tree.update(treeOf(model));
+    this.#overview.update(model.epics);
     this.#statusBar.show(statusBarOf(model));
     this.#logChanges(next.results);
   }

@@ -47,6 +47,16 @@ test('an epic opens on GitHub and splits into status groups whose issues count t
   assert.deepEqual(six?.command?.arguments, ['https://github.com/takauztovies/epic-pulse/issues/6'], 'no live session: a click opens GitHub');
 });
 
+test('every epic lists all five status groups with their counts, even the empty ones', async (t) => {
+  const now = Date.now();
+  const repo = await makeRegistry(t, { pins: [demo(8)], snapshot: demoSnapshot(now - 1000) }, now);
+  const [checklist] = treeOf(await modelOf([repo], now));
+  assert.ok(checklist?.kind === 'epic');
+  assert.deepEqual(checklist.children.map((group) => [group.label, group.description, group.children.length]), [
+    ['Todo', '2', 2], ['In progress', '0', 0], ['In review', '0', 0], ['Done', '2', 2], ['Dropped', '1', 1],
+  ]);
+});
+
 test('stale data stays on screen, marked on the epic, in the status bar and in a notice above it', async (t) => {
   const now = Date.now();
   const old = demoSnapshot(now - STALE_AFTER_MS - 60_000);

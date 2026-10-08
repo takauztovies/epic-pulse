@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { z } from 'zod';
-import { COMMAND, CONFIG_SECTION, VIEW_ID } from '../src/ids.js';
+import { COMMAND, CONFIG_SECTION, OVERVIEW_ID, VIEW_ID } from '../src/ids.js';
 import { DEFAULT_REFRESH_SECONDS, MAX_REFRESH_SECONDS, MIN_REFRESH_SECONDS } from '../src/settings.js';
 
 // The manifest and the code name the same commands, view and settings in two
@@ -44,7 +44,7 @@ test('every command the code runs is contributed, and every menu entry names one
   assert.deepEqual([...contributed], Object.values(COMMAND).sort());
   const menuCommands = Object.values(manifest.contributes.menus).flat().map((entry) => entry.command);
   for (const command of menuCommands) assert.ok(contributed.includes(command), command);
-  assert.deepEqual(Object.values(manifest.contributes.views).flat().map((view) => view.id), [VIEW_ID]);
+  assert.deepEqual(Object.values(manifest.contributes.views).flat().map((view) => view.id), [OVERVIEW_ID, VIEW_ID]);
 });
 
 test('the settings the code reads are the ones contributed, with the same default and bounds', () => {
