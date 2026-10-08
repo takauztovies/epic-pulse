@@ -1,6 +1,6 @@
 import { STATUSES, type JsonChild, type JsonEpic, type Status } from '@epic-pulse/core';
 import { COMMAND } from './ids.js';
-import { activityLines, ageText, barText, countsText, epicSessionsText, progressText, sessionsText, STATE_TEXT, STATUS_TEXT } from './labels.js';
+import { activityLines, ageText, barText, countsText, detailLines, epicSessionsText, issueDetailLines, progressText, sessionsText, STATE_TEXT, STATUS_TEXT } from './labels.js';
 import type { DisplayState, Model } from './model.js';
 
 // The Epics tree as plain data: Epic → status group → issue, with one notice
@@ -80,7 +80,7 @@ function issueNode(child: JsonChild, id: string, now: number): IssueNode {
     label,
     url: child.url,
     description: sessions.join(''),
-    tooltip: [label, STATUS_TEXT[child.status].label, ...sessions, ...activityLines(child, now)].join('\n'),
+    tooltip: [label, STATUS_TEXT[child.status].label, ...issueDetailLines(child), ...sessions, ...activityLines(child, now)].join('\n'),
     icon: child.status === 'done' || child.status === 'dropped' ? 'issue-closed' : 'issues',
     // A live session on it right now, regardless of status: green marks
     // "someone is here", distinct from the Todo/In progress/.../Done group
@@ -111,7 +111,7 @@ function epicNode(epic: JsonEpic, now: number): EpicNode {
     url: epic.url,
     label: `#${epic.number} ${barText(epic.percent)} ${epic.percent}% ${epic.title}`,
     description: [progress, epicSessionsText(epic), ...stale].join(' · '),
-    tooltip: [`#${epic.number} ${epic.title}`, `${progress}: ${countsText(epic)}`, epicSessionsText(epic), ...activityLines(epic, now), ageText(epic.fetchedAt, now)].join('\n'),
+    tooltip: [`#${epic.number} ${epic.title}`, `${progress}: ${countsText(epic)}`, ...detailLines(epic, now), epicSessionsText(epic), ...activityLines(epic, now), ageText(epic.fetchedAt, now)].join('\n'),
     icon: 'milestone',
     iconColor: epic.percent === 100 ? 'charts.green' : undefined,
     ...spreadCommand(clickCommand(epic.url, epic.sessionIds)),

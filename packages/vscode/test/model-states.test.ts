@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { test, type TestContext } from 'node:test';
-import { emptySnapshot, STALE_AFTER_MS, type ErrorCode } from '@epic-pulse/core';
+import { emptySnapshot, refKey, STALE_AFTER_MS, type ErrorCode } from '@epic-pulse/core';
 import { buildModel, type Model } from '../src/model.js';
-import { activityLines, barText, durationText, epicSessionsText } from '../src/labels.js';
+import { activityLines, barText, detailLines, durationText, epicSessionsText, issueDetailLines } from '../src/labels.js';
 import { statusBarOf } from '../src/status-model.js';
 import { treeOf } from '../src/tree-model.js';
 import { modelOf, surface } from './model-helpers.js';
@@ -152,4 +152,28 @@ test('the hover says what sessions spent and when one was last on it', () => {
   assert.deepEqual(activityLines(idle, now), ['Session time: none yet']);
   const busy = { activeSeconds: 7500, lastActivityAt: '2026-10-08T11:48:00.000Z', lastSessionId: '0f8e7c1a-2b3d-4e5f-8a9b-0c1d2e3f4a5b' };
   assert.deepEqual(activityLines(busy, now), ['Session time: 2 h 5 min', 'Last active 12 min ago (session 0f8e7c1a)']);
+});
+
+test('the epic hover gives its summary, what is in flight, who has it, how old it is and whether it moves', () => {
+  const now = Date.parse('2026-10-08T12:00:00.000Z');
+  const epic = { summary: 'Ship the import wizard.', createdAt: '2026-09-26T12:00:00.000Z', doneLast7Days: 3, openPullRequests: 2, assignees: ['ana', 'bo'] };
+  assert.deepEqual(detailLines(epic, now), [
+    'Summary: Ship the import wizard.', 'Open pull requests: 2 · Assigned: @ana, @bo', 'Opened 12 days ago · 3 done in the last 7 days',
+  ]);
+  assert.deepEqual(detailLines({ ...epic, summary: null, createdAt: null, assignees: [], openPullRequests: 0, doneLast7Days: 0 }, now), [
+    'Open pull requests: 0', '0 done in the last 7 days',
+  ]);
+  assert.deepEqual(issueDetailLines({ assignees: ['ana'], openPullRequests: 1 }), ['Assigned: @ana', 'Open pull requests: 1']);
+  assert.deepEqual(issueDetailLines({ assignees: [], openPullRequests: 0 }), []);
+});
+
+test('the status bar tooltip is Markdown, so an epic summary from GitHub can not become a link or markup', async (t) => {
+  const now = Date.now();
+  const snapshot = demoSnapshot(now - 1000);
+  const key = refKey(demo(1));
+  const hostile = { ...snapshot, epics: { ...snapshot.epics, [key]: { ...snapshot.epics[key]!, summary: '[click](https://example.invalid) **bold** <img src=x>' } } };
+  const model = await modelOf([await makeRegistry(t, { sessions: [{ id: SESSION_A, binds: [demo(4)] }], snapshot: hostile }, now)], now);
+  const line = statusBarOf(model).tooltip.split('\n').find((text) => text.startsWith('Summary\\:')) ?? '';
+  assert.doesNotMatch(line.replace(/\\./g, ''), /[[\]()<>*_:.@]/);
+  assert.equal(line.replace(/\\(.)/g, '$1').trimEnd(), 'Summary: [click](https://example.invalid) **bold** <img src=x>');
 });

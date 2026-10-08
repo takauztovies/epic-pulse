@@ -23,6 +23,7 @@ const RECORDINGS = [
   { name: 'phase-a', query: phaseADocument([1, 4, 8, MISSING]), note: 'sub-issue, epic, checklist epic and a missing issue' },
   { name: 'phase-b-subissues', query: phaseBDocument([1]), note: 'epic with sub-issues in every status' },
   { name: 'phase-b-checklist', query: phaseBDocument([8]), note: 'checklist-only epic' },
+  { name: 'phase-b-details', query: phaseBDocument([1, 8]), note: 'both demo epics with creation, closing dates, assignee logins and bodies' },
   { name: 'phase-b-missing', query: phaseBDocument([MISSING]), note: 'issue that does not exist' },
   { name: 'error-undefined-field', query: UNDEFINED_FIELD, note: 'schema lacks a field (what an older GHES answers)' },
   { name: 'error-bad-credentials', query: phaseADocument([1]), token: 'not-a-real-token', note: 'HTTP 401' },
@@ -56,7 +57,10 @@ async function main() {
   const resolved = await resolveToken(HOST, process.env);
   if (!resolved) throw new Error('no token: set GH_TOKEN or run `gh auth login`');
   await mkdir(OUT, { recursive: true });
-  for (const recording of RECORDINGS) console.log(await record(recording, resolved.token));
+  // `pnpm record-fixtures phase-b-details` records only the named ones, so a
+  // new recording never rewrites fixtures whose demo state has since moved on.
+  const only = process.argv.slice(2);
+  for (const recording of RECORDINGS.filter((r) => only.length === 0 || only.includes(r.name))) console.log(await record(recording, resolved.token));
 }
 
 main().catch((error) => {

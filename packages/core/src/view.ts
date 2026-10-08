@@ -157,6 +157,23 @@ function epicActivity(entry: EpicEntry, time: TimeFile | undefined): Activity {
   return activityOf([time?.refs[refKey(entry.ref)], ...[...keys].map((key) => time?.refs[key])]);
 }
 
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+// What the hover says besides progress: the description's opening lines, how
+// old the epic is, how many of its issues were finished this week, and who and
+// what is in flight. All of it was stored by the refresh; only the week is
+// worked out here, against the clock the view was built with.
+function epicDetails(entry: EpicEntry, now: number): Pick<JsonEpic, 'summary' | 'createdAt' | 'doneLast7Days' | 'openPullRequests' | 'assignees'> {
+  const assignees = [...new Set(entry.children.flatMap((child) => child.assignees ?? []))].slice(0, 5);
+  return {
+    summary: entry.summary ?? null,
+    createdAt: entry.createdAt === undefined ? null : iso(entry.createdAt),
+    doneLast7Days: entry.children.filter((child) => child.status === 'done' && child.closedAt !== undefined && now - child.closedAt >= 0 && now - child.closedAt <= WEEK_MS).length,
+    openPullRequests: entry.children.reduce((sum, child) => sum + (child.openPrs ?? 0), 0),
+    assignees,
+  };
+}
+
 function jsonEpic(entry: EpicEntry, bound: readonly BoundSession[], input: { readonly now: number; readonly progress: ProgressConfig; readonly time: TimeFile | undefined }): JsonEpic {
   const counts = countStatuses(entry.children);
   const points = pointsByStatus(entry.children, input.progress);
@@ -164,12 +181,12 @@ function jsonEpic(entry: EpicEntry, bound: readonly BoundSession[], input: { rea
     const sessionIds = childSessionIds(childKey(child, entry.ref), bound);
     const key = childKey(child, entry.ref);
     const time = key === undefined ? undefined : input.time?.refs[key];
-    return { number: child.number, title: child.title, url: child.url, status: child.status, sessionCount: sessionIds.length, sessionIds, ...activityOf([time]) };
+    return { number: child.number, title: child.title, url: child.url, status: child.status, sessionCount: sessionIds.length, sessionIds, assignees: [...(child.assignees ?? [])], openPullRequests: child.openPrs ?? 0, ...activityOf([time]) };
   });
   const epicSessionIds = [...new Set(children.flatMap((child) => child.sessionIds))];
   return {
     number: entry.ref.number, title: entry.title, url: entry.url, kind: entry.kind, counts, percent: percentDone(points),
-    weightedPercent: weightedPercentDone(points, input.progress), sessionIds: epicSessionIds, ...epicActivity(entry, input.time),
+    weightedPercent: weightedPercentDone(points, input.progress), sessionIds: epicSessionIds, ...epicActivity(entry, input.time), ...epicDetails(entry, input.now),
     children, fetchedAt: iso(entry.fetchedAt), stale: isStale(entry, input.now), error: entry.error, truncated: entry.truncated,
   };
 }

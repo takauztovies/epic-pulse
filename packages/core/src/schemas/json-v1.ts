@@ -16,6 +16,9 @@ export const JsonChildSchema = z
     // sessionCount is their length, kept so a reader of only the count need
     // not change.
     sessionIds: z.array(z.string()).readonly(),
+    // Who it is assigned to (logins, up to three) and how many open pull requests will close it.
+    assignees: z.array(z.string()).readonly(),
+    openPullRequests: z.number().int().nonnegative(),
     // Active session time on this item, in seconds, with when and in which
     // session it was last worked on (null: never).
     activeSeconds: z.number().int().nonnegative(),
@@ -42,6 +45,14 @@ export const JsonEpicSchema = z
     activeSeconds: z.number().int().nonnegative(),
     lastActivityAt: z.iso.datetime().nullable(),
     lastSessionId: z.string().nullable(),
+    // A few readable lines of its description, and when it was opened (null: not known).
+    summary: z.string().nullable(),
+    createdAt: z.iso.datetime().nullable(),
+    // Issues closed as done in the last seven days: is it moving?
+    doneLast7Days: z.number().int().nonnegative(),
+    // Open pull requests across its issues, and who its issues are assigned to (up to five logins).
+    openPullRequests: z.number().int().nonnegative(),
+    assignees: z.array(z.string()).readonly(),
     fetchedAt: z.iso.datetime(),
     stale: z.boolean(),
     error: ErrorCodeSchema.nullable(),

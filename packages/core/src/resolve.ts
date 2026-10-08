@@ -4,7 +4,8 @@ import type { IssueRef, RepoRef } from './schemas/common.js';
 import type { EpicNode, PhaseAIssue, SubIssueNode } from './schemas/graphql.js';
 import { MAX_CHILDREN, type Child, type EpicEntry, type Snapshot } from './schemas/snapshot.js';
 import { PROGRESS_LIMITS } from './progress-config.js';
-import { deriveStatus } from './status.js';
+import { summaryOf } from './summary.js';
+import { deriveStatus, linkedOpenPrs } from './status.js';
 
 // An epic as fetched, before the refresher stamps it with fetchedAt and error.
 export type EpicData = Omit<EpicEntry, 'fetchedAt' | 'error'>;
@@ -36,14 +37,30 @@ function labelsOf(node: SubIssueNode): readonly string[] {
   return names.filter((name) => name.length <= PROGRESS_LIMITS.maxLabelLength);
 }
 
+function assigneesOf(node: SubIssueNode): readonly string[] {
+  return (node.assignees.nodes ?? []).flatMap((user) => (user ? [user.login.slice(0, 40)] : [])).slice(0, 3);
+}
+
+function timeOf(text: string | null | undefined): number | undefined {
+  const ms = text ? Date.parse(text) : Number.NaN;
+  return Number.isFinite(ms) && ms >= 0 ? ms : undefined;
+}
+
 function subIssueChild(node: SubIssueNode, epic: IssueRef): Child {
   const labels = labelsOf(node);
+  const assignees = assigneesOf(node);
+  const status = deriveStatus(node, ownRepo(node, epic));
+  const openPrs = status === 'done' || status === 'dropped' ? 0 : linkedOpenPrs(node, ownRepo(node, epic)).length;
+  const closedAt = status === 'done' ? timeOf(node.closedAt) : undefined;
   return {
     number: node.number,
     title: node.title.slice(0, 300),
     url: node.url.slice(0, 500),
-    status: deriveStatus(node, ownRepo(node, epic)),
+    status,
     ...(labels.length === 0 ? {} : { labels }),
+    ...(assignees.length === 0 ? {} : { assignees }),
+    ...(openPrs === 0 ? {} : { openPrs }),
+    ...(closedAt === undefined ? {} : { closedAt }),
   };
 }
 
@@ -58,6 +75,7 @@ export function buildEpic(node: EpicNode, ref: IssueRef): EpicData | null {
   const kind = node.subIssues.totalCount > 0 ? 'subissues' : 'checklist';
   const children = kind === 'subissues' ? subs.map((n) => subIssueChild(n, ref)) : checklistChildren(node.body, ref);
   if (children.length === 0) return null;
+  const summary = summaryOf(node.body);
   return {
     ref,
     title: node.title.slice(0, 300),
@@ -65,6 +83,8 @@ export function buildEpic(node: EpicNode, ref: IssueRef): EpicData | null {
     kind,
     children: children.slice(0, MAX_CHILDREN),
     truncated: node.subIssues.totalCount > subs.length || children.length > MAX_CHILDREN,
+    ...(summary === undefined ? {} : { summary }),
+    ...(timeOf(node.createdAt) === undefined ? {} : { createdAt: timeOf(node.createdAt) }),
   };
 }
 

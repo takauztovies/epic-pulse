@@ -84,7 +84,26 @@ GitHub itself, so they change when the issue, its assignee or its pull request d
 | A **green epic icon**, and a green status bar | The epic is 100% done and its data is fresh. |
 | Everything else | The theme's own colour. |
 
-Hover a row for its tooltip: counts per status, the sessions, **session time**, when a session was
+Hover an epic for a briefing:
+
+```
+#1 Demo epic: sample onboarding flow
+20% · 1/5: Todo 3 · In progress 1 · Done 1 · Dropped 1
+Summary: Public demo epic used by epic-pulse fixtures and live tests. Children cover every derived status.
+Open pull requests: 2 · Assigned: @takauztovies
+Opened 8 days ago · 1 done in the last 7 days
+Session: 0f8e7c1a
+Session time: 3 h 20 min
+Last active 12 min ago (session 0f8e7c1a)
+updated just now
+```
+
+- **Summary** is the first lines of the epic's description, without markup or links.
+- **Open pull requests** counts those that will close an issue of the epic; **Assigned** lists who
+  has its issues (up to five people).
+- **Opened … · N done in the last 7 days** answers "is it moving?".
+
+An issue's hover shows who has it and its open pull requests. Both also show: counts per status, the sessions, **session time**, when a session was
 last on it, and when it was last refreshed.
 
 ### Session time

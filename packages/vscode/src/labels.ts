@@ -118,3 +118,34 @@ export function activityLines(item: Activity, now: number): readonly string[] {
   const session = item.lastSessionId === null ? '' : ` (session ${shortSessionId(item.lastSessionId)})`;
   return [time, `Last active ${agoText(item.lastActivityAt, now)}${session}`];
 }
+
+function ageOnlyText(iso: string, now: number): string {
+  const days = Math.floor(Math.max(0, now - Date.parse(iso)) / 86_400_000);
+  return days < 1 ? 'today' : days === 1 ? '1 day ago' : days < 60 ? `${days} days ago` : `${Math.floor(days / 30)} months ago`;
+}
+
+interface Details {
+  readonly summary: string | null;
+  readonly createdAt: string | null;
+  readonly doneLast7Days: number;
+  readonly openPullRequests: number;
+  readonly assignees: readonly string[];
+}
+
+// The hover's extra lines for an epic: its description's opening lines, how
+// many pull requests are open and who is assigned, and how old it is with
+// how much of it was finished this week. A line with nothing to say is left out.
+export function detailLines(epic: Details, now: number): readonly string[] {
+  const people = epic.assignees.length === 0 ? [] : [`Assigned: ${epic.assignees.map((login) => `@${login}`).join(', ')}`];
+  const flight = [`Open pull requests: ${epic.openPullRequests}`, ...people].join(' · ');
+  const age = epic.createdAt === null ? [] : [`Opened ${ageOnlyText(epic.createdAt, now)}`];
+  const moving = [...age, `${epic.doneLast7Days} done in the last 7 days`].join(' · ');
+  return [...(epic.summary === null ? [] : [`Summary: ${epic.summary}`]), flight, moving];
+}
+
+// The same for an issue: who has it and what is in flight on it.
+export function issueDetailLines(issue: Pick<Details, 'assignees' | 'openPullRequests'>): readonly string[] {
+  const people = issue.assignees.length === 0 ? [] : [`Assigned: ${issue.assignees.map((login) => `@${login}`).join(', ')}`];
+  const prs = issue.openPullRequests === 0 ? [] : [`Open pull requests: ${issue.openPullRequests}`];
+  return [...people, ...prs];
+}

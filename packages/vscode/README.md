@@ -24,7 +24,9 @@ then the title. Its description adds `1/5`, the first eight characters of each l
   its row.
 - **Green**: an issue icon is green while a live session is on it; an epic's icon and the status bar
   are green once it is 100% done.
-- **Hover** an epic or issue for its **session time** (how long Claude Code sessions actively worked on
+- **Hover** an epic for the first lines of its description, its open pull requests and who is
+  assigned, how old it is and how many issues were finished in the last 7 days; an issue for who has
+  it and its open pull requests. Both show their **session time** (how long Claude Code sessions actively worked on
   it, idle gaps over ten minutes not counted) and when a session was last on it.
 - The groups In progress, In review and Done start expanded; Todo and Dropped start collapsed.
 
@@ -94,8 +96,9 @@ Only when none of these yields a token GitHub accepts does the view offer **Sign
   - `sessions/*.jsonl`, written by the plugin's hook: issue references and timestamps for each
     session. No command text, file paths or file contents. Files untouched for a week are deleted.
   - `pins.json`: issues pinned with `epic-pulse track`.
-  - `snapshot.json`: what was fetched from GitHub (epic and sub-issue titles, numbers, URLs and
-    statuses), when, the hour's rate-limit counters, and the code of the last failure.
+  - `snapshot.json`: what was fetched from GitHub (epic and sub-issue titles, numbers, URLs,
+    statuses, labels, assignee logins, open pull request counts, opened and closed dates and the first
+    lines of an epic's description), when, the hour's rate-limit counters, and the code of the last failure.
   - `refresh.lock`, while a refresh runs.
 - **Stored for your user**, in the epic-pulse cache directory (`~/Library/Caches/epic-pulse` on macOS,
   `$XDG_CACHE_HOME/epic-pulse` or `~/.cache/epic-pulse` on Linux, `%LOCALAPPDATA%\epic-pulse` on

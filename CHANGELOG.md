@@ -7,6 +7,14 @@ Every notable change to epic-pulse is listed here. Versions follow
 
 ### Added
 
+- The hover on an epic is now a briefing: the first lines of its description, its open pull requests,
+  who its issues are assigned to, how old it is and how many issues were finished in the last 7 days;
+  an issue's hover shows its assignees and open pull requests. The same lines are in the status bar
+  tooltip (escaped as text) and the Overview card. The query reads three more fields and costs the
+  same (4 points per epic); `epic-pulse json` gains `summary`, `createdAt`, `doneLast7Days`,
+  `openPullRequests` and `assignees` on epics and `assignees` and `openPullRequests` on issues. The
+  snapshot stores them as optional fields, so existing snapshots keep working until their next refresh.
+
 - **Session time** per epic and per issue: how long Claude Code sessions actively worked on it, with
   gaps over ten minutes counted as idle, shown in the hover of the tree, the status bar and the
   Overview card. The hover also says when a session was last on it, and which. Totals are kept in

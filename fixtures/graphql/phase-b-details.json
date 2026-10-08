@@ -1,0 +1,241 @@
+{
+  "recordedAt": "2026-10-08T12:32:57.837Z",
+  "note": "both demo epics with creation, closing dates, assignee logins and bodies",
+  "status": 200,
+  "remaining": 4592,
+  "retryAfter": false,
+  "body": {
+    "data": {
+      "rateLimit": {
+        "cost": 8,
+        "remaining": 4592,
+        "resetAt": "2026-10-08T13:00:50Z"
+      },
+      "repository": {
+        "e1": {
+          "number": 1,
+          "title": "Demo epic: sample onboarding flow",
+          "url": "https://github.com/takauztovies/epic-pulse/issues/1",
+          "body": "Public demo epic used by epic-pulse fixtures and live tests. Children cover every derived status.",
+          "createdAt": "2026-09-30T13:13:05Z",
+          "subIssues": {
+            "totalCount": 6,
+            "nodes": [
+              {
+                "number": 2,
+                "title": "Demo: write welcome copy (done)",
+                "url": "https://github.com/takauztovies/epic-pulse/issues/2",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "closedAt": "2026-09-30T13:13:28Z",
+                "repository": {
+                  "nameWithOwner": "takauztovies/epic-pulse"
+                },
+                "assignees": {
+                  "totalCount": 0,
+                  "nodes": []
+                },
+                "labels": {
+                  "nodes": [
+                    {
+                      "name": "demo"
+                    }
+                  ]
+                },
+                "closedByPullRequestsReferences": {
+                  "nodes": []
+                },
+                "timelineItems": {
+                  "nodes": []
+                }
+              },
+              {
+                "number": 3,
+                "title": "Demo: legacy import wizard (not planned)",
+                "url": "https://github.com/takauztovies/epic-pulse/issues/3",
+                "state": "CLOSED",
+                "stateReason": "NOT_PLANNED",
+                "closedAt": "2026-09-30T13:13:29Z",
+                "repository": {
+                  "nameWithOwner": "takauztovies/epic-pulse"
+                },
+                "assignees": {
+                  "totalCount": 0,
+                  "nodes": []
+                },
+                "labels": {
+                  "nodes": [
+                    {
+                      "name": "demo"
+                    }
+                  ]
+                },
+                "closedByPullRequestsReferences": {
+                  "nodes": []
+                },
+                "timelineItems": {
+                  "nodes": []
+                }
+              },
+              {
+                "number": 4,
+                "title": "Demo: profile form (draft PR)",
+                "url": "https://github.com/takauztovies/epic-pulse/issues/4",
+                "state": "OPEN",
+                "stateReason": "REOPENED",
+                "closedAt": null,
+                "repository": {
+                  "nameWithOwner": "takauztovies/epic-pulse"
+                },
+                "assignees": {
+                  "totalCount": 0,
+                  "nodes": []
+                },
+                "labels": {
+                  "nodes": [
+                    {
+                      "name": "demo"
+                    }
+                  ]
+                },
+                "closedByPullRequestsReferences": {
+                  "nodes": []
+                },
+                "timelineItems": {
+                  "nodes": [
+                    {
+                      "source": {
+                        "__typename": "PullRequest",
+                        "number": 9,
+                        "state": "CLOSED",
+                        "isDraft": true,
+                        "url": "https://github.com/takauztovies/epic-pulse/pull/9",
+                        "body": "Fixes #4\n\nPublic demo fixture for epic-pulse live tests (draft PR → sub-issue shows In progress). Do not merge.",
+                        "repository": {
+                          "nameWithOwner": "takauztovies/epic-pulse"
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "number": 5,
+                "title": "Demo: email verification (ready PR)",
+                "url": "https://github.com/takauztovies/epic-pulse/issues/5",
+                "state": "OPEN",
+                "stateReason": null,
+                "closedAt": null,
+                "repository": {
+                  "nameWithOwner": "takauztovies/epic-pulse"
+                },
+                "assignees": {
+                  "totalCount": 0,
+                  "nodes": []
+                },
+                "labels": {
+                  "nodes": [
+                    {
+                      "name": "demo"
+                    }
+                  ]
+                },
+                "closedByPullRequestsReferences": {
+                  "nodes": []
+                },
+                "timelineItems": {
+                  "nodes": [
+                    {
+                      "source": {
+                        "__typename": "PullRequest",
+                        "number": 10,
+                        "state": "CLOSED",
+                        "isDraft": false,
+                        "url": "https://github.com/takauztovies/epic-pulse/pull/10",
+                        "body": "Fixes #5\n\nPublic demo fixture for epic-pulse live tests (ready PR → sub-issue shows In review). Do not merge.",
+                        "repository": {
+                          "nameWithOwner": "takauztovies/epic-pulse"
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "number": 6,
+                "title": "Demo: avatar upload (assigned)",
+                "url": "https://github.com/takauztovies/epic-pulse/issues/6",
+                "state": "OPEN",
+                "stateReason": "REOPENED",
+                "closedAt": null,
+                "repository": {
+                  "nameWithOwner": "takauztovies/epic-pulse"
+                },
+                "assignees": {
+                  "totalCount": 1,
+                  "nodes": [
+                    {
+                      "login": "takauztovies"
+                    }
+                  ]
+                },
+                "labels": {
+                  "nodes": [
+                    {
+                      "name": "demo"
+                    }
+                  ]
+                },
+                "closedByPullRequestsReferences": {
+                  "nodes": []
+                },
+                "timelineItems": {
+                  "nodes": []
+                }
+              },
+              {
+                "number": 7,
+                "title": "Demo: tour tooltips (untouched)",
+                "url": "https://github.com/takauztovies/epic-pulse/issues/7",
+                "state": "OPEN",
+                "stateReason": null,
+                "closedAt": null,
+                "repository": {
+                  "nameWithOwner": "takauztovies/epic-pulse"
+                },
+                "assignees": {
+                  "totalCount": 0,
+                  "nodes": []
+                },
+                "labels": {
+                  "nodes": [
+                    {
+                      "name": "demo"
+                    }
+                  ]
+                },
+                "closedByPullRequestsReferences": {
+                  "nodes": []
+                },
+                "timelineItems": {
+                  "nodes": []
+                }
+              }
+            ]
+          }
+        },
+        "e8": {
+          "number": 8,
+          "title": "Demo checklist epic: docs site",
+          "url": "https://github.com/takauztovies/epic-pulse/issues/8",
+          "body": "Checkbox-only epic (no sub-issues).\n\n- [x] Pick a static site generator\n- [x] Write the install page\n- [ ] Write the configuration page\n- [ ] Add screenshots\n- [ ] ~~Translate into French~~",
+          "createdAt": "2026-09-30T13:13:18Z",
+          "subIssues": {
+            "totalCount": 0,
+            "nodes": []
+          }
+        }
+      }
+    }
+  }
+}
