@@ -5,7 +5,7 @@ import { issueLink } from '../links.js';
 import { signedOutHosts } from '../model.js';
 import type { Poller } from '../poller.js';
 import type { RepoTarget } from '../repos.js';
-import { intakeUriParts, sessionUriParts } from '../sessions.js';
+import { intakeUriParts, sessionIdsFrom, sessionUriParts } from '../sessions.js';
 import { trackIn, untrackEverywhere } from '../track.js';
 import type { TreeNode } from '../tree-model.js';
 import { signIn } from './auth.js';
@@ -83,8 +83,7 @@ async function pickSession(ids: readonly string[]): Promise<string | undefined> 
 // its tab. A session started from another folder may not be found there, in
 // which case Claude Code starts a new conversation instead.
 async function openSession(value: unknown, log: vscode.LogOutputChannel): Promise<void> {
-  const ids = Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [];
-  const id = await pickSession(ids);
+  const id = await pickSession(sessionIdsFrom(value));
   const parts = id === undefined ? undefined : sessionUriParts(id);
   if (parts === undefined) {
     log.warn('openSession refused: no valid session id');

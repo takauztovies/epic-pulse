@@ -31,7 +31,7 @@ test('an epic opens on GitHub and splits into status groups whose issues count t
   const repo = await makeRegistry(t, { sessions: [{ id: SESSION_A, binds: [demo(4)] }], snapshot: demoSnapshot(now - 1000) }, now);
   const [epic] = treeOf(await modelOf([repo], now));
   assert.ok(epic?.kind === 'epic');
-  assert.deepEqual(epic.command, { command: 'epicPulse.openSession', title: 'Open Claude Code session', arguments: [SESSION_A] });
+  assert.deepEqual(epic.command, { command: 'epicPulse.openSession', title: 'Open Claude Code session', arguments: [[SESSION_A]] });
   assert.equal(epic.url, 'https://github.com/takauztovies/epic-pulse/issues/1');
   const groups = epic.children.map((group) => [group.label, group.expanded, group.description, group.children.map((issue) => [issue.label.split(' ')[0], issue.description, issue.iconColor])]);
   assert.deepEqual(groups, [
@@ -42,7 +42,7 @@ test('an epic opens on GitHub and splits into status groups whose issues count t
     ['Dropped', false, '1', [['#3', '', undefined]]],
   ]);
   const four = epic.children[1]?.children[0];
-  assert.deepEqual(four?.command, { command: 'epicPulse.openSession', title: 'Open Claude Code session', arguments: [SESSION_A] });
+  assert.deepEqual(four?.command, { command: 'epicPulse.openSession', title: 'Open Claude Code session', arguments: [[SESSION_A]] });
   const six = epic.children[1]?.children[1];
   assert.deepEqual(six?.command?.arguments, ['https://github.com/takauztovies/epic-pulse/issues/6'], 'no live session: a click opens GitHub');
 });

@@ -26,3 +26,9 @@ export function intakeUriParts(epicUrl: string): SessionUriParts | undefined {
   const ref = target && own ? makeRef({ host: own.host ?? 'github.com', owner: own.owner, repo: own.repo, number: target.number }) : undefined;
   return ref ? { scheme: 'vscode', authority: 'anthropic.claude-code', path: '/open', query: `prompt=/epic-pulse:intake ${issueUrl(ref)}` } : undefined;
 }
+
+// The ids a click hands to openSession: the first argument, an array of strings.
+// Anything else (a stray argument from the palette, a malformed command) is no ids.
+export function sessionIdsFrom(argument: unknown): readonly string[] {
+  return Array.isArray(argument) ? argument.filter((id): id is string => typeof id === 'string') : [];
+}

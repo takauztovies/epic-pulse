@@ -10,7 +10,7 @@ import type { DisplayState, Model } from './model.js';
 export interface CommandRef {
   readonly command: string;
   readonly title: string;
-  readonly arguments?: readonly string[];
+  readonly arguments?: readonly unknown[];
 }
 
 interface NodeBase {
@@ -57,8 +57,11 @@ function openCommand(url: string): CommandRef {
 
 // A click goes to the live Claude Code session working on the item when there
 // is one, and to GitHub otherwise; "Open on GitHub" stays in the context menu.
+// VS Code calls the handler with each entry of `arguments` as its own parameter,
+// so the ids go in as ONE entry, an array: spread, a lone id arrived as a string
+// and every click was refused.
 function clickCommand(url: string | null, sessionIds: readonly string[]): CommandRef | undefined {
-  if (sessionIds.length > 0) return { command: COMMAND.openSession, title: 'Open Claude Code session', arguments: sessionIds };
+  if (sessionIds.length > 0) return { command: COMMAND.openSession, title: 'Open Claude Code session', arguments: [sessionIds] };
   return url === null ? undefined : openCommand(url);
 }
 
