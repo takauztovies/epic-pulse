@@ -38,7 +38,7 @@ function legendItem(epic: JsonEpic, status: Status): string {
 function card(epic: JsonEpic, index: number, now: number): string {
   const stale = epic.stale ? ' · stale' : '';
   return `<section class="card">
-<button class="head" data-i="${index}"><span class="title">#${epic.number} ${escapeHtml(epic.title)}</span><span class="pct">${epic.percent}%</span></button>
+<button class="head" data-i="${index}"><span class="title">${escapeHtml(epic.key)} ${escapeHtml(epic.title)}</span><span class="pct">${epic.percent}%</span></button>
 <progress class="${epic.percent === 100 ? 'full' : ''}" max="100" value="${epic.percent}"></progress>
 <ul class="legend">${STATUSES.map((status) => legendItem(epic, status)).join('')}</ul>
 ${detailLines(epic, now).map((text) => `<div class="meta">${escapeHtml(text)}</div>`).join('')}

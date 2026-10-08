@@ -55,13 +55,13 @@ function epicLine(epic: JsonEpic, options: { readonly more: number; readonly pen
   const stale = epic.stale ? [epic.error === null ? 'stale' : `stale (${epic.error})`] : [];
   const loading = options.pending > 0 ? [`${options.pending} loading`] : [];
   const extra = options.more > 0 ? ` (+${options.more})` : '';
-  const head = `#${epic.number} ${epic.percent}% ${fraction(epic)}`;
-  const withBar = `#${epic.number} ${bar(epic.percent)} ${epic.percent}% ${fraction(epic)}`;
+  const head = `${epic.key} ${epic.percent}% ${fraction(epic)}`;
+  const withBar = `${epic.key} ${bar(epic.percent)} ${epic.percent}% ${fraction(epic)}`;
   return fit([
     [withBar, ...detail, ...stale, ...loading].join(' · ') + extra,
     [head, ...detail, ...stale, ...loading].join(' · ') + extra,
     [head, ...stale, ...loading].join(' · ') + extra,
-    [`#${epic.number} ${epic.percent}%`, ...stale].join(' · '),
+    [`${epic.key} ${epic.percent}%`, ...stale].join(' · '),
   ], options.width);
 }
 

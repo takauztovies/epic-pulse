@@ -2,6 +2,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { findWorktree } from './git.js';
 import { compileBranchPattern, DEFAULT_BRANCH_PATTERN } from './branch-pattern.js';
+import { parseJira, type JiraConfig } from './jira-config.js';
 import { DEFAULT_PROGRESS, parseProgress, type ProgressConfig } from './progress-config.js';
 import { parseJson } from './result.js';
 import { CONFIG_LIMITS, RawConfigSchema } from './schemas/config.js';
@@ -13,6 +14,8 @@ export interface Config {
   readonly ignorePaths: readonly string[];
   readonly ignoreMainCheckout: boolean;
   readonly progress: ProgressConfig;
+  // Absent unless the repository declares a Jira site and projects.
+  readonly jira?: JiraConfig;
 }
 
 export const DEFAULT_CONFIG: Config = {
@@ -43,6 +46,7 @@ function ignorePathsOf(entries: readonly unknown[] | undefined): readonly string
 export function parseConfig(value: unknown): Config {
   const raw = RawConfigSchema.safeParse(value);
   if (!raw.success) return DEFAULT_CONFIG;
+  const jira = parseJira(raw.data.jira);
   const source = raw.data.branchIssuePattern;
   const compiled = source === undefined ? undefined : compileBranchPattern(source);
   return {
@@ -50,6 +54,7 @@ export function parseConfig(value: unknown): Config {
     ignorePaths: ignorePathsOf(raw.data.ignorePaths),
     ignoreMainCheckout: raw.data.ignoreMainCheckout ?? false,
     progress: parseProgress(raw.data.progress),
+    ...(jira ? { jira } : {}),
   };
 }
 
@@ -57,6 +62,12 @@ export function parseConfig(value: unknown): Config {
 export async function loadProgressFor(dir: string): Promise<ProgressConfig> {
   const worktree = await findWorktree(dir);
   return worktree ? (await loadConfig(worktree.root)).progress : DEFAULT_PROGRESS;
+}
+
+// The repository's jira block, found from any directory inside it.
+export async function loadJiraFor(dir: string): Promise<JiraConfig | undefined> {
+  const worktree = await findWorktree(dir);
+  return worktree ? (await loadConfig(worktree.root)).jira : undefined;
 }
 
 export async function loadConfig(root: string): Promise<Config> {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { STALE_AFTER_MS } from '@epic-pulse/core';
+import { makeJiraRef, STALE_AFTER_MS } from '@epic-pulse/core';
 import { buildModel } from '../src/model.js';
 import { pollRepo } from '../src/poll.js';
 import { statusBarOf } from '../src/status-model.js';
@@ -43,4 +43,17 @@ test('signed out with data from before keeps the epic on screen, and its click s
   // Stale by age only: a refresh without a token leaves the epic's own error alone.
   assert.equal(treeOf(model)[1]?.description, '20% · 1/5 · Session: 0f8e7c1a · stale');
   assert.equal(statusBarOf(model).command, 'epicPulse.signIn');
+});
+
+// A Jira site is reached with JIRA_* in the environment, never with a GitHub
+// sign-in, so signing in to GitHub can not cure it and must not be offered.
+test('a Jira-only repository with no credentials is an error with its code, never a GitHub sign-in prompt', async (t) => {
+  const now = Date.now();
+  const jira = makeJiraRef({ host: 'acme.atlassian.net', project: 'EPD', number: 4 })!;
+  const repo = await makeRegistry(t, { sessions: [{ id: SESSION_A, binds: [jira] }] }, now);
+  const result = await pollRepo(repo, { now, env: noGhEnv(t), grant: {} });
+  assert.deepEqual([result.refresh, result.token, result.hosts], [{ status: 'done', requests: 0, points: 0, error: 'no_token' }, 'none', []]);
+  const model = buildModel({ results: [result], now });
+  assert.notEqual(model.state, 'signed-out');
+  assert.equal(statusBarOf(model).command, 'epicPulse.epics.focus');
 });

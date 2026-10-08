@@ -173,5 +173,5 @@ test('the repository progress config changes the percentages, and a child in the
   const progress = { ...DEFAULT_PROGRESS, sizes: { 'est:4': 4 }, unsized: 1, inProgress: 50, inReview: 50 };
   const result = buildView({ snapshot, sessions: [own], pins: [], now: T0 + 1000, scope: { session: own }, progress }).epics[0];
   assert.equal(result?.percent, 4 * 100 / (4 + 1 + 1 + 1 + 1) | 0);
-  assert.deepEqual(Object.keys(result?.children[0] ?? {}).sort(), ['activeSeconds', 'assignees', 'lastActivityAt', 'lastSessionId', 'number', 'openPullRequests', 'sessionCount', 'sessionIds', 'status', 'title', 'url']);
+  assert.deepEqual(Object.keys(result?.children[0] ?? {}).sort(), ['activeSeconds', 'assignees', 'key', 'lastActivityAt', 'lastSessionId', 'number', 'openPullRequests', 'sessionCount', 'sessionIds', 'status', 'title', 'url']);
 });

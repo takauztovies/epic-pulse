@@ -199,7 +199,28 @@ narrow the bar goes first, then the counts. Like the views it counts Done only.
 | Sign in to GitHub | Signs in through VS Code. Palette. |
 | Show status details | Prints where each registry is and how the last refresh went. Palette. |
 
-## 7. Troubleshooting
+## 7. Jira
+
+A repository whose work is in Jira Cloud is set up once, and then looks the same as a GitHub one, with
+Jira keys (`PROJ-12`) instead of `#12`.
+
+1. In the repository's `.epic-pulse.json` add:
+   ```json
+   { "jira": { "site": "acme.atlassian.net", "projects": ["PROJ"] } }
+   ```
+   A project's In Review style statuses can be mapped with `"statusMap": { "in qa": "in_review" }`.
+2. In **your own environment** (where VS Code and Claude Code start) set `JIRA_SITE=acme.atlassian.net`,
+   `JIRA_EMAIL=you@example.com` and `JIRA_API_TOKEN=...` (create one at
+   <https://id.atlassian.com/manage-profile/security/api-tokens>, with an expiry). They are not read
+   from the repository, on purpose: see the README's privacy section.
+3. Work as usual. A branch `feature/PROJ-12-login`, a commit message `PROJ-12 add login`, or
+   `/epic-pulse:track PROJ-12` binds the issue; **+** in the Epics view takes `PROJ-12` as well.
+
+Epics are Jira Epics; their issues are the epic's children. Statuses come from Jira's status
+categories (To Do, In Progress, Done), with "review" statuses in review and Won't Do / Duplicate
+resolutions as dropped. There are no pull-request counts for Jira issues.
+
+## 8. Troubleshooting
 
 | You see | Do this |
 | --- | --- |
@@ -210,6 +231,7 @@ narrow the bar goes first, then the counts. Like the views it counts Done only.
 | Clicking a row opens GitHub, not a session | No live session is on it; sessions count as live for two hours after their last hook call. |
 | A session opens as a new conversation | It was started in another folder or worktree; open that folder. |
 | **Start Working on This Epic…** does nothing useful | The epic-pulse plugin is not installed, so Claude Code does not know `/epic-pulse:intake`. |
+| A Jira epic says **No epic**, or **Refresh failed: no_token** | `JIRA_SITE`, `JIRA_EMAIL` and `JIRA_API_TOKEN` are not in the environment VS Code or Claude Code started with (restart them after setting), `JIRA_SITE` does not list the site in `.epic-pulse.json`, or the token has expired (Jira then answers with nothing). |
 | A bar looks behind the work in flight | By design: the bar counts closed work only. In-flight credit is `weightedPercent` in `epic-pulse json`. |
 
 `epic-pulse doctor` checks the setup from a terminal.

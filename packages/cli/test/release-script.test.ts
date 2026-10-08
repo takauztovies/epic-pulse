@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { git } from './helpers.js';
@@ -186,4 +186,20 @@ test('after a release has tracked plugin/dist, a rebuilt bundle does not block t
   const second = release(repo, [nextMinor(repo)]);
   assert.equal(second.status, 0, second.stderr);
   assert.equal(blob(repo, `HEAD:${PLUGIN_BUNDLE}`), fileBlob(repo, 'packages/cli/dist/epic-pulse.mjs'));
+});
+
+// Jira support was first tested against hand-written fixtures, flagged
+// unverified. Shipping that would ship code never run against a real Jira.
+test('--check refuses to release while a Jira fixture is marked unverified, and passes once it is recorded', (t) => {
+  const repo = releaseRepo(t, { withJiraFixtures: true });
+  const current = cliVersion(repo);
+  const dir = join(repo, 'fixtures', 'jira');
+  assertRefused(release(repo, ['--check', current]), 1, /fixtures\/jira\/phase-a\.json is marked unverified/);
+  const files = readdirSync(dir).map((name) => join(dir, name));
+  writeFileSync(files[0] ?? '', JSON.stringify({ ...JSON.parse(readFileSync(files[0] ?? '', 'utf8')) as object, unverified: undefined }));
+  assert.match(release(repo, ['--check', current]).stderr, /is marked unverified/, 'one recorded fixture is not all of them');
+  for (const file of files) writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, 'utf8')) as object, unverified: false }));
+  assert.equal(release(repo, ['--check', current]).status, 0, 'recorded fixtures ship');
+  rmSync(dir, { recursive: true });
+  assert.equal(release(repo, ['--check', current]).status, 0, 'a repository with no Jira fixtures ships');
 });

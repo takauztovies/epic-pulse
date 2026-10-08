@@ -1,4 +1,4 @@
-import { makeRef, parseIssueTarget, refKey } from './ref.js';
+import { displayKey, JIRA_KEY, kindOf, makeJiraRef, makeRef, parseIssueTarget, refKey } from './ref.js';
 import { activeBindings, isHookInactive, isLive, type Binding, type SessionState } from './registry.js';
 import type { ErrorCode, IssueRef, StateKind } from './schemas/common.js';
 import type { JsonEpic, JsonV1 } from './schemas/json-v1.js';
@@ -115,6 +115,11 @@ function stateOf(scoped: Scoped): StateKind {
 // A child's own URL names its repository (sub-issues may live elsewhere); a
 // checklist item without one can only mean an issue of the epic's repository.
 function childKey(child: Child, epic: IssueRef): string | undefined {
+  if (kindOf(epic) === 'jira') {
+    const parts = child.key === undefined ? null : JIRA_KEY.exec(child.key);
+    const own = parts ? makeJiraRef({ host: epic.host, project: parts[1] ?? '', number: Number(parts[2]) }) : undefined;
+    return own ? refKey(own) : undefined;
+  }
   const target = child.url === null ? undefined : parseIssueTarget(child.url);
   const own = target?.repo;
   const ref = target && own ? makeRef({ host: own.host ?? epic.host, owner: own.owner, repo: own.repo, number: target.number })
@@ -181,11 +186,11 @@ function jsonEpic(entry: EpicEntry, bound: readonly BoundSession[], input: { rea
     const sessionIds = childSessionIds(childKey(child, entry.ref), bound);
     const key = childKey(child, entry.ref);
     const time = key === undefined ? undefined : input.time?.refs[key];
-    return { number: child.number, title: child.title, url: child.url, status: child.status, sessionCount: sessionIds.length, sessionIds, assignees: [...(child.assignees ?? [])], openPullRequests: child.openPrs ?? 0, ...activityOf([time]) };
+    return { number: child.number, key: child.key ?? (child.number === null ? null : `#${child.number}`), title: child.title, url: child.url, status: child.status, sessionCount: sessionIds.length, sessionIds, assignees: [...(child.assignees ?? [])], openPullRequests: child.openPrs ?? 0, ...activityOf([time]) };
   });
   const epicSessionIds = [...new Set(children.flatMap((child) => child.sessionIds))];
   return {
-    number: entry.ref.number, title: entry.title, url: entry.url, kind: entry.kind, counts, percent: percentDone(points),
+    number: entry.ref.number, key: displayKey(entry.ref), title: entry.title, url: entry.url, kind: entry.kind, counts, percent: percentDone(points),
     weightedPercent: weightedPercentDone(points, input.progress), sessionIds: epicSessionIds, ...epicActivity(entry, input.time), ...epicDetails(entry, input.now),
     children, fetchedAt: iso(entry.fetchedAt), stale: isStale(entry, input.now), error: entry.error, truncated: entry.truncated,
   };

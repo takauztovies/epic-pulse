@@ -1,5 +1,5 @@
 import {
-  addPin, DEFAULT_HOST, findWorktree, LIVE_WINDOW_MS, makeRef, parseIssueTarget, pathsFor, readRemote, refKey,
+  addPin, DEFAULT_HOST, findWorktree, LIVE_WINDOW_MS, displayKey, loadConfig, makeJiraRef, makeRef, parseIssueTarget, pathsFor, readRemote, refKey,
   registryDirFor, removePin, type IssueRef, type IssueTarget, type PinsErrorCode,
 } from '@epic-pulse/core';
 import { lastHookActivity } from './activity.js';
@@ -7,6 +7,8 @@ import { parseCommandArgs } from './args.js';
 import { failWith, NOT_A_REPO, printError, printLine, usageError } from './io.js';
 
 export type TrackVerb = 'track' | 'untrack';
+
+const NO_JIRA_SITE = 'no Jira site is declared; add a "jira" block with "site" and "projects" to .epic-pulse.json, or give the issue URL';
 
 const PIN_ERRORS: Readonly<Record<PinsErrorCode, string>> = {
   corrupt: 'pins.json can not be read, so it was left unchanged',
@@ -18,6 +20,11 @@ const PIN_ERRORS: Readonly<Record<PinsErrorCode, string>> = {
 // and a bare owner/repo means that repository's host, or github.com.
 async function refFor(target: IssueTarget, cwd: string): Promise<IssueRef | undefined> {
   const worktree = await findWorktree(cwd);
+  if (target.jira) {
+    // A bare key belongs to the site the repository declares; a URL names its own.
+    const host = target.jira.host ?? (worktree ? (await loadConfig(worktree.root)).jira?.site : undefined);
+    return host ? makeJiraRef({ host, project: target.jira.project, number: target.number }) : undefined;
+  }
   const base = worktree ? await readRemote(worktree.commonDir) : undefined;
   const own = target.repo;
   const repo = own ? { host: own.host ?? base?.host ?? DEFAULT_HOST, owner: own.owner, repo: own.repo } : base;
@@ -57,7 +64,7 @@ async function sessionOnly(verb: TrackVerb, word: string, env: NodeJS.ProcessEnv
 }
 
 function changed(verb: TrackVerb, ref: IssueRef, didChange: boolean): string {
-  const key = refKey(ref);
+  const key = ref.kind === 'jira' ? displayKey(ref) : refKey(ref);
   if (verb === 'track') return didChange ? `epic-pulse: pinned ${key} for this repository.` : `epic-pulse: ${key} was already pinned.`;
   return didChange ? `epic-pulse: unpinned ${key}.` : `epic-pulse: ${key} was not pinned.`;
 }
@@ -67,7 +74,7 @@ async function repoPin(verb: TrackVerb, target: IssueTarget, env: NodeJS.Process
   const dir = await registryDirFor(cwd, env);
   if (dir === undefined) return failWith(NOT_A_REPO);
   const ref = await refFor(target, cwd);
-  if (!ref) return failWith('this repository has no GitHub remote; name one as owner/repo#N');
+  if (!ref) return failWith(target.jira ? NO_JIRA_SITE : 'this repository has no GitHub remote; name one as owner/repo#N');
   const paths = pathsFor(dir);
   const result = verb === 'track' ? await addPin(paths, ref, Date.now()) : await removePin(paths, ref);
   if (!result.ok) return failWith(PIN_ERRORS[result.error]);

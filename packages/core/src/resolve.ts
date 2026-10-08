@@ -18,7 +18,7 @@ export function epicRefFor(ref: IssueRef, node: PhaseAIssue | null): IssueRef | 
   if (node.parent === null) return ref;
   const [owner, repo] = node.parent.repository.nameWithOwner.split('/');
   if (!owner || !repo) return null;
-  return makeRef({ host: ref.host, owner, repo, number: node.parent.number }) ?? null;
+  return makeRef({ kind: ref.kind, host: ref.host, owner, repo, number: node.parent.number }) ?? null;
 }
 
 // A sub-issue may live in another repository of the epic's host. Its pull

@@ -5,6 +5,16 @@ Every notable change to epic-pulse is listed here. Versions follow
 
 ## Unreleased
 
+### Added
+
+- **Jira Cloud**, per repository: declare a `jira` block (`site`, `projects`, optional `statusMap`) in
+  `.epic-pulse.json` and set `JIRA_SITE`, `JIRA_EMAIL` and `JIRA_API_TOKEN` in your environment. Epics
+  are Jira Epics with their children; statuses follow Jira's status categories with the repository's
+  map on top; sessions bind to `PROJ-12` through a branch name, a commit message or
+  `epic-pulse track PROJ-12`, only for the declared projects. Credentials go only to a site you list in
+  `JIRA_SITE`, never to one a repository names. `epic-pulse json` gains `key` (`#12` or `PROJ-12`) on
+  epics and issues. See "Jira" in the README.
+
 ## 0.3.4
 
 ### Added

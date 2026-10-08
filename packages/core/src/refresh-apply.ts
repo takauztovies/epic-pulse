@@ -1,7 +1,7 @@
 import type { RateInfo } from './queries.js';
 import { refKey } from './ref.js';
 import { RATE_LIMITED_BACKOFF_MS, RETAIN_MS } from './refresh-plan.js';
-import { buildEpic, epicRefFor } from './resolve.js';
+import { buildEpic, epicRefFor, type EpicData } from './resolve.js';
 import type { ErrorCode, IssueRef } from './schemas/common.js';
 import type { EpicNode, PhaseAIssue } from './schemas/graphql.js';
 import type { EpicEntry, Resolution, Snapshot } from './schemas/snapshot.js';
@@ -40,7 +40,13 @@ function withOwnAnswer(key: string, resolution: Resolution, answered: ReadonlyMa
 // re-points every issue that led to it at "no epic", which the 30-minute
 // resolution cache then keeps instead of asking again every two minutes.
 export function applyEpics(snapshot: Snapshot, answers: readonly (readonly [IssueRef, EpicNode | null])[], now: number): Snapshot {
-  const built = answers.map(([ref, node]) => [refKey(ref), node ? buildEpic(node, ref) : null] as const);
+  return applyBuiltEpics(snapshot, answers.map(([ref, node]) => [ref, node ? buildEpic(node, ref) : null] as const), now);
+}
+
+// The same for an epic a provider has already turned into snapshot data (Jira
+// reports statuses itself, so there is no GitHub node to derive them from).
+export function applyBuiltEpics(snapshot: Snapshot, answers: readonly (readonly [IssueRef, EpicData | null])[], now: number): Snapshot {
+  const built = answers.map(([ref, data]) => [refKey(ref), data] as const);
   const gone = new Set(built.flatMap(([key, data]) => (data ? [] : [key])));
   const answered = new Map(built.map(([key, data]) => [key, data !== null] as const));
   const fetched = built.flatMap(([key, data]) => (data ? [[key, { ...data, fetchedAt: now, error: null }] as const] : []));

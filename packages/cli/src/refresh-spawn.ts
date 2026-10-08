@@ -2,8 +2,8 @@ import { spawn } from 'node:child_process';
 import { statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import {
-  emptySnapshot, epicsToWatch, gatherRefs, homeDirectory, needsFetch, needsResolution, pinnedRefs, REFRESH_SESSION_ENV, withSession,
-  type Pin, type SessionState, type SnapshotRead,
+  emptySnapshot, epicsToWatch, gatherRefs, homeDirectory, needsFetch, needsResolution, pinnedRefs, REFRESH_SESSION_ENV, withSession, jiraToEnv,
+  type JiraConfig, type Pin, type SessionState, type SnapshotRead,
 } from '@epic-pulse/core';
 import { retryingLater, type RefreshAttempt } from './refresh-attempt.js';
 import { bundlePath } from './runtime.js';
@@ -70,6 +70,7 @@ export function spawnDetached(file: string, args: readonly string[], env: NodeJS
 // over through EPIC_PULSE_DIR, which also works when no working directory
 // would, and the status line's own session, whose issues the refresh then keeps
 // current even when the session is not live, through EPIC_PULSE_SESSION.
-export function spawnRefresh(dir: string, env: NodeJS.ProcessEnv, session?: string): void {
-  spawnDetached(process.execPath, [bundlePath(), 'refresh'], { ...env, EPIC_PULSE_DIR: dir, [REFRESH_SESSION_ENV]: session ?? '' });
+export function spawnRefresh(dir: string, env: NodeJS.ProcessEnv, extra: { readonly session?: string; readonly jira?: JiraConfig | undefined } = {}): void {
+  const handedOver = { ...env, EPIC_PULSE_DIR: dir, [REFRESH_SESSION_ENV]: extra.session ?? '', ...jiraToEnv(extra.jira) };
+  spawnDetached(process.execPath, [bundlePath(), 'refresh'], handedOver);
 }

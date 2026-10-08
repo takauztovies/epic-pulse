@@ -1,0 +1,159 @@
+{
+  "recordedAt": "2026-10-08T00:00:00.000Z",
+  "unverified": true,
+  "note": "an epic with a child in every lane. UNVERIFIED: written by hand from Atlassian's REST v3 documentation, not recorded from a Jira site. Replace with `pnpm record-fixtures jira` (needs JIRA_SITE, JIRA_EMAIL, JIRA_API_TOKEN and the demo project) before release; release.mjs --check refuses to ship while this flag is set.",
+  "status": 200,
+  "remaining": null,
+  "retryAfter": false,
+  "body": {
+    "epics": {
+      "issues": [
+        {
+          "key": "EPD-1",
+          "fields": {
+            "summary": "Demo epic: sample onboarding flow",
+            "description": {
+              "type": "doc",
+              "version": 1,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Public demo epic used by epic-pulse fixtures and live tests."
+                    }
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Children cover every derived status."
+                    }
+                  ]
+                }
+              ]
+            },
+            "created": "2026-09-30T13:13:05.000+0000"
+          }
+        }
+      ],
+      "isLast": true
+    },
+    "children": {
+      "EPD-1": {
+        "issues": [
+          {
+            "key": "EPD-2",
+            "fields": {
+              "summary": "Write welcome copy",
+              "status": {
+                "name": "Done",
+                "statusCategory": {
+                  "key": "done"
+                }
+              },
+              "resolution": {
+                "name": "Done"
+              },
+              "resolutiondate": "2026-09-30T13:13:28.000+0000",
+              "assignee": null,
+              "labels": []
+            }
+          },
+          {
+            "key": "EPD-3",
+            "fields": {
+              "summary": "Legacy import wizard",
+              "status": {
+                "name": "Closed",
+                "statusCategory": {
+                  "key": "done"
+                }
+              },
+              "resolution": {
+                "name": "Won't Do"
+              },
+              "resolutiondate": "2026-09-30T13:13:29.000+0000",
+              "assignee": null,
+              "labels": []
+            }
+          },
+          {
+            "key": "EPD-4",
+            "fields": {
+              "summary": "Profile form",
+              "status": {
+                "name": "In Progress",
+                "statusCategory": {
+                  "key": "indeterminate"
+                }
+              },
+              "resolution": null,
+              "resolutiondate": null,
+              "assignee": {
+                "displayName": "Ana Example"
+              },
+              "labels": [
+                "Frontend"
+              ]
+            }
+          },
+          {
+            "key": "EPD-5",
+            "fields": {
+              "summary": "Email verification",
+              "status": {
+                "name": "In Review",
+                "statusCategory": {
+                  "key": "indeterminate"
+                }
+              },
+              "resolution": null,
+              "resolutiondate": null,
+              "assignee": null,
+              "labels": []
+            }
+          },
+          {
+            "key": "EPD-6",
+            "fields": {
+              "summary": "Avatar upload",
+              "status": {
+                "name": "To Do",
+                "statusCategory": {
+                  "key": "new"
+                }
+              },
+              "resolution": null,
+              "resolutiondate": null,
+              "assignee": {
+                "displayName": "Ana Example"
+              },
+              "labels": []
+            }
+          },
+          {
+            "key": "EPD-7",
+            "fields": {
+              "summary": "Tour tooltips",
+              "status": {
+                "name": "Backlog",
+                "statusCategory": {
+                  "key": "new"
+                }
+              },
+              "resolution": null,
+              "resolutiondate": null,
+              "assignee": null,
+              "labels": []
+            }
+          }
+        ],
+        "complete": true
+      }
+    }
+  }
+}

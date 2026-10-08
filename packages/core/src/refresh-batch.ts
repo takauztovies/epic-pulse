@@ -1,6 +1,6 @@
 import type { RawResponse } from './github.js';
 import { touchLock, type Lock } from './lock.js';
-import { providerFor } from './provider.js';
+import { providerFor, type ProviderSettings } from './provider.js';
 import type { Failure, RateInfo } from './queries.js';
 import { applyRefusal, chargePoints, chargeRate, markEpicErrors, rateLimited } from './refresh-apply.js';
 import { backingOff, HOURLY_BUDGET_POINTS, PHASE_A_COST, phaseBCost } from './refresh-plan.js';
@@ -35,6 +35,8 @@ export interface Context {
   readonly lock: Lock;
   readonly clock: () => number;
   readonly ledger?: UsageLedger;
+  // What the repository says about its tracker (the jira block), for parse.
+  readonly settings?: ProviderSettings;
 }
 
 export interface Batch {
@@ -122,8 +124,8 @@ function charged(run: Run, batch: Batch, answer: { readonly rate: RateInfo | nul
   return { ...run, snapshot: chargeRate(snapshot, rate), points: run.points + rate.cost };
 }
 
-export function answered(run: Run, batch: Batch, res: RawResponse): Run {
-  const parsed = providerFor().parse(batch, res);
+export function answered(run: Run, batch: Batch, answer: { readonly res: RawResponse; readonly settings?: ProviderSettings }): Run {
+  const parsed = providerFor(batch.repo).parse(batch, answer.res, answer.settings ?? {});
   if (!parsed.ok) return rejected(run, batch, parsed.error);
   return charged(run, batch, { rate: parsed.value.rate, snapshot: parsed.value.apply(run.snapshot, run.now) });
 }
@@ -133,9 +135,9 @@ export async function runBatch(run: Run, batch: Batch, ctx: Context): Promise<Ru
   if (!token.ok) return failed(run, batch, token.error);
   const reserved = await reserve(run, batch, ctx);
   if (reserved.failure) return failed(reserved.run, batch, reserved.failure);
-  const sent = await providerFor().send(token.value, batch);
+  const sent = await providerFor(batch.repo).send(token.value, batch);
   await touchLock(ctx.lock, ctx.clock());
   const counted = { ...reserved.run, requests: reserved.run.requests + 1 };
-  const next = sent.ok ? answered(counted, batch, sent.value) : failed(counted, batch, sent.error);
+  const next = sent.ok ? answered(counted, batch, { res: sent.value, settings: ctx.settings }) : failed(counted, batch, sent.error);
   return topUp(next, { host: batch.repo.host, points: next.points - counted.points - costOf(batch) }, ctx);
 }

@@ -8,6 +8,8 @@ import { EpicKindSchema } from './snapshot.js';
 export const JsonChildSchema = z
   .object({
     number: IssueNumberSchema.nullable(),
+    // What to call it: `#12`, or `PROJ-12` on Jira; null for a plain checklist line.
+    key: z.string().nullable(),
     title: z.string(),
     url: z.string().nullable(),
     status: StatusSchema,
@@ -30,6 +32,8 @@ export const JsonChildSchema = z
 export const JsonEpicSchema = z
   .object({
     number: IssueNumberSchema,
+    // What to call it: `#1`, or `PROJ-1` on Jira.
+    key: z.string(),
     title: z.string(),
     url: z.string(),
     kind: EpicKindSchema,

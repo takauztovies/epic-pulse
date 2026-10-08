@@ -55,7 +55,7 @@ function repoLines(result: RepoResult): readonly string[] {
     `  snapshot written: ${snapshot.fetchedAt ?? 'never'}`,
     `  last refresh: ${refreshText(result.refresh)}`,
     `  token: ${TOKEN_TEXT[result.token]}`,
-    ...epics.map((epic) => `  epic #${epic.number}: ${progressText(epic)}${epic.stale ? ', stale' : ''}`),
+    ...epics.map((epic) => `  epic ${epic.key}: ${progressText(epic)}${epic.stale ? ', stale' : ''}`),
   ];
 }
 

@@ -9,6 +9,9 @@ export const EpicKindSchema = z.enum(['subissues', 'checklist']);
 export const ChildSchema = z
   .object({
     number: IssueNumberSchema.nullable(),
+    // A Jira issue's own key (PROJ-5): a child may be in another project than its epic,
+    // so the number alone does not say. Absent on GitHub, where a child is #number.
+    key: z.string().max(40).optional(),
     title: z.string().max(300),
     url: z.string().max(500).nullable(),
     status: StatusSchema,

@@ -14,7 +14,7 @@
 // with -f: Claude Code fetches the plugin's directory from the release tag as
 // it is, and this is the copy it runs. release.yml runs --check against the tag.
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { URL, fileURLToPath } from 'node:url';
 
@@ -159,8 +159,23 @@ function mismatches(manifest, version) {
   ];
 }
 
+// Jira support was written before any Jira site was available to record from,
+// so its fixtures were written by hand from Atlassian's documentation and say
+// `"unverified": true`. A release must not ship code tested only against that:
+// `pnpm record-fixtures jira` replaces them with real responses, without the flag.
+const JIRA_FIXTURES = 'fixtures/jira';
+
+function unverifiedFixtures() {
+  const dir = join(ROOT, JIRA_FIXTURES);
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir).filter((name) => name.endsWith('.json')).flatMap((name) => {
+    const unverified = JSON.parse(readFileSync(join(dir, name), 'utf8')).unverified === true;
+    return unverified ? [`${JIRA_FIXTURES}/${name} is marked unverified (hand-written, not recorded from Jira): run pnpm record-fixtures jira before releasing`] : [];
+  });
+}
+
 function check(version) {
-  const wrong = presentManifests().flatMap((manifest) => mismatches(manifest, version.text));
+  const wrong = [...presentManifests().flatMap((manifest) => mismatches(manifest, version.text)), ...unverifiedFixtures()];
   if (wrong.length > 0) throw new ReleaseError(wrong.join('\n'));
   return `epic-pulse: every manifest says ${version.text} and the marketplace installs ${tagOf(version.text)}: ${presentManifests().map((m) => m.path).join(', ')}`;
 }
