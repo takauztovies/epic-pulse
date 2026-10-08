@@ -54,12 +54,12 @@ export function phaseADocument(numbers: readonly number[]): string {
 // multiply the rate-limit cost: 1 + 100 x 4 = 401 requests, which GitHub bills
 // as 4 points per epic; the repository is a plain field and costs nothing.
 const EPIC_FRAGMENT = `fragment EpicFields on Issue {
-  number title url body
+  number title url body createdAt
   subIssues(first: 100) {
     totalCount
     nodes {
-      number title url state stateReason repository { nameWithOwner }
-      assignees(first: 1) { totalCount }
+      number title url state stateReason closedAt repository { nameWithOwner }
+      assignees(first: 3) { totalCount nodes { login } }
       labels(first: 20) { nodes { name } }
       closedByPullRequestsReferences(first: 5) {
         nodes { number state isDraft url repository { nameWithOwner } }

@@ -15,6 +15,11 @@ export const ChildSchema = z
     // The labels on the item, lowercased, so a size can be read from them under
     // whatever table the repository configures; absent: it has none.
     labels: z.array(z.string().max(60)).max(20).readonly().optional(),
+    // Who it is assigned to (up to three logins), how many open pull requests will close it,
+    // and when it was closed. Each absent when unknown or none.
+    assignees: z.array(z.string().max(40)).max(3).readonly().optional(),
+    openPrs: z.number().int().positive().optional(),
+    closedAt: z.number().int().nonnegative().optional(),
   })
   .readonly();
 
@@ -30,6 +35,9 @@ export const EpicEntrySchema = z
     kind: EpicKindSchema,
     children: z.array(ChildSchema).max(MAX_CHILDREN).readonly(),
     truncated: z.boolean(),
+    // A few readable lines of its description, and when it was opened.
+    summary: z.string().max(300).optional(),
+    createdAt: z.number().int().nonnegative().optional(),
     fetchedAt: z.number().int().nonnegative(),
     error: ErrorCodeSchema.nullable(),
   })

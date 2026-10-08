@@ -1,5 +1,5 @@
 import { STATUSES, type JsonEpic, type Status } from '@epic-pulse/core';
-import { durationText, epicSessionsText, progressText, STATUS_TEXT } from './labels.js';
+import { detailLines, durationText, epicSessionsText, progressText, STATUS_TEXT } from './labels.js';
 
 // The Overview panel as one HTML document: a card per epic with a coloured
 // progress bar and every status with its count, zeros included. Every string
@@ -35,18 +35,19 @@ function legendItem(epic: JsonEpic, status: Status): string {
   return `<li><span class="dot ${status}"></span>${STATUS_TEXT[status].label} <b>${epic.counts[status]}</b></li>`;
 }
 
-function card(epic: JsonEpic, index: number): string {
+function card(epic: JsonEpic, index: number, now: number): string {
   const stale = epic.stale ? ' · stale' : '';
   return `<section class="card">
 <button class="head" data-i="${index}"><span class="title">#${epic.number} ${escapeHtml(epic.title)}</span><span class="pct">${epic.percent}%</span></button>
 <progress class="${epic.percent === 100 ? 'full' : ''}" max="100" value="${epic.percent}"></progress>
 <ul class="legend">${STATUSES.map((status) => legendItem(epic, status)).join('')}</ul>
+${detailLines(epic, now).map((text) => `<div class="meta">${escapeHtml(text)}</div>`).join('')}
 <div class="meta">${progressText(epic)} · ${epicSessionsText(epic)} · Time ${durationText(epic.activeSeconds)}${stale}</div>
 </section>`;
 }
 
-export function overviewHtml(epics: readonly JsonEpic[], nonce: string): string {
-  const body = epics.length === 0 ? '<p class="meta">No epic to show. The Epics view says why.</p>' : epics.map(card).join('\n');
+export function overviewHtml(epics: readonly JsonEpic[], nonce: string, now: number = Date.now()): string {
+  const body = epics.length === 0 ? '<p class="meta">No epic to show. The Epics view says why.</p>' : epics.map((epic, index) => card(epic, index, now)).join('\n');
   const csp = `default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'`;
   return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><style nonce="${nonce}">${STYLE}</style></head><body>${body}<script nonce="${nonce}">${SCRIPT}</script></body></html>`;
 }

@@ -66,7 +66,12 @@ export const SubIssueNodeSchema = z.object({
   state: z.string(),
   stateReason: z.string().nullable(),
   repository: RepoNameSchema,
-  assignees: z.object({ totalCount: z.number().int().nonnegative() }),
+  assignees: z.object({
+    totalCount: z.number().int().nonnegative(),
+    // Optional so an answer cached or recorded before logins were asked for still parses.
+    nodes: z.array(z.object({ login: z.string() }).nullable()).optional(),
+  }),
+  closedAt: z.string().nullable().optional(),
   // Optional so an answer cached or recorded before labels were asked for still parses.
   labels: z.object({ nodes: z.array(z.object({ name: z.string() }).nullable()) }).optional(),
   closedByPullRequestsReferences: z.object({ nodes: z.array(PrNodeSchema.nullable()) }),
@@ -78,6 +83,7 @@ export const EpicNodeSchema = z.object({
   title: z.string(),
   url: z.string(),
   body: z.string(),
+  createdAt: z.string().optional(),
   subIssues: z.object({
     totalCount: z.number().int().nonnegative(),
     nodes: z.array(SubIssueNodeSchema.nullable()),
