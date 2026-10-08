@@ -1,7 +1,9 @@
 import { isAbsolute, resolve } from 'node:path';
 import { commandSignals, type CommandSignal } from './extract-commands.js';
 import { absolutePaths, branchRef, worktreeContexts, type WorktreeContext } from './extract-paths.js';
-import { DEFAULT_HOST, makeRef, refKey, type IssueTarget } from './ref.js';
+import type { JiraConfig } from './jira-config.js';
+import { jiraKeysIn } from './jira-keys.js';
+import { DEFAULT_HOST, makeJiraRef, makeRef, refKey, type IssueTarget } from './ref.js';
 import type { BindVia, IssueRef, RepoRef } from './schemas/common.js';
 import type { HookPayload } from './schemas/hook.js';
 import type { BindEntry } from './schemas/registry.js';
@@ -40,7 +42,15 @@ export function closingRefs(text: string, base: RepoRef): readonly IssueRef[] {
   });
 }
 
-function targetRef(target: IssueTarget, base: RepoRef | undefined): IssueRef | undefined {
+// A Jira key binds only with a site to put it on: the one its URL names, or the
+// one the repository's .epic-pulse.json declares.
+function jiraTargetRef(target: NonNullable<IssueTarget['jira']>, number: number, jira: JiraConfig | undefined): IssueRef | undefined {
+  const host = target.host ?? jira?.site;
+  return host ? makeJiraRef({ host, project: target.project, number }) : undefined;
+}
+
+function targetRef(target: IssueTarget, base: RepoRef | undefined, jira: JiraConfig | undefined): IssueRef | undefined {
+  if (target.jira) return jiraTargetRef(target.jira, target.number, jira);
   const own = target.repo;
   const repo = own ? { host: own.host ?? base?.host ?? DEFAULT_HOST, owner: own.owner, repo: own.repo } : base;
   return repo ? makeRef({ ...repo, number: target.number }) : undefined;
@@ -48,8 +58,12 @@ function targetRef(target: IssueTarget, base: RepoRef | undefined): IssueRef | u
 
 function signalActions(signal: CommandSignal, contexts: Contexts): readonly Action[] {
   const base = 'repo' in signal.hint ? signal.hint.repo : contexts.get(signal.hint.dir)?.remote;
-  if (signal.kind === 'closing') return base ? closingRefs(signal.text, base).map((ref) => ({ op: 'bind', ref, via: 'closing' })) : [];
-  const ref = targetRef(signal.target, base);
+  const jira = 'dir' in signal.hint ? contexts.get(signal.hint.dir)?.config.jira : undefined;
+  if (signal.kind === 'closing') {
+    const keys = jira ? jiraKeysIn(signal.text, jira) : [];
+    return [...(base ? closingRefs(signal.text, base) : []), ...keys].map((ref) => ({ op: 'bind', ref, via: 'closing' }));
+  }
+  const ref = targetRef(signal.target, base, jira);
   if (!ref) return [];
   return [signal.kind === 'unbind' ? { op: 'unbind', ref } : { op: 'bind', ref, via: signal.via }];
 }

@@ -4,7 +4,7 @@ import type { JsonChild, JsonEpic, JsonV1 } from '@epic-pulse/core';
 // falls back to its number, and a plain checklist line to its text.
 function childKey(child: JsonChild): string {
   if (child.url !== null) return child.url;
-  return child.number === null ? `text:${child.title}` : `#${child.number}`;
+  return child.key === null ? `text:${child.title}` : child.key;
 }
 
 function newest(copies: readonly JsonEpic[]): JsonEpic {

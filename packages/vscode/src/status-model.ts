@@ -28,7 +28,7 @@ function epicText(model: Model): string {
   if (!first) return '';
   const more = rest.length > 0 ? ` +${rest.length}` : '';
   const stale = model.epics.some((epic) => epic.stale) ? ' $(warning)' : '';
-  return `$(pulse) #${first.number} ${progressText(first)}${more}${stale}`;
+  return `$(pulse) ${first.key} ${progressText(first)}${more}${stale}`;
 }
 
 function stateText(model: Model): string {
@@ -52,7 +52,7 @@ function stateBlock(model: Model): string {
 
 function epicBlock(epic: JsonEpic, now: number): string {
   const line = [progressText(epic), countsText(epic), ...staleMarks(epic)].join(' · ');
-  return `**#${epic.number}** ${escapeMarkdown(epic.title)}  \n${line}  \n${[...detailLines(epic, now).map(escapeMarkdown), epicSessionsText(epic), ...activityLines(epic, now)].join('  \n')}`;
+  return `**${epic.key}** ${escapeMarkdown(epic.title)}  \n${line}  \n${[...detailLines(epic, now).map(escapeMarkdown), epicSessionsText(epic), ...activityLines(epic, now)].join('  \n')}`;
 }
 
 // A click signs in when that is what is missing; otherwise it opens the tree.

@@ -26,6 +26,7 @@ const ALLOWED_URLS: ReadonlyMap<string, string> = new Map([
   ['https://api.${host}/graphql', 'GraphQL on GitHub Enterprise Cloud with data residency (<name>.ghe.com)'],
   ['https://${host}/api/graphql', 'GraphQL on GitHub Enterprise Server'],
   ['https://${ref.host}/${ref.owner}/${ref.repo}/issues/${ref.number}', 'an issue link to show, never fetched'],
+  ['https://${ref.host}/browse/${displayKey(ref)}', 'a Jira issue link to show, never fetched'],
   ['http://[${value}]', "zod's IPv6 check hands this to URL.canParse, never fetched"],
   ['https://json-schema.org/draft/2020-12/schema', 'a JSON Schema dialect id inside zod, never fetched'],
   ['http://json-schema.org/draft-07/schema#', 'a JSON Schema dialect id inside zod, never fetched'],

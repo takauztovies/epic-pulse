@@ -17,9 +17,19 @@ export const RepoSchema = z
 
 export const IssueNumberSchema = z.number().int().positive().max(2_147_483_647);
 
-export const RepoRefSchema = z.object({ host: HostSchema, owner: OwnerSchema, repo: RepoSchema }).readonly();
+// Which tracker a reference belongs to. Absent means GitHub, so every file
+// written before this field existed stays valid, byte for byte, and a GitHub
+// reference is still written without it. A Jira reference has the same four
+// fields: `host` is the site, `owner` and `repo` are both the lowercased
+// project key, `number` is the issue's number (PROJ-123 is project `proj`,
+// number 123). refKey, repoKey, issueUrl and displayKey (ref.ts) are what
+// tell them apart.
+export const REF_KINDS = ['github', 'jira'] as const;
+export const RefKindSchema = z.enum(REF_KINDS);
+
+export const RepoRefSchema = z.object({ kind: RefKindSchema.optional(), host: HostSchema, owner: OwnerSchema, repo: RepoSchema }).readonly();
 export const IssueRefSchema = z
-  .object({ host: HostSchema, owner: OwnerSchema, repo: RepoSchema, number: IssueNumberSchema })
+  .object({ kind: RefKindSchema.optional(), host: HostSchema, owner: OwnerSchema, repo: RepoSchema, number: IssueNumberSchema })
   .readonly();
 
 export const STATUSES = ['todo', 'in_progress', 'in_review', 'done', 'dropped'] as const;
@@ -54,6 +64,8 @@ export const ErrorCodeSchema = z.enum(ERROR_CODES);
 
 export const STATE_KINDS = ['ok', 'none', 'loading', 'stale', 'error', 'hook-inactive', 'unsupported'] as const;
 export const StateKindSchema = z.enum(STATE_KINDS);
+
+export type RefKind = z.infer<typeof RefKindSchema>;
 
 export const BIND_VIAS = ['gh', 'closing', 'branch', 'pin'] as const;
 export const BindViaSchema = z.enum(BIND_VIAS);

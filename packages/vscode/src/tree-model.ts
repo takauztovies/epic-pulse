@@ -72,7 +72,7 @@ function spreadCommand(command: CommandRef | undefined): { readonly command?: Co
 }
 
 function issueNode(child: JsonChild, id: string, now: number): IssueNode {
-  const label = child.number === null ? child.title : `#${child.number} ${child.title}`;
+  const label = child.key === null ? child.title : `${child.key} ${child.title}`;
   const sessions = child.sessionCount > 0 ? [sessionsText(child.sessionCount)] : [];
   return {
     kind: 'issue',
@@ -109,9 +109,9 @@ function epicNode(epic: JsonEpic, now: number): EpicNode {
     kind: 'epic',
     id: epic.url,
     url: epic.url,
-    label: `#${epic.number} ${barText(epic.percent)} ${epic.percent}% ${epic.title}`,
+    label: `${epic.key} ${barText(epic.percent)} ${epic.percent}% ${epic.title}`,
     description: [progress, epicSessionsText(epic), ...stale].join(' · '),
-    tooltip: [`#${epic.number} ${epic.title}`, `${progress}: ${countsText(epic)}`, ...detailLines(epic, now), epicSessionsText(epic), ...activityLines(epic, now), ageText(epic.fetchedAt, now)].join('\n'),
+    tooltip: [`${epic.key} ${epic.title}`, `${progress}: ${countsText(epic)}`, ...detailLines(epic, now), epicSessionsText(epic), ...activityLines(epic, now), ageText(epic.fetchedAt, now)].join('\n'),
     icon: 'milestone',
     iconColor: epic.percent === 100 ? 'charts.green' : undefined,
     ...spreadCommand(clickCommand(epic.url, epic.sessionIds)),

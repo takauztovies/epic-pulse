@@ -1,5 +1,6 @@
 import { isAbsolute } from 'node:path';
 import { branchIssueNumber } from './branch-pattern.js';
+import { jiraKeysIn } from './jira-keys.js';
 import { isIgnoredPath, loadConfig, type Config } from './config.js';
 import { findWorktree, readBranch, readRemote, type WorktreeInfo } from './git.js';
 import { makeRef } from './ref.js';
@@ -38,6 +39,8 @@ export function branchRef(path: string, context: WorktreeContext): IssueRef | un
   const { info, config, branch, remote } = context;
   if (config.ignoreMainCheckout && info.isMain) return undefined;
   if (isIgnoredPath(config, info.root, path)) return undefined;
+  const key = branch === undefined || !config.jira ? undefined : jiraKeysIn(branch, config.jira)[0];
+  if (key) return key;
   const number = branch === undefined ? undefined : branchIssueNumber(branch, config.branchIssuePattern);
   return number !== undefined && remote ? makeRef({ ...remote, number }) : undefined;
 }
