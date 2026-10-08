@@ -87,13 +87,23 @@
       },
       {
         "command": "epicPulse.track",
-        "title": "Track an Epic or Issue…",
+        "title": "Track an Epic or Issue\u2026",
         "category": "Epic Pulse",
         "icon": "$(add)"
       },
       {
         "command": "epicPulse.untrack",
         "title": "Stop Tracking",
+        "category": "Epic Pulse"
+      },
+      {
+        "command": "epicPulse.openSession",
+        "title": "Open Claude Code Session",
+        "category": "Epic Pulse"
+      },
+      {
+        "command": "epicPulse.openOnGitHub",
+        "title": "Open on GitHub",
         "category": "Epic Pulse"
       }
     ],
@@ -105,6 +115,14 @@
         },
         {
           "command": "epicPulse.untrack",
+          "when": "false"
+        },
+        {
+          "command": "epicPulse.openSession",
+          "when": "false"
+        },
+        {
+          "command": "epicPulse.openOnGitHub",
           "when": "false"
         }
       ],
@@ -133,6 +151,11 @@
           "command": "epicPulse.untrack",
           "when": "view == epicPulse.epics && viewItem == epic",
           "group": "inline"
+        },
+        {
+          "command": "epicPulse.openOnGitHub",
+          "when": "view == epicPulse.epics && (viewItem == epic || viewItem == issue)",
+          "group": "navigation"
         }
       ]
     },

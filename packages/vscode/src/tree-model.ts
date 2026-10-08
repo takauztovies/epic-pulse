@@ -55,6 +55,17 @@ function openCommand(url: string): CommandRef {
   return { command: COMMAND.openIssue, title: 'Open on GitHub', arguments: [url] };
 }
 
+// A click goes to the live Claude Code session working on the item when there
+// is one, and to GitHub otherwise; "Open on GitHub" stays in the context menu.
+function clickCommand(url: string | null, sessionIds: readonly string[]): CommandRef | undefined {
+  if (sessionIds.length > 0) return { command: COMMAND.openSession, title: 'Open Claude Code session', arguments: sessionIds };
+  return url === null ? undefined : openCommand(url);
+}
+
+function spreadCommand(command: CommandRef | undefined): { readonly command?: CommandRef } {
+  return command === undefined ? {} : { command };
+}
+
 function issueNode(child: JsonChild, id: string): IssueNode {
   const label = child.number === null ? child.title : `#${child.number} ${child.title}`;
   const sessions = child.sessionCount > 0 ? [sessionsText(child.sessionCount)] : [];
@@ -70,7 +81,7 @@ function issueNode(child: JsonChild, id: string): IssueNode {
     // "someone is here", distinct from the Todo/In progress/.../Done group
     // it's already sorted into by workflow state.
     iconColor: child.sessionCount > 0 ? 'charts.green' : undefined,
-    ...(child.url === null ? {} : { command: openCommand(child.url) }),
+    ...spreadCommand(clickCommand(child.url, child.sessionIds)),
   };
 }
 
@@ -99,7 +110,7 @@ function epicNode(epic: JsonEpic, now: number): EpicNode {
     tooltip: [`#${epic.number} ${epic.title}`, `${progress}: ${countsText(epic)}`, epicSessionsText(epic), ageText(epic.fetchedAt, now)].join('\n'),
     icon: 'milestone',
     iconColor: epic.percent === 100 ? 'charts.green' : undefined,
-    command: openCommand(epic.url),
+    ...spreadCommand(clickCommand(epic.url, epic.sessionIds)),
     children: groupNodes(epic),
   };
 }

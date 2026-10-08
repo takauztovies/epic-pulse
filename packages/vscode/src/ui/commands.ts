@@ -5,6 +5,7 @@ import { issueLink } from '../links.js';
 import { signedOutHosts } from '../model.js';
 import type { Poller } from '../poller.js';
 import type { RepoTarget } from '../repos.js';
+import { sessionUriParts } from '../sessions.js';
 import { trackIn, untrackEverywhere } from '../track.js';
 import type { TreeNode } from '../tree-model.js';
 import { signIn } from './auth.js';
@@ -72,12 +73,38 @@ async function untrack(node: TreeNode, deps: CommandDeps): Promise<void> {
   if (result.ok) await deps.poller.trigger();
 }
 
+async function pickSession(ids: readonly string[]): Promise<string | undefined> {
+  if (ids.length <= 1) return ids[0];
+  const picked = await vscode.window.showQuickPick(ids.map((id) => ({ label: id.slice(0, 8), description: id, id })), { placeHolder: 'Which Claude Code session?' });
+  return picked?.id;
+}
+
+// Hands the session to the Claude Code extension, which opens it or focuses
+// its tab. A session started from another folder may not be found there, in
+// which case Claude Code starts a new conversation instead.
+async function openSession(value: unknown, log: vscode.LogOutputChannel): Promise<void> {
+  const ids = Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [];
+  const id = await pickSession(ids);
+  const parts = id === undefined ? undefined : sessionUriParts(id);
+  if (parts === undefined) {
+    log.warn('openSession refused: no valid session id');
+    return;
+  }
+  await vscode.env.openExternal(vscode.Uri.from(parts));
+}
+
+async function openOnGitHub(node: TreeNode, log: vscode.LogOutputChannel): Promise<void> {
+  if (node.kind === 'epic' || node.kind === 'issue') await openIssue(node.url, log);
+}
+
 export function registerCommands(deps: CommandDeps): readonly vscode.Disposable[] {
   return [
     vscode.commands.registerCommand(COMMAND.refresh, () => deps.poller.trigger()),
     vscode.commands.registerCommand(COMMAND.openIssue, (value: unknown) => openIssue(value, deps.log)),
     vscode.commands.registerCommand(COMMAND.signIn, () => signInAndRefresh(deps)),
     vscode.commands.registerCommand(COMMAND.showStatus, () => showStatus(deps)),
+    vscode.commands.registerCommand(COMMAND.openSession, (value: unknown) => openSession(value, deps.log)),
+    vscode.commands.registerCommand(COMMAND.openOnGitHub, (node: TreeNode) => openOnGitHub(node, deps.log)),
     vscode.commands.registerCommand(COMMAND.track, () => track(deps)),
     vscode.commands.registerCommand(COMMAND.untrack, (node: TreeNode) => untrack(node, deps)),
   ];
