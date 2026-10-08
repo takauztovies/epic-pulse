@@ -1902,18 +1902,18 @@ var validateAsync = async (schema, value, _ctx) => {
   return result.issues.length === 0;
 };
 var _encode = (_Err) => {
-  const parse3 = _parse(_Err);
+  const parse4 = _parse(_Err);
   const fn = (schema, value, _ctx, _params) => {
     const ctx = _ctx ? { ..._ctx, direction: "backward" } : { direction: "backward" };
-    return parse3(schema, value, ctx, finalizeParams(fn, _params));
+    return parse4(schema, value, ctx, finalizeParams(fn, _params));
   };
   return fn;
 };
 var encode = /* @__PURE__ */ _encode($ZodRealError);
 var _decode = (_Err) => {
-  const parse3 = _parse(_Err);
+  const parse4 = _parse(_Err);
   const fn = (schema, value, _ctx, _params) => {
-    return parse3(schema, value, _ctx, finalizeParams(fn, _params));
+    return parse4(schema, value, _ctx, finalizeParams(fn, _params));
   };
   return fn;
 };
@@ -4076,13 +4076,13 @@ function handleIntersectionResults(result, left, right) {
         result.issues.push(keyIssues.get(k));
     }
   }
-  const merged = mergeValues(left.value, right.value);
-  if (!merged.valid) {
+  const merged2 = mergeValues(left.value, right.value);
+  if (!merged2.valid) {
     if (aborted(result))
       return result;
-    throw new Error(`Unmergable intersection. Error path: ${JSON.stringify(merged.mergeErrorPath)}`);
+    throw new Error(`Unmergable intersection. Error path: ${JSON.stringify(merged2.mergeErrorPath)}`);
   }
-  result.value = merged.data;
+  result.value = merged2.data;
   return result;
 }
 var $ZodTuple = /* @__PURE__ */ $constructor("$ZodTuple", (inst, def) => {
@@ -15872,8 +15872,8 @@ function foldObjects(members2) {
         if (!parts.some((seen) => JSON.stringify(seen) === JSON.stringify(part)))
           parts.push(part);
       }
-      const merged = parts.length === 1 ? parts[0] : foldObjects(parts) ?? { allOf: parts };
-      assignProp(properties, key, merged);
+      const merged2 = parts.length === 1 ? parts[0] : foldObjects(parts) ?? { allOf: parts };
+      assignProp(properties, key, merged2);
     }
     for (const key of object2.required ?? [])
       required2.add(key);
@@ -20913,6 +20913,7 @@ function pathsFor(dir) {
     sessionsDir: join4(dir, "sessions"),
     pinsFile: join4(dir, "pins.json"),
     snapshotFile: join4(dir, "snapshot.json"),
+    timeFile: join4(dir, "time.json"),
     lockFile: join4(dir, "refresh.lock")
   };
 }
@@ -21052,7 +21053,12 @@ var SubIssueNodeSchema = external_exports.object({
   state: external_exports.string(),
   stateReason: external_exports.string().nullable(),
   repository: RepoNameSchema,
-  assignees: external_exports.object({ totalCount: external_exports.number().int().nonnegative() }),
+  assignees: external_exports.object({
+    totalCount: external_exports.number().int().nonnegative(),
+    // Optional so an answer cached or recorded before logins were asked for still parses.
+    nodes: external_exports.array(external_exports.object({ login: external_exports.string() }).nullable()).optional()
+  }),
+  closedAt: external_exports.string().nullable().optional(),
   // Optional so an answer cached or recorded before labels were asked for still parses.
   labels: external_exports.object({ nodes: external_exports.array(external_exports.object({ name: external_exports.string() }).nullable()) }).optional(),
   closedByPullRequestsReferences: external_exports.object({ nodes: external_exports.array(PrNodeSchema.nullable()) }),
@@ -21063,6 +21069,7 @@ var EpicNodeSchema = external_exports.object({
   title: external_exports.string(),
   url: external_exports.string(),
   body: external_exports.string(),
+  createdAt: external_exports.string().optional(),
   subIssues: external_exports.object({
     totalCount: external_exports.number().int().nonnegative(),
     nodes: external_exports.array(SubIssueNodeSchema.nullable())
@@ -21088,12 +21095,12 @@ function phaseADocument(numbers) {
 }`;
 }
 var EPIC_FRAGMENT = `fragment EpicFields on Issue {
-  number title url body
+  number title url body createdAt
   subIssues(first: 100) {
     totalCount
     nodes {
-      number title url state stateReason repository { nameWithOwner }
-      assignees(first: 1) { totalCount }
+      number title url state stateReason closedAt repository { nameWithOwner }
+      assignees(first: 3) { totalCount nodes { login } }
       labels(first: 20) { nodes { name } }
       closedByPullRequestsReferences(first: 5) {
         nodes { number state isDraft url repository { nameWithOwner } }
@@ -21362,7 +21369,12 @@ var ChildSchema = external_exports.object({
   status: StatusSchema,
   // The labels on the item, lowercased, so a size can be read from them under
   // whatever table the repository configures; absent: it has none.
-  labels: external_exports.array(external_exports.string().max(60)).max(20).readonly().optional()
+  labels: external_exports.array(external_exports.string().max(60)).max(20).readonly().optional(),
+  // Who it is assigned to (up to three logins), how many open pull requests will close it,
+  // and when it was closed. Each absent when unknown or none.
+  assignees: external_exports.array(external_exports.string().max(40)).max(3).readonly().optional(),
+  openPrs: external_exports.number().int().positive().optional(),
+  closedAt: external_exports.number().int().nonnegative().optional()
 }).readonly();
 var MAX_CHILDREN = 500;
 var EpicEntrySchema = external_exports.object({
@@ -21372,6 +21384,9 @@ var EpicEntrySchema = external_exports.object({
   kind: EpicKindSchema,
   children: external_exports.array(ChildSchema).max(MAX_CHILDREN).readonly(),
   truncated: external_exports.boolean(),
+  // A few readable lines of its description, and when it was opened.
+  summary: external_exports.string().max(300).optional(),
+  createdAt: external_exports.number().int().nonnegative().optional(),
   fetchedAt: external_exports.number().int().nonnegative(),
   error: ErrorCodeSchema.nullable()
 }).readonly();
@@ -21388,6 +21403,18 @@ var SnapshotSchema = external_exports.object({
   error: ErrorCodeSchema.nullable(),
   detail: external_exports.string().max(120).nullable()
 }).readonly();
+
+// packages/core/src/summary.ts
+var SUMMARY_MAX = 280;
+var SUMMARY_SCAN_MAX = 4e3;
+function summaryOf(body) {
+  const lines = body.slice(0, SUMMARY_SCAN_MAX).replace(/<!--[\s\S]*?-->/g, " ").replace(/```[\s\S]*?```/g, " ").replace(/!\[[^\]]*\]\([^)]*\)/g, " ").replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, "").replace(/\*\*|__|`/g, "").split(/\r?\n/).map((line) => line.replace(/^\s*(?:#{1,6}\s+|[-*+]\s+\[[ xX]\]\s*|[-*+]\s+|>\s*)/, "").trim()).filter((line) => line.length > 0);
+  const text = lines.join(" ").replace(/\s+/g, " ").trim();
+  if (text.length === 0) return void 0;
+  if (text.length <= SUMMARY_MAX) return text;
+  const cut = text.slice(0, SUMMARY_MAX);
+  return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), SUMMARY_MAX / 2))}\u2026`;
+}
 
 // packages/core/src/resolve.ts
 function epicRefFor(ref, node2) {
@@ -21406,14 +21433,28 @@ function labelsOf(node2) {
   const names = (node2.labels?.nodes ?? []).flatMap((label) => label ? [label.name.toLowerCase()] : []);
   return names.filter((name) => name.length <= PROGRESS_LIMITS.maxLabelLength);
 }
+function assigneesOf(node2) {
+  return (node2.assignees.nodes ?? []).flatMap((user) => user ? [user.login.slice(0, 40)] : []).slice(0, 3);
+}
+function timeOf(text) {
+  const ms = text ? Date.parse(text) : Number.NaN;
+  return Number.isFinite(ms) && ms >= 0 ? ms : void 0;
+}
 function subIssueChild(node2, epic) {
   const labels = labelsOf(node2);
+  const assignees = assigneesOf(node2);
+  const status = deriveStatus(node2, ownRepo(node2, epic));
+  const openPrs = status === "done" || status === "dropped" ? 0 : linkedOpenPrs(node2, ownRepo(node2, epic)).length;
+  const closedAt = status === "done" ? timeOf(node2.closedAt) : void 0;
   return {
     number: node2.number,
     title: node2.title.slice(0, 300),
     url: node2.url.slice(0, 500),
-    status: deriveStatus(node2, ownRepo(node2, epic)),
-    ...labels.length === 0 ? {} : { labels }
+    status,
+    ...labels.length === 0 ? {} : { labels },
+    ...assignees.length === 0 ? {} : { assignees },
+    ...openPrs === 0 ? {} : { openPrs },
+    ...closedAt === void 0 ? {} : { closedAt }
   };
 }
 function buildEpic(node2, ref) {
@@ -21421,13 +21462,16 @@ function buildEpic(node2, ref) {
   const kind = node2.subIssues.totalCount > 0 ? "subissues" : "checklist";
   const children = kind === "subissues" ? subs.map((n) => subIssueChild(n, ref)) : checklistChildren(node2.body, ref);
   if (children.length === 0) return null;
+  const summary = summaryOf(node2.body);
   return {
     ref,
     title: node2.title.slice(0, 300),
     url: node2.url.slice(0, 500),
     kind,
     children: children.slice(0, MAX_CHILDREN),
-    truncated: node2.subIssues.totalCount > subs.length || children.length > MAX_CHILDREN
+    truncated: node2.subIssues.totalCount > subs.length || children.length > MAX_CHILDREN,
+    ...summary === void 0 ? {} : { summary },
+    ...timeOf(node2.createdAt) === void 0 ? {} : { createdAt: timeOf(node2.createdAt) }
   };
 }
 function unresolvedRefs(refs, snapshot) {
@@ -21484,6 +21528,40 @@ function pruneSnapshot(snapshot, refs, now) {
   const epicKeys = new Set(issues.flatMap(([key, r]) => [...r.epic ? [refKey(r.epic)] : [], ...r.isEpic ? [key] : []]));
   const epics = Object.entries(snapshot.epics).filter(([key]) => epicKeys.has(key));
   return { ...snapshot, issues: Object.fromEntries(issues), epics: Object.fromEntries(epics) };
+}
+
+// packages/core/src/provider-github.ts
+async function send(token, batch) {
+  const numbers = batch.refs.map((ref) => ref.number);
+  const query = batch.phase === "A" ? phaseADocument(numbers) : phaseBDocument(numbers);
+  try {
+    return ok(await postGraphql({ host: batch.repo.host, token, query, variables: { owner: batch.repo.owner, name: batch.repo.repo } }));
+  } catch (error62) {
+    return fail(describeFetchError(error62));
+  }
+}
+function parse3(batch, res) {
+  if (batch.phase === "A") {
+    const parsed2 = parsePhaseA(res);
+    if (!parsed2.ok) return parsed2;
+    const answers2 = batch.refs.map((ref) => [ref, parsed2.value.issues.get(ref.number) ?? null]);
+    return ok({ rate: parsed2.value.rate, apply: (snapshot, now) => applyResolutions(snapshot, answers2, now) });
+  }
+  const parsed = parsePhaseB(res);
+  if (!parsed.ok) return parsed;
+  const answers = batch.refs.map((ref) => [ref, parsed.value.epics.get(ref.number) ?? null]);
+  return ok({ rate: parsed.value.rate, apply: (snapshot, now) => applyEpics(snapshot, answers, now) });
+}
+var GITHUB = {
+  kind: "github",
+  token: async (host, env) => (await resolveToken(host, env))?.token,
+  send,
+  parse: parse3
+};
+
+// packages/core/src/provider.ts
+function providerFor() {
+  return GITHUB;
 }
 
 // packages/core/src/usage-ledger.ts
@@ -21602,15 +21680,6 @@ async function topUp(run4, extra, ctx) {
   await recordUsage(ctx.ledger, { ts: run4.now, ...extra }, ctx.clock());
   return { ...run4, spent: (run4.spent ?? 0) + extra.points };
 }
-async function send(token, batch) {
-  const numbers = batch.refs.map((ref) => ref.number);
-  const query = batch.phase === "A" ? phaseADocument(numbers) : phaseBDocument(numbers);
-  try {
-    return ok(await postGraphql({ host: batch.repo.host, token, query, variables: { owner: batch.repo.owner, name: batch.repo.repo } }));
-  } catch (error62) {
-    return fail(describeFetchError(error62));
-  }
-}
 var PERMANENT = /* @__PURE__ */ new Set(["not_found", "forbidden", "unsupported"]);
 var UNMARKED = /* @__PURE__ */ new Set(["budget", "no_token"]);
 function noted(run4, batch, code) {
@@ -21631,31 +21700,131 @@ function charged(run4, batch, answer) {
   return { ...run4, snapshot: chargeRate(snapshot, rate), points: run4.points + rate.cost };
 }
 function answered(run4, batch, res) {
-  if (batch.phase === "A") {
-    const parsed2 = parsePhaseA(res);
-    if (!parsed2.ok) return rejected(run4, batch, parsed2.error);
-    const answers2 = batch.refs.map((ref) => [ref, parsed2.value.issues.get(ref.number) ?? null]);
-    return charged(run4, batch, { rate: parsed2.value.rate, snapshot: applyResolutions(run4.snapshot, answers2, run4.now) });
-  }
-  const parsed = parsePhaseB(res);
+  const parsed = providerFor().parse(batch, res);
   if (!parsed.ok) return rejected(run4, batch, parsed.error);
-  const answers = batch.refs.map((ref) => [ref, parsed.value.epics.get(ref.number) ?? null]);
-  return charged(run4, batch, { rate: parsed.value.rate, snapshot: applyEpics(run4.snapshot, answers, run4.now) });
+  return charged(run4, batch, { rate: parsed.value.rate, snapshot: parsed.value.apply(run4.snapshot, run4.now) });
 }
 async function runBatch(run4, batch, ctx) {
   const token = admit(run4, batch, ctx);
   if (!token.ok) return failed(run4, batch, token.error);
   const reserved = await reserve(run4, batch, ctx);
   if (reserved.failure) return failed(reserved.run, batch, reserved.failure);
-  const sent = await send(token.value, batch);
+  const sent = await providerFor().send(token.value, batch);
   await touchLock(ctx.lock, ctx.clock());
   const counted = { ...reserved.run, requests: reserved.run.requests + 1 };
   const next = sent.ok ? answered(counted, batch, sent.value) : failed(counted, batch, sent.error);
   return topUp(next, { host: batch.repo.host, points: next.points - counted.points - costOf(batch) }, ctx);
 }
 
+// packages/core/src/time-store.ts
+import { readdir as readdir2, readFile as readFile5, stat as stat6 } from "node:fs/promises";
+
+// packages/core/src/time.ts
+var IDLE_CAP_MS = 10 * 60 * 1e3;
+var BINDING_TTL_MS2 = 6 * 60 * 60 * 1e3;
+var EMPTY_TIME = { v: 1, sessions: {}, refs: {} };
+var NO_FOCUS = { keys: [], since: 0, pinned: false };
+function nextFocus(focus, line) {
+  if (line.ev === "end") return NO_FOCUS;
+  const unbound = new Set(line.unbinds.map(refKey));
+  const kept = focus.keys.filter((key) => !unbound.has(key));
+  const bound = line.binds.filter((bind) => !unbound.has(refKey(bind.ref)));
+  if (bound.length > 0) return { keys: bound.map((bind) => refKey(bind.ref)), since: line.ts, pinned: bound.some((bind) => bind.via === "pin") };
+  const lapsed = !focus.pinned && line.ts - focus.since > BINDING_TTL_MS2;
+  return lapsed || kept.length === 0 ? NO_FOCUS : { ...focus, keys: kept };
+}
+function creditsFor(lines, from) {
+  const ordered = [...lines].sort((a, b) => a.ts - b.ts);
+  const credits = /* @__PURE__ */ new Map();
+  const add = (key, ms, lastTs) => {
+    const before = credits.get(key);
+    credits.set(key, { ms: (before?.ms ?? 0) + ms, lastTs: Math.max(before?.lastTs ?? 0, lastTs) });
+  };
+  let focus = NO_FOCUS;
+  ordered.forEach((line, index) => {
+    focus = nextFocus(focus, line);
+    for (const bind of line.binds) if (line.ts >= from) add(refKey(bind.ref), 0, line.ts);
+    const next = ordered[index + 1];
+    const gap = next ? next.ts - line.ts : 0;
+    if (!next || line.ts < from || gap > IDLE_CAP_MS || focus.keys.length === 0) return;
+    for (const key of focus.keys) add(key, Math.floor(gap / focus.keys.length), next.ts);
+  });
+  return credits;
+}
+function merged(before, credit, session) {
+  const newer = credit.lastTs >= (before?.lastTs ?? 0);
+  return {
+    ms: (before?.ms ?? 0) + credit.ms,
+    lastTs: Math.max(before?.lastTs ?? 0, credit.lastTs),
+    lastSession: newer ? session : before?.lastSession ?? session
+  };
+}
+function advanceTime(previous, sessions) {
+  const watermarks = {};
+  const refs = { ...previous.refs };
+  for (const [id, lines] of sessions) {
+    const from = previous.sessions[id] ?? 0;
+    for (const [key, credit] of creditsFor(lines, from)) refs[key] = merged(refs[key], credit, id);
+    watermarks[id] = lines.reduce((latest2, line) => Math.max(latest2, line.ts), from);
+  }
+  return { v: 1, sessions: watermarks, refs };
+}
+
+// packages/core/src/schemas/time.ts
+var TimeRefSchema = external_exports.object({
+  // Active session time in milliseconds.
+  ms: external_exports.number().int().nonnegative(),
+  // The last time a session was on this issue, and which session.
+  lastTs: external_exports.number().int().nonnegative(),
+  lastSession: external_exports.string().max(64)
+}).readonly();
+var TimeFileSchema = external_exports.object({
+  v: external_exports.literal(1),
+  // Session id -> the timestamp of its last counted line.
+  sessions: external_exports.record(external_exports.string(), external_exports.number().int().nonnegative()).readonly(),
+  // refKey -> its total.
+  refs: external_exports.record(external_exports.string(), TimeRefSchema).readonly()
+}).readonly();
+
+// packages/core/src/time-store.ts
+var MAX_SESSION_BYTES = 16 * 1024 * 1024;
+var MAX_TIME_BYTES = 1024 * 1024;
+var MAX_REFS2 = 5e3;
+async function readTime(paths) {
+  try {
+    if ((await stat6(paths.timeFile)).size > MAX_TIME_BYTES) return EMPTY_TIME;
+    const parsed = TimeFileSchema.safeParse(parseJson(await readFile5(paths.timeFile, "utf8")));
+    return parsed.success ? parsed.data : EMPTY_TIME;
+  } catch {
+    return EMPTY_TIME;
+  }
+}
+async function allSessionLines(paths) {
+  const names = await readdir2(paths.sessionsDir).catch(() => []);
+  const found = await Promise.all(names.filter((name) => name.endsWith(".jsonl")).map(async (name) => {
+    const id = name.slice(0, -".jsonl".length);
+    const file2 = sessionFile(paths, id);
+    const info = file2 ? await stat6(file2).catch(() => void 0) : void 0;
+    if (!file2 || !info?.isFile() || info.size > MAX_SESSION_BYTES) return [];
+    return [[id, parseLines(await readFile5(file2, "utf8").catch(() => ""))]];
+  }));
+  return new Map(found.flat());
+}
+function capped(time3) {
+  const entries = Object.entries(time3.refs);
+  if (entries.length <= MAX_REFS2) return time3;
+  const kept = entries.sort((a, b) => b[1].lastTs - a[1].lastTs).slice(0, MAX_REFS2);
+  return { ...time3, refs: Object.fromEntries(kept) };
+}
+async function updateTime(paths) {
+  const next = capped(advanceTime(await readTime(paths), await allSessionLines(paths)));
+  await atomicWriteFile(paths.timeFile, `${JSON.stringify(TimeFileSchema.parse(next))}
+`).catch(() => void 0);
+  return next;
+}
+
 // packages/core/src/snapshot.ts
-import { readFile as readFile5, stat as stat6 } from "node:fs/promises";
+import { readFile as readFile6, stat as stat7 } from "node:fs/promises";
 var MAX_SNAPSHOT_BYTES = 5 * 1024 * 1024;
 function emptySnapshot(now) {
   return {
@@ -21671,8 +21840,8 @@ function emptySnapshot(now) {
 }
 async function readSnapshot(file2) {
   try {
-    if ((await stat6(file2)).size > MAX_SNAPSHOT_BYTES) return { status: "corrupt" };
-    const parsed = SnapshotSchema.safeParse(parseJson(await readFile5(file2, "utf8")));
+    if ((await stat7(file2)).size > MAX_SNAPSHOT_BYTES) return { status: "corrupt" };
+    const parsed = SnapshotSchema.safeParse(parseJson(await readFile6(file2, "utf8")));
     return parsed.success ? { status: "ok", snapshot: parsed.data } : { status: "corrupt" };
   } catch (error62) {
     return errnoOf(error62) === "ENOENT" ? { status: "missing" } : { status: "corrupt" };
@@ -21731,7 +21900,7 @@ async function tokensFor(run4, refs, options) {
   if (overBudget(run4, PHASE_A_COST)) return /* @__PURE__ */ new Map();
   const given = new Map(Object.entries(options.tokens ?? {}));
   const hosts = [...new Set(pendingRefs(run4, refs).map((ref) => ref.host))];
-  const found = await Promise.all(hosts.map(async (host) => [host, given.get(host) ?? (await resolveToken(host, options.env))?.token]));
+  const found = await Promise.all(hosts.map(async (host) => [host, given.get(host) ?? await providerFor().token(host, options.env)]));
   return new Map(found.flatMap(([host, token]) => token === void 0 ? [] : [[host, token]]));
 }
 async function openUsage(options) {
@@ -21781,6 +21950,7 @@ async function refreshLocked(options, lock) {
   const run4 = await runPhaseB(await runPhaseA(start, refs, ctx), refs, ctx);
   const next = finalSnapshot(run4, refs);
   if (run4.requests > 0 || !unchanged(before, next, refs)) await writeSnapshot(paths.snapshotFile, { ...next, updatedAt: now });
+  await updateTime(paths);
   await pruneSessions(paths, now);
   return { status: "done", requests: run4.requests, points: run4.points, error: run4.failure?.code ?? null };
 }
@@ -21857,7 +22027,15 @@ var JsonChildSchema = external_exports.object({
   // The live sessions bound to this child, most recent binding first.
   // sessionCount is their length, kept so a reader of only the count need
   // not change.
-  sessionIds: external_exports.array(external_exports.string()).readonly()
+  sessionIds: external_exports.array(external_exports.string()).readonly(),
+  // Who it is assigned to (logins, up to three) and how many open pull requests will close it.
+  assignees: external_exports.array(external_exports.string()).readonly(),
+  openPullRequests: external_exports.number().int().nonnegative(),
+  // Active session time on this item, in seconds, with when and in which
+  // session it was last worked on (null: never).
+  activeSeconds: external_exports.number().int().nonnegative(),
+  lastActivityAt: external_exports.iso.datetime().nullable(),
+  lastSessionId: external_exports.string().nullable()
 }).readonly();
 var JsonEpicSchema = external_exports.object({
   number: IssueNumberSchema,
@@ -21871,6 +22049,19 @@ var JsonEpicSchema = external_exports.object({
   // Every live session bound to any child of this epic, deduplicated: the
   // epic-level answer to "which session is working on this".
   sessionIds: external_exports.array(external_exports.string()).readonly(),
+  // Active session time on this epic: its own and all its issues', in seconds, with when and in which
+  // session it was last worked on (null: never).
+  activeSeconds: external_exports.number().int().nonnegative(),
+  lastActivityAt: external_exports.iso.datetime().nullable(),
+  lastSessionId: external_exports.string().nullable(),
+  // A few readable lines of its description, and when it was opened (null: not known).
+  summary: external_exports.string().nullable(),
+  createdAt: external_exports.iso.datetime().nullable(),
+  // Issues closed as done in the last seven days: is it moving?
+  doneLast7Days: external_exports.number().int().nonnegative(),
+  // Open pull requests across its issues, and who its issues are assigned to (up to five logins).
+  openPullRequests: external_exports.number().int().nonnegative(),
+  assignees: external_exports.array(external_exports.string()).readonly(),
   fetchedAt: external_exports.iso.datetime(),
   stale: external_exports.boolean(),
   error: ErrorCodeSchema.nullable(),
@@ -21979,12 +22170,38 @@ function childKey(child, epic) {
 function childSessionIds(key, bound) {
   return key === void 0 ? [] : bound.filter((session) => session.keys.has(key)).map((session) => session.sessionId);
 }
+function activityOf(entries) {
+  const present = entries.filter((entry) => entry !== void 0);
+  const latest2 = present.reduce((best, entry) => best === void 0 || entry.lastTs > best.lastTs ? entry : best, void 0);
+  return {
+    activeSeconds: Math.floor(present.reduce((sum, entry) => sum + entry.ms, 0) / 1e3),
+    lastActivityAt: latest2 ? iso(latest2.lastTs) : null,
+    lastSessionId: latest2?.lastSession ?? null
+  };
+}
+function epicActivity(entry, time3) {
+  const keys = new Set(entry.children.flatMap((child) => childKey(child, entry.ref) ?? []));
+  return activityOf([time3?.refs[refKey(entry.ref)], ...[...keys].map((key) => time3?.refs[key])]);
+}
+var WEEK_MS = 7 * 24 * 60 * 60 * 1e3;
+function epicDetails(entry, now) {
+  const assignees = [...new Set(entry.children.flatMap((child) => child.assignees ?? []))].slice(0, 5);
+  return {
+    summary: entry.summary ?? null,
+    createdAt: entry.createdAt === void 0 ? null : iso(entry.createdAt),
+    doneLast7Days: entry.children.filter((child) => child.status === "done" && child.closedAt !== void 0 && now - child.closedAt >= 0 && now - child.closedAt <= WEEK_MS).length,
+    openPullRequests: entry.children.reduce((sum, child) => sum + (child.openPrs ?? 0), 0),
+    assignees
+  };
+}
 function jsonEpic(entry, bound, input2) {
   const counts = countStatuses(entry.children);
   const points = pointsByStatus(entry.children, input2.progress);
   const children = entry.children.map((child) => {
     const sessionIds = childSessionIds(childKey(child, entry.ref), bound);
-    return { number: child.number, title: child.title, url: child.url, status: child.status, sessionCount: sessionIds.length, sessionIds };
+    const key = childKey(child, entry.ref);
+    const time3 = key === void 0 ? void 0 : input2.time?.refs[key];
+    return { number: child.number, title: child.title, url: child.url, status: child.status, sessionCount: sessionIds.length, sessionIds, assignees: [...child.assignees ?? []], openPullRequests: child.openPrs ?? 0, ...activityOf([time3]) };
   });
   const epicSessionIds = [...new Set(children.flatMap((child) => child.sessionIds))];
   return {
@@ -21996,6 +22213,8 @@ function jsonEpic(entry, bound, input2) {
     percent: percentDone(points),
     weightedPercent: weightedPercentDone(points, input2.progress),
     sessionIds: epicSessionIds,
+    ...epicActivity(entry, input2.time),
+    ...epicDetails(entry, input2.now),
     children,
     fetchedAt: iso(entry.fetchedAt),
     stale: isStale(entry, input2.now),
@@ -22016,7 +22235,7 @@ function buildView(input2) {
     liveSessions: live.length,
     pending: pendingCount(scoped),
     snapshot: { state: stateOf(scoped), fetchedAt: snapshot ? iso(snapshot.updatedAt) : null, error: errorOf(scoped) },
-    epics: entries.map((entry) => jsonEpic(entry, bound, { now: input2.now, progress: input2.progress ?? DEFAULT_PROGRESS }))
+    epics: entries.map((entry) => jsonEpic(entry, bound, { now: input2.now, progress: input2.progress ?? DEFAULT_PROGRESS, time: input2.time }))
   };
 }
 
@@ -22042,15 +22261,15 @@ function parseCommandArgs(args, spec) {
 }
 
 // packages/cli/src/doctor-checks.ts
-import { readFile as readFile8 } from "node:fs/promises";
+import { readFile as readFile9 } from "node:fs/promises";
 
 // packages/cli/src/activity.ts
-import { readdir as readdir2, stat as stat7 } from "node:fs/promises";
+import { readdir as readdir3, stat as stat8 } from "node:fs/promises";
 import { join as join7 } from "node:path";
 async function lastHookActivity(paths) {
-  const names = await readdir2(paths.sessionsDir).catch(() => []);
+  const names = await readdir3(paths.sessionsDir).catch(() => []);
   const times = await Promise.all(
-    names.filter((name) => name.endsWith(".jsonl")).map((name) => stat7(join7(paths.sessionsDir, name)).then((info) => info.mtimeMs, () => 0))
+    names.filter((name) => name.endsWith(".jsonl")).map((name) => stat8(join7(paths.sessionsDir, name)).then((info) => info.mtimeMs, () => 0))
   );
   const newest = times.reduce((latest2, time3) => Math.max(latest2, time3), 0);
   return newest > 0 ? newest : void 0;
@@ -22082,7 +22301,7 @@ function desiredStatusLine(scope, env) {
 }
 
 // packages/cli/src/hook-log.ts
-import { appendFile as appendFile2, readFile as readFile6, rename as rename2, stat as stat8 } from "node:fs/promises";
+import { appendFile as appendFile2, readFile as readFile7, rename as rename2, stat as stat9 } from "node:fs/promises";
 import { join as join9 } from "node:path";
 var HOOK_LOG = "hook.log";
 var MAX_LOG_BYTES = 64 * 1024;
@@ -22099,14 +22318,14 @@ var HOOK_ERROR_CODES = [
 var LogLineSchema = external_exports.object({ ts: external_exports.number().int().nonnegative(), code: external_exports.enum(HOOK_ERROR_CODES) });
 async function logHookError(dir, code, now) {
   const file2 = join9(dir, HOOK_LOG);
-  const size = await stat8(file2).then((info) => info.size, () => 0);
+  const size = await stat9(file2).then((info) => info.size, () => 0);
   if (size >= MAX_LOG_BYTES) await rename2(file2, `${file2}.1`).catch(() => void 0);
   await ensureDir(dir);
   await appendFile2(file2, `${JSON.stringify({ ts: now, code })}
 `, { mode: 384 });
 }
 async function lastHookError(dir) {
-  const text = await readFile6(join9(dir, HOOK_LOG), "utf8").catch(() => "");
+  const text = await readFile7(join9(dir, HOOK_LOG), "utf8").catch(() => "");
   const lines = text.split("\n").filter(Boolean).reverse();
   for (const line of lines) {
     const parsed = LogLineSchema.safeParse(parseJson(line));
@@ -22116,20 +22335,20 @@ async function lastHookError(dir) {
 }
 
 // packages/cli/src/runtime.ts
-import { readFile as readFile7 } from "node:fs/promises";
+import { readFile as readFile8 } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 function bundlePath() {
   return fileURLToPath(import.meta.url);
 }
 async function runtimeState(env) {
-  const [own2, copy] = await Promise.all([readFile7(bundlePath()), readFile7(runtimeFile(env)).catch(() => void 0)]);
+  const [own2, copy] = await Promise.all([readFile8(bundlePath()), readFile8(runtimeFile(env)).catch(() => void 0)]);
   if (copy === void 0) return "missing";
   return copy.equals(own2) ? "current" : "outdated";
 }
 async function syncRuntime(env) {
   try {
     const target = runtimeFile(env);
-    const [own2, copy] = await Promise.all([readFile7(bundlePath()), readFile7(target).catch(() => void 0)]);
+    const [own2, copy] = await Promise.all([readFile8(bundlePath()), readFile8(target).catch(() => void 0)]);
     if (copy?.equals(own2)) return ok("unchanged");
     await atomicWriteFile(target, own2.toString("utf8"));
     return ok("copied");
@@ -22193,7 +22412,7 @@ async function registryChecks(cwd, env, now) {
 }
 async function statusLineCheck(scope, env, cwd) {
   const file2 = settingsFile(scope, env, cwd);
-  const text = await readFile8(file2, "utf8").catch((error62) => errnoOf(error62) === "ENOENT" ? void 0 : null);
+  const text = await readFile9(file2, "utf8").catch((error62) => errnoOf(error62) === "ENOENT" ? void 0 : null);
   const state = text === null ? "the file can not be read" : STATUS_LINE_STATES[mergeStatusLine(text, desiredStatusLine(scope, env)).action];
   return [`statusLine (${scope})`, `${state}: ${file2}`];
 }
@@ -22302,10 +22521,10 @@ async function runHook(env) {
 }
 
 // packages/cli/src/install.ts
-import { readFile as readFile9, writeFile as writeFile2 } from "node:fs/promises";
+import { readFile as readFile10, writeFile as writeFile2 } from "node:fs/promises";
 async function readSettings(file2) {
   try {
-    return ok(await readFile9(file2));
+    return ok(await readFile10(file2));
   } catch (error62) {
     return errnoOf(error62) === "ENOENT" ? ok(void 0) : fail("io");
   }
@@ -22378,18 +22597,19 @@ async function runJson(args, env) {
   if (dir === void 0) return failWith(NOT_A_REPO);
   const paths = pathsFor(dir);
   const now = Date.now();
-  const [sessions, snapshot, pins, progress] = await Promise.all([
+  const [sessions, snapshot, pins, progress, time3] = await Promise.all([
     readLiveSessions(paths, now),
     readSnapshot(paths.snapshotFile),
     readPins(paths),
-    loadProgressFor(cwd)
+    loadProgressFor(cwd),
+    readTime(paths)
   ]);
-  printLine(JSON.stringify(buildView({ snapshot, sessions, pins: pinsOf(pins), now, progress }), null, 2));
+  printLine(JSON.stringify(buildView({ snapshot, sessions, pins: pinsOf(pins), now, progress, time: time3 }), null, 2));
   return 0;
 }
 
 // packages/cli/src/refresh-attempt.ts
-import { readFile as readFile10, stat as stat9 } from "node:fs/promises";
+import { readFile as readFile11, stat as stat10 } from "node:fs/promises";
 import { join as join10 } from "node:path";
 var ATTEMPT_FILE = "refresh-attempt.json";
 var RETRY_AFTER_MS = 6e4;
@@ -22398,8 +22618,8 @@ var AttemptSchema = external_exports.object({ v: external_exports.literal(1), at
 async function readAttempt(dir) {
   const file2 = join10(dir, ATTEMPT_FILE);
   try {
-    if ((await stat9(file2)).size > MAX_ATTEMPT_BYTES) return void 0;
-    const parsed = AttemptSchema.safeParse(parseJson(await readFile10(file2, "utf8")));
+    if ((await stat10(file2)).size > MAX_ATTEMPT_BYTES) return void 0;
+    const parsed = AttemptSchema.safeParse(parseJson(await readFile11(file2, "utf8")));
     return parsed.success ? parsed.data : void 0;
   } catch {
     return void 0;
