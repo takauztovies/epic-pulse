@@ -243,6 +243,8 @@ a field that is wrong falls back to its default without voiding the others.
 
 ## Jira
 
+**Experimental.** Jira support has not yet been run against a real Jira site: it was written and tested against Atlassian's documentation, and its test data is hand-written. Expect rough edges (statuses, paging, an expired token reading as "no epic"), and report what you see. GitHub is unaffected: nothing changes for a repository without a `jira` block.
+
 Jira Cloud works beside GitHub, per repository. An epic is a Jira Epic (or any issue with children), its
 issues are the children of `parent = EPIC-1`, and the percentage, the bar, the hover and the views are
 the same.

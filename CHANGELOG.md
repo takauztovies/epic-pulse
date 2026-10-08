@@ -5,9 +5,17 @@ Every notable change to epic-pulse is listed here. Versions follow
 
 ## Unreleased
 
+## 0.3.5
+
+### Fixed
+
+- Clicking an epic or an issue with a live Claude Code session did nothing: the click handed VS Code
+  the session ids as separate arguments, so the handler received a bare id instead of the list and
+  refused it. It now opens the session.
+
 ### Added
 
-- **Jira Cloud**, per repository: declare a `jira` block (`site`, `projects`, optional `statusMap`) in
+- **Jira Cloud (experimental)**, per repository: it has not been run against a real Jira site yet, only against fixtures written from Atlassian's documentation, and this release says so on purpose (fixtures/jira/unverified-ack.json; the release check refuses a later version unless the fixtures are recorded or it is acknowledged again). Declare a `jira` block (`site`, `projects`, optional `statusMap`) in
   `.epic-pulse.json` and set `JIRA_SITE`, `JIRA_EMAIL` and `JIRA_API_TOKEN` in your environment. Epics
   are Jira Epics with their children; statuses follow Jira's status categories with the repository's
   map on top; sessions bind to `PROJ-12` through a branch name, a commit message or

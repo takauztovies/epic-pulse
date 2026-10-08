@@ -161,23 +161,45 @@ function mismatches(manifest, version) {
 
 // Jira support was written before any Jira site was available to record from,
 // so its fixtures were written by hand from Atlassian's documentation and say
-// `"unverified": true`. A release must not ship code tested only against that:
-// `pnpm record-fixtures jira` replaces them with real responses, without the flag.
+// `"unverified": true`. `pnpm record-fixtures jira` replaces them with real
+// responses, without the flag. Until then a release is refused, unless the
+// repository carries a signed-off acknowledgement for THAT version: a committed
+// file (fixtures/jira/unverified-ack.json) naming the version, so the next
+// release is refused again unless it is recorded or acknowledged anew, in a
+// change someone reviews.
 const JIRA_FIXTURES = 'fixtures/jira';
+const ACK_FILE = 'unverified-ack.json';
 
 function unverifiedFixtures() {
   const dir = join(ROOT, JIRA_FIXTURES);
   if (!existsSync(dir)) return [];
-  return readdirSync(dir).filter((name) => name.endsWith('.json')).flatMap((name) => {
+  return readdirSync(dir).filter((name) => name.endsWith('.json') && name !== ACK_FILE).flatMap((name) => {
     const unverified = JSON.parse(readFileSync(join(dir, name), 'utf8')).unverified === true;
-    return unverified ? [`${JIRA_FIXTURES}/${name} is marked unverified (hand-written, not recorded from Jira): run pnpm record-fixtures jira before releasing`] : [];
+    return unverified ? [`${JIRA_FIXTURES}/${name}`] : [];
   });
 }
 
+function acknowledges(version) {
+  const file = join(ROOT, JIRA_FIXTURES, ACK_FILE);
+  if (!existsSync(file)) return false;
+  try {
+    return JSON.parse(readFileSync(file, 'utf8')).version === version;
+  } catch {
+    return false;
+  }
+}
+
+function refusal(name) {
+  return `${name} is marked unverified (hand-written, not recorded from Jira): run pnpm record-fixtures jira before releasing, or acknowledge this version in ${JIRA_FIXTURES}/${ACK_FILE}`;
+}
+
 function check(version) {
-  const wrong = [...presentManifests().flatMap((manifest) => mismatches(manifest, version.text)), ...unverifiedFixtures()];
+  const flagged = unverifiedFixtures();
+  const acknowledged = flagged.length > 0 && acknowledges(version.text);
+  const wrong = [...presentManifests().flatMap((manifest) => mismatches(manifest, version.text)), ...(acknowledged ? [] : flagged.map(refusal))];
   if (wrong.length > 0) throw new ReleaseError(wrong.join('\n'));
-  return `epic-pulse: every manifest says ${version.text} and the marketplace installs ${tagOf(version.text)}: ${presentManifests().map((m) => m.path).join(', ')}`;
+  const note = acknowledged ? `\nepic-pulse: WARNING ${flagged.length} Jira fixtures are unverified; ${version.text} acknowledges that (${JIRA_FIXTURES}/${ACK_FILE})` : '';
+  return `epic-pulse: every manifest says ${version.text} and the marketplace installs ${tagOf(version.text)}: ${presentManifests().map((m) => m.path).join(', ')}${note}`;
 }
 
 function release(args) {

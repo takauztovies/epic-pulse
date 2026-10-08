@@ -1,7 +1,7 @@
 # Design: GitLab and Jira Cloud behind a provider seam
 
-Status: the provider interface (step 1) is merged. Jira Cloud is implemented on `feat/jira` and not yet
-released (see "Jira: what was built" at the end). GitLab is not started. Today every part of
+Status: the provider interface (step 1) is merged. Jira Cloud is implemented and ships experimental in 0.3.5 (unverified
+fixtures, acknowledged in `fixtures/jira/unverified-ack.json`; see "Jira: what was built" at the end). GitLab is not started. Today every part of
 epic-pulse that talks to an issue tracker assumed GitHub; this adds GitLab (work-item epics) and Jira
 Cloud (status categories), each as its own release.
 

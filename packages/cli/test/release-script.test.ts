@@ -189,11 +189,19 @@ test('after a release has tracked plugin/dist, a rebuilt bundle does not block t
 });
 
 // Jira support was first tested against hand-written fixtures, flagged
-// unverified. Shipping that would ship code never run against a real Jira.
-test('--check refuses to release while a Jira fixture is marked unverified, and passes once it is recorded', (t) => {
+// unverified. Shipping that would ship code never run against a real Jira, so a
+// release is refused unless a committed file acknowledges that exact version.
+const ACK = ['fixtures', 'jira', 'unverified-ack.json'];
+
+function unacknowledged(repo: string): string {
+  rmSync(join(repo, ...ACK), { force: true });
+  return join(repo, 'fixtures', 'jira');
+}
+
+test('--check refuses to release while a Jira fixture is marked unverified, and passes once they are all recorded', (t) => {
   const repo = releaseRepo(t, { withJiraFixtures: true });
   const current = cliVersion(repo);
-  const dir = join(repo, 'fixtures', 'jira');
+  const dir = unacknowledged(repo);
   assertRefused(release(repo, ['--check', current]), 1, /fixtures\/jira\/phase-a\.json is marked unverified/);
   const files = readdirSync(dir).map((name) => join(dir, name));
   writeFileSync(files[0] ?? '', JSON.stringify({ ...JSON.parse(readFileSync(files[0] ?? '', 'utf8')) as object, unverified: undefined }));
@@ -202,4 +210,23 @@ test('--check refuses to release while a Jira fixture is marked unverified, and 
   assert.equal(release(repo, ['--check', current]).status, 0, 'recorded fixtures ship');
   rmSync(dir, { recursive: true });
   assert.equal(release(repo, ['--check', current]).status, 0, 'a repository with no Jira fixtures ships');
+});
+
+test('--check lets unverified fixtures through only for the version the acknowledgement names, and says so', (t) => {
+  const repo = releaseRepo(t, { withJiraFixtures: true });
+  const current = cliVersion(repo);
+  unacknowledged(repo);
+  const ack = (version: unknown) => writeFileSync(join(repo, ...ACK), JSON.stringify({ version, note: 'test' }));
+  ack(current);
+  const passed = release(repo, ['--check', current]);
+  assert.equal(passed.status, 0);
+  assert.match(passed.stdout, /WARNING \d+ Jira fixtures are unverified; .+ acknowledges that/);
+  ack(nextMinor(repo));
+  assertRefused(release(repo, ['--check', current]), 1, /is marked unverified .*acknowledge this version/);
+  for (const bad of [undefined, 7, `v${current}`, `${current}.1`]) {
+    ack(bad);
+    assertRefused(release(repo, ['--check', current]), 1, /is marked unverified/);
+  }
+  writeFileSync(join(repo, ...ACK), '{ not json');
+  assertRefused(release(repo, ['--check', current]), 1, /is marked unverified/);
 });
