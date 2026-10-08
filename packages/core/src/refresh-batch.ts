@@ -1,7 +1,8 @@
-import { describeFetchError, postGraphql, type RawResponse } from './github.js';
+import type { RawResponse } from './github.js';
 import { touchLock, type Lock } from './lock.js';
-import { parsePhaseA, parsePhaseB, phaseADocument, phaseBDocument, type Failure, type RateInfo } from './queries.js';
-import { applyEpics, applyRefusal, applyResolutions, chargePoints, chargeRate, markEpicErrors, rateLimited } from './refresh-apply.js';
+import { providerFor } from './provider.js';
+import type { Failure, RateInfo } from './queries.js';
+import { applyRefusal, chargePoints, chargeRate, markEpicErrors, rateLimited } from './refresh-apply.js';
 import { backingOff, HOURLY_BUDGET_POINTS, PHASE_A_COST, phaseBCost } from './refresh-plan.js';
 import { fail, ok, type Result } from './result.js';
 import type { ErrorCode, IssueRef, RepoRef } from './schemas/common.js';
@@ -83,19 +84,6 @@ async function topUp(run: Run, extra: { readonly host: string; readonly points: 
   return { ...run, spent: (run.spent ?? 0) + extra.points };
 }
 
-// The only network call. A thrown error goes through describeFetchError's
-// whitelist, never into a message: undici echoes a malformed header value,
-// token included, in its error text.
-async function send(token: string, batch: Batch): Promise<Result<RawResponse, Failure>> {
-  const numbers = batch.refs.map((ref) => ref.number);
-  const query = batch.phase === 'A' ? phaseADocument(numbers) : phaseBDocument(numbers);
-  try {
-    return ok(await postGraphql({ host: batch.repo.host, token, query, variables: { owner: batch.repo.owner, name: batch.repo.repo } }));
-  } catch (error) {
-    return fail(describeFetchError(error));
-  }
-}
-
 // The answers asking again would not change: this repository's issues can
 // not be read with this token, or the host has no sub-issues.
 const PERMANENT: ReadonlySet<ErrorCode> = new Set(['not_found', 'forbidden', 'unsupported']);
@@ -135,16 +123,9 @@ function charged(run: Run, batch: Batch, answer: { readonly rate: RateInfo | nul
 }
 
 export function answered(run: Run, batch: Batch, res: RawResponse): Run {
-  if (batch.phase === 'A') {
-    const parsed = parsePhaseA(res);
-    if (!parsed.ok) return rejected(run, batch, parsed.error);
-    const answers = batch.refs.map((ref) => [ref, parsed.value.issues.get(ref.number) ?? null] as const);
-    return charged(run, batch, { rate: parsed.value.rate, snapshot: applyResolutions(run.snapshot, answers, run.now) });
-  }
-  const parsed = parsePhaseB(res);
+  const parsed = providerFor().parse(batch, res);
   if (!parsed.ok) return rejected(run, batch, parsed.error);
-  const answers = batch.refs.map((ref) => [ref, parsed.value.epics.get(ref.number) ?? null] as const);
-  return charged(run, batch, { rate: parsed.value.rate, snapshot: applyEpics(run.snapshot, answers, run.now) });
+  return charged(run, batch, { rate: parsed.value.rate, snapshot: parsed.value.apply(run.snapshot, run.now) });
 }
 
 export async function runBatch(run: Run, batch: Batch, ctx: Context): Promise<Run> {
@@ -152,7 +133,7 @@ export async function runBatch(run: Run, batch: Batch, ctx: Context): Promise<Ru
   if (!token.ok) return failed(run, batch, token.error);
   const reserved = await reserve(run, batch, ctx);
   if (reserved.failure) return failed(reserved.run, batch, reserved.failure);
-  const sent = await send(token.value, batch);
+  const sent = await providerFor().send(token.value, batch);
   await touchLock(ctx.lock, ctx.clock());
   const counted = { ...reserved.run, requests: reserved.run.requests + 1 };
   const next = sent.ok ? answered(counted, batch, sent.value) : failed(counted, batch, sent.error);

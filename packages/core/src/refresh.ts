@@ -1,4 +1,4 @@
-import { resolveToken } from './github.js';
+import { providerFor } from './provider.js';
 import { acquireLock, releaseLock, type Lock } from './lock.js';
 import { pathsFor, userCacheDir, type RegistryPaths } from './paths.js';
 import { pinsOf, readPins } from './pins.js';
@@ -107,7 +107,7 @@ async function tokensFor(run: Run, refs: readonly IssueRef[], options: RefreshOp
   if (overBudget(run, PHASE_A_COST)) return new Map();
   const given = new Map(Object.entries(options.tokens ?? {}));
   const hosts = [...new Set(pendingRefs(run, refs).map((ref) => ref.host))];
-  const found = await Promise.all(hosts.map(async (host) => [host, given.get(host) ?? (await resolveToken(host, options.env))?.token] as const));
+  const found = await Promise.all(hosts.map(async (host) => [host, given.get(host) ?? (await providerFor().token(host, options.env))] as const));
   return new Map(found.flatMap(([host, token]) => (token === undefined ? [] : [[host, token] as const])));
 }
 
