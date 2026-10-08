@@ -5,6 +5,14 @@ Every notable change to epic-pulse is listed here. Versions follow
 
 ## Unreleased
 
+### Added
+
+- **Session time** per epic and per issue: how long Claude Code sessions actively worked on it, with
+  gaps over ten minutes counted as idle, shown in the hover of the tree, the status bar and the
+  Overview card. The hover also says when a session was last on it, and which. Totals are kept in
+  `time.json` in the repository's git directory so they outlive the session files. `epic-pulse json`
+  gains `activeSeconds`, `lastActivityAt` and `lastSessionId` on epics and issues.
+
 ## 0.3.3
 
 ### Added

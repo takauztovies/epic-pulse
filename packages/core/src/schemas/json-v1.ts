@@ -16,6 +16,11 @@ export const JsonChildSchema = z
     // sessionCount is their length, kept so a reader of only the count need
     // not change.
     sessionIds: z.array(z.string()).readonly(),
+    // Active session time on this item, in seconds, with when and in which
+    // session it was last worked on (null: never).
+    activeSeconds: z.number().int().nonnegative(),
+    lastActivityAt: z.iso.datetime().nullable(),
+    lastSessionId: z.string().nullable(),
   })
   .readonly();
 
@@ -32,6 +37,11 @@ export const JsonEpicSchema = z
     // Every live session bound to any child of this epic, deduplicated: the
     // epic-level answer to "which session is working on this".
     sessionIds: z.array(z.string()).readonly(),
+    // Active session time on this epic: its own and all its issues', in seconds, with when and in which
+    // session it was last worked on (null: never).
+    activeSeconds: z.number().int().nonnegative(),
+    lastActivityAt: z.iso.datetime().nullable(),
+    lastSessionId: z.string().nullable(),
     fetchedAt: z.iso.datetime(),
     stale: z.boolean(),
     error: ErrorCodeSchema.nullable(),

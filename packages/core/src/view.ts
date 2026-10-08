@@ -6,6 +6,7 @@ import type { Pin } from './schemas/registry.js';
 import type { Child, EpicEntry, Snapshot } from './schemas/snapshot.js';
 import type { SnapshotRead } from './snapshot.js';
 import { DEFAULT_PROGRESS, type ProgressConfig } from './progress-config.js';
+import type { TimeFile, TimeRef } from './schemas/time.js';
 import { countStatuses, isStale, percentDone, pointsByStatus, weightedPercentDone } from './status.js';
 
 export interface ViewInput {
@@ -20,6 +21,8 @@ export interface ViewInput {
   readonly scope?: { readonly session: SessionState | undefined };
   // What the percentages count for; the defaults when the repository sets none.
   readonly progress?: ProgressConfig;
+  // What sessions have spent on each issue (time.json); none when absent.
+  readonly time?: TimeFile;
 }
 
 interface Scoped {
@@ -129,17 +132,44 @@ function childSessionIds(key: string | undefined, bound: readonly BoundSession[]
   return key === undefined ? [] : bound.filter((session) => session.keys.has(key)).map((session) => session.sessionId);
 }
 
-function jsonEpic(entry: EpicEntry, bound: readonly BoundSession[], input: { readonly now: number; readonly progress: ProgressConfig }): JsonEpic {
+interface Activity {
+  readonly activeSeconds: number;
+  readonly lastActivityAt: string | null;
+  readonly lastSessionId: string | null;
+}
+
+// Several issues' time as one: the sum, and the most recent of them.
+function activityOf(entries: readonly (TimeRef | undefined)[]): Activity {
+  const present = entries.filter((entry): entry is TimeRef => entry !== undefined);
+  const latest = present.reduce<TimeRef | undefined>((best, entry) => (best === undefined || entry.lastTs > best.lastTs ? entry : best), undefined);
+  return {
+    activeSeconds: Math.floor(present.reduce((sum, entry) => sum + entry.ms, 0) / 1000),
+    lastActivityAt: latest ? iso(latest.lastTs) : null,
+    lastSessionId: latest?.lastSession ?? null,
+  };
+}
+
+// An epic's own time plus every distinct issue's (a checklist may list one
+// issue twice). A session is credited to one issue at a time, so the sum
+// never counts the same minute twice.
+function epicActivity(entry: EpicEntry, time: TimeFile | undefined): Activity {
+  const keys = new Set(entry.children.flatMap((child) => childKey(child, entry.ref) ?? []));
+  return activityOf([time?.refs[refKey(entry.ref)], ...[...keys].map((key) => time?.refs[key])]);
+}
+
+function jsonEpic(entry: EpicEntry, bound: readonly BoundSession[], input: { readonly now: number; readonly progress: ProgressConfig; readonly time: TimeFile | undefined }): JsonEpic {
   const counts = countStatuses(entry.children);
   const points = pointsByStatus(entry.children, input.progress);
   const children = entry.children.map((child) => {
     const sessionIds = childSessionIds(childKey(child, entry.ref), bound);
-    return { number: child.number, title: child.title, url: child.url, status: child.status, sessionCount: sessionIds.length, sessionIds };
+    const key = childKey(child, entry.ref);
+    const time = key === undefined ? undefined : input.time?.refs[key];
+    return { number: child.number, title: child.title, url: child.url, status: child.status, sessionCount: sessionIds.length, sessionIds, ...activityOf([time]) };
   });
   const epicSessionIds = [...new Set(children.flatMap((child) => child.sessionIds))];
   return {
     number: entry.ref.number, title: entry.title, url: entry.url, kind: entry.kind, counts, percent: percentDone(points),
-    weightedPercent: weightedPercentDone(points, input.progress), sessionIds: epicSessionIds,
+    weightedPercent: weightedPercentDone(points, input.progress), sessionIds: epicSessionIds, ...epicActivity(entry, input.time),
     children, fetchedAt: iso(entry.fetchedAt), stale: isStale(entry, input.now), error: entry.error, truncated: entry.truncated,
   };
 }
@@ -157,6 +187,6 @@ export function buildView(input: ViewInput): JsonV1 {
     liveSessions: live.length,
     pending: pendingCount(scoped),
     snapshot: { state: stateOf(scoped), fetchedAt: snapshot ? iso(snapshot.updatedAt) : null, error: errorOf(scoped) },
-    epics: entries.map((entry) => jsonEpic(entry, bound, { now: input.now, progress: input.progress ?? DEFAULT_PROGRESS })),
+    epics: entries.map((entry) => jsonEpic(entry, bound, { now: input.now, progress: input.progress ?? DEFAULT_PROGRESS, time: input.time })),
   };
 }

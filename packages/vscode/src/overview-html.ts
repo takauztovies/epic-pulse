@@ -1,5 +1,5 @@
 import { STATUSES, type JsonEpic, type Status } from '@epic-pulse/core';
-import { epicSessionsText, progressText, STATUS_TEXT } from './labels.js';
+import { durationText, epicSessionsText, progressText, STATUS_TEXT } from './labels.js';
 
 // The Overview panel as one HTML document: a card per epic with a coloured
 // progress bar and every status with its count, zeros included. Every string
@@ -41,7 +41,7 @@ function card(epic: JsonEpic, index: number): string {
 <button class="head" data-i="${index}"><span class="title">#${epic.number} ${escapeHtml(epic.title)}</span><span class="pct">${epic.percent}%</span></button>
 <progress class="${epic.percent === 100 ? 'full' : ''}" max="100" value="${epic.percent}"></progress>
 <ul class="legend">${STATUSES.map((status) => legendItem(epic, status)).join('')}</ul>
-<div class="meta">${progressText(epic)} · ${epicSessionsText(epic)}${stale}</div>
+<div class="meta">${progressText(epic)} · ${epicSessionsText(epic)} · Time ${durationText(epic.activeSeconds)}${stale}</div>
 </section>`;
 }
 
