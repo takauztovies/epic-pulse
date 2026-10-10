@@ -47,6 +47,8 @@ export const PrNodeSchema = z.object({
   isDraft: z.boolean(),
   url: z.string(),
   body: z.string().optional(),
+  // Optional: read only where the branch matters (the repository's open pull requests).
+  headRefName: z.string().optional(),
   repository: RepoNameSchema,
 });
 
@@ -78,6 +80,9 @@ export const SubIssueNodeSchema = z.object({
   labels: z.object({ nodes: z.array(z.object({ name: z.string() }).nullable()) }).optional(),
   closedByPullRequestsReferences: z.object({ nodes: z.array(PrNodeSchema.nullable()) }),
   timelineItems: z.object({ nodes: z.array(TimelineNodeSchema.nullable()) }),
+  // Never in a GitHub answer: parsePhaseB fills it with the repository's open pull
+  // requests whose branch is named for this issue (`123-login`).
+  branchPullRequests: z.array(PrNodeSchema).readonly().optional(),
 });
 
 export const EpicNodeSchema = z.object({
@@ -92,10 +97,14 @@ export const EpicNodeSchema = z.object({
   }),
 });
 
+// The repository holds one alias per epic (`e1`, `e8`) and the repository's open
+// pull requests (`openPrs`), so each part is parsed on its own (queries.ts).
 export const PhaseBDataSchema = z.object({
   rateLimit: RateLimitNodeSchema.nullable(),
-  repository: z.record(z.string(), EpicNodeSchema.nullable()).nullable(),
+  repository: z.record(z.string(), z.unknown()).nullable(),
 });
+
+export const OpenPrsSchema = z.object({ nodes: z.array(PrNodeSchema.nullable()) });
 
 export type GqlError = z.infer<typeof GqlErrorSchema>;
 export type PhaseAIssue = z.infer<typeof PhaseAIssueSchema>;
