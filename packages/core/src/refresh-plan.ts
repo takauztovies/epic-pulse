@@ -114,8 +114,13 @@ export function needsFetch(snapshot: Snapshot, epics: readonly IssueRef[], now: 
 // with five nested connections each (the sub-issue count is one), 501 requests; the total over 100,
 // rounded, is the cost, and it is never below 1. The fixtures were recorded
 // before labels were asked for and say 3; the live document costs 5.
+// The repository's open pull requests (queries.ts OPEN_PRS), once per request: a
+// connection with nothing nested in it is one request to GitHub, not 100, so it is
+// absorbed by the rounding (measured live: 5, 10 and 15 points for 1, 2 and 3 epics).
+const OPEN_PR_REQUESTS = 1;
+
 export function phaseBCost(epics: number): number {
-  return Math.max(1, Math.round((epics * 501) / 100));
+  return Math.max(1, Math.round((epics * 501 + OPEN_PR_REQUESTS) / 100));
 }
 
 // How many epics the next Phase B request may carry within the hourly budget.

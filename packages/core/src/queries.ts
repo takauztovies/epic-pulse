@@ -1,13 +1,17 @@
+import { branchIssueNumber, DEFAULT_BRANCH_PATTERN } from './branch-pattern.js';
 import { classifyGraphqlErrors, classifyHttp } from './gql-errors.js';
 import type { RawResponse } from './github.js';
 import { fail, ok, type Result } from './result.js';
 import type { ErrorCode } from './schemas/common.js';
 import { IssueNumberSchema } from './schemas/common.js';
 import {
+  EpicNodeSchema,
   GqlEnvelopeSchema,
+  OpenPrsSchema,
   PhaseADataSchema,
   PhaseBDataSchema,
   type EpicNode,
+  type PrNode,
   type PhaseAIssue,
   type RateLimitNode,
 } from './schemas/graphql.js';
@@ -79,11 +83,18 @@ const EPIC_FRAGMENT = `fragment EpicFields on Issue {
   }
 }`;
 
+// The repository's open pull requests, newest first, for the ones whose branch is
+// named for an issue: such a pull request leaves no trace on the issue unless it
+// also mentions it. A connection with nothing nested costs GitHub one request,
+// not 100, so it adds no points (refresh-plan.ts).
+const OPEN_PRS = 'openPrs: pullRequests(states: OPEN, first: 100, orderBy: { field: UPDATED_AT, direction: DESC }) { nodes { number state isDraft url headRefName repository { nameWithOwner } } }';
+
 export function phaseBDocument(numbers: readonly number[]): string {
   return `query PhaseB($owner: String!, $name: String!) {
   ${RATE}
   repository(owner: $owner, name: $name) {
     ${aliased('e', numbers, '{ ...EpicFields }')}
+    ${OPEN_PRS}
   }
 }
 ${EPIC_FRAGMENT}`;
@@ -132,10 +143,31 @@ export interface PhaseBParsed {
   readonly epics: ReadonlyMap<number, EpicNode | null>;
 }
 
+// Each sub-issue gets the open pull requests whose branch is named for it. A
+// recording made before the list was asked for has none, and that is not an error.
+function withBranchPrs(epics: ReadonlyMap<number, EpicNode | null>, prs: readonly (PrNode | null)[]): ReadonlyMap<number, EpicNode | null> {
+  const byIssue = new Map<number, PrNode[]>();
+  for (const pr of prs) {
+    const number = pr?.headRefName === undefined ? undefined : branchIssueNumber(pr.headRefName, DEFAULT_BRANCH_PATTERN);
+    if (pr && number !== undefined) byIssue.set(number, [...(byIssue.get(number) ?? []), pr]);
+  }
+  return new Map([...epics].map(([number, epic]) => [number, epic && {
+    ...epic,
+    subIssues: { ...epic.subIssues, nodes: epic.subIssues.nodes.map((node) => node && { ...node, branchPullRequests: byIssue.get(node.number) ?? [] }) },
+  }] as const));
+}
+
 export function parsePhaseB(res: RawResponse): Result<PhaseBParsed, Failure> {
   const opened = openEnvelope(res);
   if (!opened.ok) return opened;
   const data = PhaseBDataSchema.safeParse(opened.value.data);
   if (!data.success || !data.data.repository) return fail({ code: 'invalid_response', detail: 'phase_b_shape' });
-  return ok({ rate: toRate(data.data.rateLimit), epics: keyed('e', data.data.repository) });
+  const epics = new Map<number, EpicNode | null>();
+  for (const [number, raw] of keyed('e', data.data.repository)) {
+    const epic = EpicNodeSchema.nullable().safeParse(raw ?? null);
+    if (!epic.success) return fail({ code: 'invalid_response', detail: 'phase_b_shape' });
+    epics.set(number, epic.data);
+  }
+  const prs = OpenPrsSchema.safeParse(data.data.repository['openPrs']);
+  return ok({ rate: toRate(data.data.rateLimit), epics: withBranchPrs(epics, prs.success ? prs.data.nodes : []) });
 }
