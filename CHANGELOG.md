@@ -7,6 +7,25 @@ Every notable change to epic-pulse is listed here. Versions follow
 
 ### Added
 
+- **Usage-limit warning.** From 90% of the account's 5-hour or weekly usage, the status line of every
+  session starts with a red `⚠ 91% 5h limit, resets in 2h10m · /compact`, and a new prompt hook tells
+  each session's agent once (again at 95% and 99%) to finish its step, write a handoff and start no new
+  work. `EPIC_PULSE_LIMIT_WARN` moves the threshold, `NO_COLOR` drops the colour. The status line keeps
+  the latest reading in `limits.json` and the hook remembers whom it told in `limits-notified.json`,
+  both in the user cache directory.
+
+### Changed
+
+- Statuses follow pull requests more closely. An open pull request from a branch named for the issue
+  (`123-login`) counts as its work even when it never mentions the issue: in review when ready, in
+  progress as a draft. An open pull request that mentions an issue without closing it moves it to in
+  progress (never to review); one that names more than three issues moves none. The query reads the
+  repository's 100 most recently updated open pull requests, at no extra cost (measured). Both new
+  routes count only pull requests from a branch in the repository itself, never from a fork, which
+  anyone can open.
+
+### Added
+
 - **The whole tree.** A sub-issue that has sub-issues is followed as a sub-epic, at every level down to
   GitHub's limit of eight: the VS Code view opens each one onto its own status groups with its own
   percentage, and an epic counts the items at the bottom of its tree rather than its direct children.

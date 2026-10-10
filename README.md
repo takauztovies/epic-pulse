@@ -57,6 +57,25 @@ it touches. It reports how the epic fits and proposes slices, each saying what i
 architecture it uses or changes, and waits for you to pick one before anything is edited. It never
 closes, edits, labels or comments on an issue. See the [manual](docs/MANUAL.md).
 
+## Near the usage limit
+
+Claude Code tells each session's status line how much of the account's 5-hour and weekly usage is
+spent (Claude Code 2.1.80 or later, on a subscription). From 90% the status line of **every** session
+puts a red warning in front of the epic:
+
+```
+⚠ 91% 5h limit, resets in 2h10m · /compact · #12 ▓▓▓░░░░░░░ 30% 3/10
+```
+
+The plugin's prompt hook also tells each session's agent once, on your next prompt, to finish the step
+it is on, write a short handoff, start no new subagents or long-running work, and suggest `/compact`.
+It is told again at 95% and 99%, and again in the next usage window; the note is a few dozen tokens.
+
+What it can not do: no program can type `/compact` into another session for you, and compacting does
+not give back what was spent; it makes the next turns cheaper. Set `EPIC_PULSE_LIMIT_WARN` (50 to 100)
+to warn earlier or later, and `NO_COLOR` for no colour. Both need the status line installed
+(`epic-pulse statusline install`), since that is where Claude Code reports the usage.
+
 ## Set up the status line
 
 A plugin can not set Claude Code's `statusLine`, so one command does it:
@@ -157,8 +176,8 @@ only limit is a 1.5-second tripwire that catches a render waiting on the network
 | Status | A sub-issue that is |
 | --- | --- |
 | Todo | open, with nobody assigned and no pull request on the way |
-| In progress | open and assigned, or with a draft pull request that will close it |
-| In review | open, with a ready pull request that will close it |
+| In progress | open and assigned, or with a draft pull request that will close it, or with any open pull request that mentions it (one that names more than three issues does not count). Only pull requests from a branch in the repository itself count this way: anyone can open one from a fork |
+| In review | open, with a ready pull request that will close it: one with a closing keyword, GitHub's own link, or one from a branch named for the issue (`123-login`) |
 | Done | closed as completed, or closed without a reason |
 | Dropped | closed as not planned, or as a duplicate |
 
@@ -331,6 +350,8 @@ While you work, epic-pulse writes these files and no others:
 <git-common-dir>/epic-pulse/refresh-attempt.json
 <claude-config-dir>/epic-pulse/runtime.mjs
 <user-cache-dir>/epic-pulse/usage.jsonl
+<user-cache-dir>/epic-pulse/limits.json
+<user-cache-dir>/epic-pulse/limits-notified.json
 <user-cache-dir>/epic-pulse/usage.lock
 ```
 
@@ -345,6 +366,8 @@ While you work, epic-pulse writes these files and no others:
 | `refresh-attempt.json` | `epic-pulse refresh`, which the status line starts | when the last refresh ended and the code it stopped with; after a failure the status line starts the next one a minute later |
 | `runtime.mjs` | the hook at session start, and `statusline install` | a copy of the program for the status line to run |
 | `usage.jsonl` | the refresher | the last hour's charges, one line each: when, which host, how many points and a hash of the repository's registry path, so that every refresher on the machine shares one budget of 300 points an hour |
+| `limits.json` | the status line | the latest usage reading Claude Code gave the status line: the 5-hour and weekly percentages, when each resets, and when it was read. Nothing else |
+| `limits-notified.json` | the prompt hook | which session was already told about which step of the usage limit: session ids, the step, the reset time, when. At most 200 sessions |
 | `usage.lock` | the refresher | a process id and a random token, while the ledger is written |
 
 - `<git-common-dir>` is the repository's `.git` directory, which all its worktrees share. Nothing is
