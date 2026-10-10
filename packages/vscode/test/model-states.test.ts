@@ -5,9 +5,9 @@ import { emptySnapshot, refKey, STALE_AFTER_MS, type ErrorCode } from '@epic-pul
 import { buildModel, type Model } from '../src/model.js';
 import { activityLines, barText, detailLines, durationText, epicSessionsText, issueDetailLines } from '../src/labels.js';
 import { statusBarOf } from '../src/status-model.js';
-import { treeOf } from '../src/tree-model.js';
+import { childrenOf, treeOf, type TreeNode } from '../src/tree-model.js';
 import { modelOf, surface } from './model-helpers.js';
-import { demo, demoSnapshot, makeRegistry, SESSION_A, tempDir } from './registry-helpers.js';
+import { demo, demoSnapshot, makeRegistry, nestedSnapshot, SESSION_A, tempDir } from './registry-helpers.js';
 
 // Every state, from real registry and snapshot files read through core's
 // buildView. Signed-out needs a real refresh and is in signed-out.test.ts.
@@ -176,4 +176,19 @@ test('the status bar tooltip is Markdown, so an epic summary from GitHub can not
   const line = statusBarOf(model).tooltip.split('\n').find((text) => text.startsWith('Summary\\:')) ?? '';
   assert.doesNotMatch(line.replace(/\\./g, ''), /[[\]()<>*_:.@]/);
   assert.equal(line.replace(/\\(.)/g, '$1').trimEnd(), 'Summary: [click](https://example.invalid) **bold** <img src=x>');
+});
+
+// Every row that has items under it opens onto its own status groups, however deep.
+test('a sub-epic row opens onto its own status groups, down to the deepest leaf', async (t) => {
+  const now = Date.now();
+  const repo = await makeRegistry(t, { sessions: [{ id: SESSION_A, binds: [demo(48)] }], pins: [demo(43)], snapshot: nestedSnapshot(now - 1000) }, now);
+  const [epic] = treeOf(await modelOf([repo], now));
+  const items = (node: TreeNode | undefined): readonly TreeNode[] => childrenOf(node!).flatMap(childrenOf);
+  const a = items(epic).find((n) => n.label.startsWith('#44'));
+  const b = items(a).find((n) => n.label.startsWith('#45'));
+  const leaf = items(b).find((n) => n.label.startsWith('#48'));
+  assert.deepEqual([a?.description, a?.icon], ['50% · 1/2 · 1 session', 'type-hierarchy-sub']);
+  assert.deepEqual([b?.description, leaf?.icon, leaf?.iconColor], ['0% · 0/1 · 1 session', 'issues', 'charts.green']);
+  assert.deepEqual(childrenOf(leaf!), [], 'a leaf has nothing to open');
+  assert.equal(new Set([epic, a, b, leaf].map((n) => n?.id)).size, 4, 'ids stay unique at every level');
 });

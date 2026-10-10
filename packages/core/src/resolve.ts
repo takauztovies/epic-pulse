@@ -52,6 +52,7 @@ function subIssueChild(node: SubIssueNode, epic: IssueRef): Child {
   const status = deriveStatus(node, ownRepo(node, epic));
   const openPrs = status === 'done' || status === 'dropped' ? 0 : linkedOpenPrs(node, ownRepo(node, epic)).length;
   const closedAt = status === 'done' ? timeOf(node.closedAt) : undefined;
+  const subCount = node.subIssues?.totalCount ?? 0;
   return {
     number: node.number,
     title: node.title.slice(0, 300),
@@ -61,6 +62,7 @@ function subIssueChild(node: SubIssueNode, epic: IssueRef): Child {
     ...(assignees.length === 0 ? {} : { assignees }),
     ...(openPrs === 0 ? {} : { openPrs }),
     ...(closedAt === undefined ? {} : { closedAt }),
+    ...(subCount === 0 ? {} : { subCount }),
   };
 }
 

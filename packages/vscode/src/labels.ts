@@ -55,6 +55,12 @@ export function barText(percent: number): string {
   return '█'.repeat(filled) + '░'.repeat(BAR_CELLS - filled);
 }
 
+// "40% · 2/5" for a sub-epic row: done over the countable leaves below it.
+export function branchProgressText(counts: JsonEpic['counts'], percent: number): string {
+  const total = STATUSES.reduce((sum, status) => sum + counts[status], 0) - counts.dropped;
+  return `${percent}% · ${counts.done}/${total}`;
+}
+
 export function countsText(epic: JsonEpic): string {
   return STATUSES.filter((status) => epic.counts[status] > 0)
     .map((status) => `${STATUS_TEXT[status].label} ${epic.counts[status]}`)

@@ -60,6 +60,7 @@ const EPIC_FRAGMENT = `fragment EpicFields on Issue {
     nodes {
       number title url state stateReason closedAt repository { nameWithOwner }
       assignees(first: 3) { totalCount nodes { login } }
+      subIssues(first: 1) { totalCount }
       labels(first: 20) { nodes { name } }
       closedByPullRequestsReferences(first: 5) {
         nodes { number state isDraft url repository { nameWithOwner } }

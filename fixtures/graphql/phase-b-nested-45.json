@@ -1,0 +1,61 @@
+{
+  "recordedAt": "2026-10-10T18:44:01.756Z",
+  "note": "sub-epic B, the deepest: one leaf (#48)",
+  "status": 200,
+  "remaining": 4943,
+  "retryAfter": false,
+  "body": {
+    "data": {
+      "rateLimit": {
+        "cost": 5,
+        "remaining": 4943,
+        "resetAt": "2026-10-10T19:42:25Z"
+      },
+      "repository": {
+        "e45": {
+          "number": 45,
+          "title": "Demo nested: sub-epic B (deepest)",
+          "url": "https://github.com/takauztovies/epic-pulse/issues/45",
+          "body": "The sub-epic at the bottom of the tree.",
+          "createdAt": "2026-10-10T18:42:58Z",
+          "subIssues": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "number": 48,
+                "title": "Demo nested: leaf at depth 4",
+                "url": "https://github.com/takauztovies/epic-pulse/issues/48",
+                "state": "OPEN",
+                "stateReason": null,
+                "closedAt": null,
+                "repository": {
+                  "nameWithOwner": "takauztovies/epic-pulse"
+                },
+                "assignees": {
+                  "totalCount": 1,
+                  "nodes": [
+                    {
+                      "login": "takauztovies"
+                    }
+                  ]
+                },
+                "subIssues": {
+                  "totalCount": 0
+                },
+                "labels": {
+                  "nodes": []
+                },
+                "closedByPullRequestsReferences": {
+                  "nodes": []
+                },
+                "timelineItems": {
+                  "nodes": []
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

@@ -37,7 +37,7 @@ test('a paced repository still asks at once for what it has never resolved or fe
   paced(cache, paths.dir, { now, points: 1 });
   const outcome = await refresh({ dir: paths.dir, now, env: sendingEnv(t, cache) });
   assert.deepEqual(outcome, { status: 'done', requests: 2, points: 0, error: 'network' });
-  assert.deepEqual(chargedAt(cache, now), [1, 4], 'Phase A for #5, then Phase B for epic #7 alone');
+  assert.deepEqual(chargedAt(cache, now), [1, 5], 'Phase A for #5, then Phase B for epic #7 alone');
   const read = await readSnapshot(paths.snapshotFile);
   assert.deepEqual(read.status === 'ok' ? read.snapshot.epics[refKey(invalid(4))] : read.status, old, 'the cached epic waits its turn');
 });

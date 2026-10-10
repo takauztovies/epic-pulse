@@ -1,4 +1,4 @@
-import { displayKey, JIRA_KEY, kindOf, makeJiraRef, makeRef, parseIssueTarget, refKey } from './ref.js';
+import { displayKey, refKey } from './ref.js';
 import { activeBindings, isHookInactive, isLive, type Binding, type SessionState } from './registry.js';
 import type { ErrorCode, IssueRef, StateKind } from './schemas/common.js';
 import type { JsonEpic, JsonV1 } from './schemas/json-v1.js';
@@ -7,6 +7,7 @@ import type { Child, EpicEntry, Snapshot } from './schemas/snapshot.js';
 import type { SnapshotRead } from './snapshot.js';
 import { DEFAULT_PROGRESS, type ProgressConfig } from './progress-config.js';
 import type { TimeFile, TimeRef } from './schemas/time.js';
+import { buildChildren, type BoundSession } from './view-tree.js';
 import { countStatuses, isStale, percentDone, pointsByStatus, weightedPercentDone } from './status.js';
 
 export interface ViewInput {
@@ -112,31 +113,6 @@ function stateOf(scoped: Scoped): StateKind {
   return error ? 'error' : 'loading';
 }
 
-// A child's own URL names its repository (sub-issues may live elsewhere); a
-// checklist item without one can only mean an issue of the epic's repository.
-function childKey(child: Child, epic: IssueRef): string | undefined {
-  if (kindOf(epic) === 'jira') {
-    const parts = child.key === undefined ? null : JIRA_KEY.exec(child.key);
-    const own = parts ? makeJiraRef({ host: epic.host, project: parts[1] ?? '', number: Number(parts[2]) }) : undefined;
-    return own ? refKey(own) : undefined;
-  }
-  const target = child.url === null ? undefined : parseIssueTarget(child.url);
-  const own = target?.repo;
-  const ref = target && own ? makeRef({ host: own.host ?? epic.host, owner: own.owner, repo: own.repo, number: target.number })
-    : child.number === null ? undefined : makeRef({ ...epic, number: child.number });
-  return ref ? refKey(ref) : undefined;
-}
-
-interface BoundSession {
-  readonly sessionId: string;
-  readonly keys: ReadonlySet<string>;
-}
-
-// The live sessions bound to one child, most recently live session first.
-function childSessionIds(key: string | undefined, bound: readonly BoundSession[]): readonly string[] {
-  return key === undefined ? [] : bound.filter((session) => session.keys.has(key)).map((session) => session.sessionId);
-}
-
 interface Activity {
   readonly activeSeconds: number;
   readonly lastActivityAt: string | null;
@@ -154,44 +130,51 @@ function activityOf(entries: readonly (TimeRef | undefined)[]): Activity {
   };
 }
 
-// An epic's own time plus every distinct issue's (a checklist may list one
-// issue twice). A session is credited to one issue at a time, so the sum
-// never counts the same minute twice.
-function epicActivity(entry: EpicEntry, time: TimeFile | undefined): Activity {
-  const keys = new Set(entry.children.flatMap((child) => childKey(child, entry.ref) ?? []));
-  return activityOf([time?.refs[refKey(entry.ref)], ...[...keys].map((key) => time?.refs[key])]);
+// An epic's own time plus that of every distinct item below it. A session is
+// credited to one issue at a time, so the sum never counts the same minute twice.
+function epicActivity(entry: EpicEntry, keys: readonly string[], time: TimeFile | undefined): Activity {
+  return activityOf([time?.refs[refKey(entry.ref)], ...[...new Set(keys)].map((key) => time?.refs[key])]);
 }
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 // What the hover says besides progress: the description's opening lines, how
-// old the epic is, how many of its issues were finished this week, and who and
+// old the epic is, how many items under it were finished this week, and who and
 // what is in flight. All of it was stored by the refresh; only the week is
-// worked out here, against the clock the view was built with.
-function epicDetails(entry: EpicEntry, now: number): Pick<JsonEpic, 'summary' | 'createdAt' | 'doneLast7Days' | 'openPullRequests' | 'assignees'> {
-  const assignees = [...new Set(entry.children.flatMap((child) => child.assignees ?? []))].slice(0, 5);
+// worked out here, against the clock the view was built with. `leaves` is every
+// item that counts, from every level.
+function epicDetails(entry: EpicEntry, leaves: readonly Child[], now: number): Pick<JsonEpic, 'summary' | 'createdAt' | 'doneLast7Days' | 'openPullRequests' | 'assignees'> {
+  const assignees = [...new Set(leaves.flatMap((child) => child.assignees ?? []))].slice(0, 5);
   return {
     summary: entry.summary ?? null,
     createdAt: entry.createdAt === undefined ? null : iso(entry.createdAt),
-    doneLast7Days: entry.children.filter((child) => child.status === 'done' && child.closedAt !== undefined && now - child.closedAt >= 0 && now - child.closedAt <= WEEK_MS).length,
-    openPullRequests: entry.children.reduce((sum, child) => sum + (child.openPrs ?? 0), 0),
+    doneLast7Days: leaves.filter((child) => child.status === 'done' && child.closedAt !== undefined && now - child.closedAt >= 0 && now - child.closedAt <= WEEK_MS).length,
+    openPullRequests: leaves.reduce((sum, child) => sum + (child.openPrs ?? 0), 0),
     assignees,
   };
 }
 
-function jsonEpic(entry: EpicEntry, bound: readonly BoundSession[], input: { readonly now: number; readonly progress: ProgressConfig; readonly time: TimeFile | undefined }): JsonEpic {
-  const counts = countStatuses(entry.children);
-  const points = pointsByStatus(entry.children, input.progress);
-  const children = entry.children.map((child) => {
-    const sessionIds = childSessionIds(childKey(child, entry.ref), bound);
-    const key = childKey(child, entry.ref);
-    const time = key === undefined ? undefined : input.time?.refs[key];
-    return { number: child.number, key: child.key ?? (child.number === null ? null : `#${child.number}`), title: child.title, url: child.url, status: child.status, sessionCount: sessionIds.length, sessionIds, assignees: [...(child.assignees ?? [])], openPullRequests: child.openPrs ?? 0, ...activityOf([time]) };
-  });
+interface EpicInput {
+  readonly now: number;
+  readonly progress: ProgressConfig;
+  readonly time: TimeFile | undefined;
+  readonly snapshot: Snapshot | undefined;
+  readonly bound: readonly BoundSession[];
+}
+
+// The counts, the percentages and the details are over the leaves of the whole
+// tree: a sub-epic is not an item of work itself, the items under it are.
+function jsonEpic(entry: EpicEntry, input: EpicInput): JsonEpic {
+  const built = buildChildren(entry, { snapshot: input.snapshot, bound: input.bound, time: input.time, iso });
+  const leaves = built.flatMap((node) => node.leaves);
+  const keys = built.flatMap((node) => node.keys);
+  const children = built.map((node) => node.json);
+  const counts = countStatuses(leaves);
+  const points = pointsByStatus(leaves, input.progress);
   const epicSessionIds = [...new Set(children.flatMap((child) => child.sessionIds))];
   return {
     number: entry.ref.number, key: displayKey(entry.ref), title: entry.title, url: entry.url, kind: entry.kind, counts, percent: percentDone(points),
-    weightedPercent: weightedPercentDone(points, input.progress), sessionIds: epicSessionIds, ...epicActivity(entry, input.time), ...epicDetails(entry, input.now),
+    weightedPercent: weightedPercentDone(points, input.progress), sessionIds: epicSessionIds, ...epicActivity(entry, keys, input.time), ...epicDetails(entry, leaves, input.now),
     children, fetchedAt: iso(entry.fetchedAt), stale: isStale(entry, input.now), error: entry.error, truncated: entry.truncated,
   };
 }
@@ -209,6 +192,6 @@ export function buildView(input: ViewInput): JsonV1 {
     liveSessions: live.length,
     pending: pendingCount(scoped),
     snapshot: { state: stateOf(scoped), fetchedAt: snapshot ? iso(snapshot.updatedAt) : null, error: errorOf(scoped) },
-    epics: entries.map((entry) => jsonEpic(entry, bound, { now: input.now, progress: input.progress ?? DEFAULT_PROGRESS, time: input.time })),
+    epics: entries.map((entry) => jsonEpic(entry, { now: input.now, progress: input.progress ?? DEFAULT_PROGRESS, time: input.time, snapshot, bound })),
   };
 }

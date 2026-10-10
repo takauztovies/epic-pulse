@@ -3,6 +3,7 @@ import { childrenOf, loadingTree, type CommandRef, type TreeNode } from '../tree
 
 function collapsibleState(node: TreeNode): vscode.TreeItemCollapsibleState {
   if (node.kind === 'epic') return vscode.TreeItemCollapsibleState.Expanded;
+  if (node.kind === 'issue') return node.children.length > 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None;
   if (node.kind !== 'group' || node.children.length === 0) return vscode.TreeItemCollapsibleState.None;
   return node.expanded ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed;
 }

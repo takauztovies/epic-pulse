@@ -5,6 +5,7 @@ import { buildEpic, epicRefFor, type EpicData } from './resolve.js';
 import type { ErrorCode, IssueRef } from './schemas/common.js';
 import type { EpicNode, PhaseAIssue } from './schemas/graphql.js';
 import type { EpicEntry, Resolution, Snapshot } from './schemas/snapshot.js';
+import { descendantEpics } from './tree.js';
 
 // Pure snapshot transitions. Each returns a new snapshot; the refresher
 // decides which ones to apply and in what order.
@@ -85,6 +86,8 @@ export function pruneSnapshot(snapshot: Snapshot, refs: readonly IssueRef[], now
   const wanted = new Set(refs.map(refKey));
   const issues = Object.entries(snapshot.issues).filter(([key, r]) => wanted.has(key) || now - r.resolvedAt < RETAIN_MS);
   const epicKeys = new Set(issues.flatMap(([key, r]) => [...(r.epic ? [refKey(r.epic)] : []), ...(r.isEpic ? [key] : [])]));
-  const epics = Object.entries(snapshot.epics).filter(([key]) => epicKeys.has(key));
+  const roots = Object.entries(snapshot.epics).filter(([key]) => epicKeys.has(key)).map(([, entry]) => entry.ref);
+  const reachable = new Set([...epicKeys, ...descendantEpics(snapshot, roots).map(refKey)]);
+  const epics = Object.entries(snapshot.epics).filter(([key]) => reachable.has(key));
   return { ...snapshot, issues: Object.fromEntries(issues), epics: Object.fromEntries(epics) };
 }

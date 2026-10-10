@@ -1,6 +1,6 @@
 import { STATUSES, type JsonChild, type JsonEpic, type Status } from '@epic-pulse/core';
 import { COMMAND } from './ids.js';
-import { activityLines, ageText, barText, countsText, detailLines, epicSessionsText, issueDetailLines, progressText, sessionsText, STATE_TEXT, STATUS_TEXT } from './labels.js';
+import { activityLines, ageText, barText, branchProgressText, countsText, detailLines, epicSessionsText, issueDetailLines, progressText, sessionsText, STATE_TEXT, STATUS_TEXT } from './labels.js';
 import type { DisplayState, Model } from './model.js';
 
 // The Epics tree as plain data: Epic → status group → issue, with one notice
@@ -34,6 +34,8 @@ export interface NoticeNode extends NodeBase {
 export interface IssueNode extends NodeBase {
   readonly kind: 'issue';
   readonly url: string | null;
+  // Its own status groups when it is a sub-epic with items under it, however deep; else none.
+  readonly children: readonly GroupNode[];
 }
 
 export interface GroupNode extends NodeBase {
@@ -77,14 +79,17 @@ function spreadCommand(command: CommandRef | undefined): { readonly command?: Co
 function issueNode(child: JsonChild, id: string, now: number): IssueNode {
   const label = child.key === null ? child.title : `${child.key} ${child.title}`;
   const sessions = child.sessionCount > 0 ? [sessionsText(child.sessionCount)] : [];
+  const below = groupNodes({ id, children: child.children }, now);
+  const branch = child.counts === null || child.percent === null ? [] : [branchProgressText(child.counts, child.percent)];
   return {
     kind: 'issue',
     id,
     label,
     url: child.url,
-    description: sessions.join(''),
+    children: child.children.length === 0 ? [] : below,
+    description: [...branch, ...sessions].join(' · '),
     tooltip: [label, STATUS_TEXT[child.status].label, ...issueDetailLines(child), ...sessions, ...activityLines(child, now)].join('\n'),
-    icon: child.status === 'done' || child.status === 'dropped' ? 'issue-closed' : 'issues',
+    icon: child.children.length > 0 ? 'type-hierarchy-sub' : child.status === 'done' || child.status === 'dropped' ? 'issue-closed' : 'issues',
     // A live session on it right now, regardless of status: green marks
     // "someone is here", distinct from the Todo/In progress/.../Done group
     // it's already sorted into by workflow state.
@@ -96,12 +101,12 @@ function issueNode(child: JsonChild, id: string, now: number): IssueNode {
 // Workflow order, every status shown even with none, so an epic always reads the same. Work that is moving, and work that is
 // finished, starts expanded; only Todo and Dropped start collapsed.
 // An issue's id is its position, since a checklist may list one issue twice.
-function groupNodes(epic: JsonEpic, now: number): readonly GroupNode[] {
+function groupNodes(owner: { readonly id: string; readonly children: readonly JsonChild[] }, now: number): readonly GroupNode[] {
   return STATUSES.flatMap((status) => {
-    const children = epic.children.flatMap((child, index) => (child.status === status ? [issueNode(child, `${epic.url}#${index}`, now)] : []));
+    const children = owner.children.flatMap((child, index) => (child.status === status ? [issueNode(child, `${owner.id}#${index}`, now)] : []));
     const { label, icon } = STATUS_TEXT[status];
     const expanded = status === 'in_progress' || status === 'in_review' || status === 'done';
-    return [{ kind: 'group', id: `${epic.url}:${status}`, status, label, description: String(children.length), tooltip: label, icon, expanded, children }];
+    return [{ kind: 'group', id: `${owner.id}:${status}`, status, label, description: String(children.length), tooltip: label, icon, expanded, children }];
   });
 }
 
@@ -118,7 +123,7 @@ function epicNode(epic: JsonEpic, now: number): EpicNode {
     icon: 'milestone',
     iconColor: epic.percent === 100 ? 'charts.green' : undefined,
     ...spreadCommand(clickCommand(epic.url, epic.sessionIds)),
-    children: groupNodes(epic, now),
+    children: groupNodes({ id: epic.url, children: epic.children }, now),
   };
 }
 
@@ -158,5 +163,5 @@ export function loadingTree(): readonly TreeNode[] {
 }
 
 export function childrenOf(node: TreeNode): readonly TreeNode[] {
-  return node.kind === 'epic' || node.kind === 'group' ? node.children : [];
+  return node.kind === 'epic' || node.kind === 'group' || node.kind === 'issue' ? node.children : [];
 }

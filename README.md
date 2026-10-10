@@ -121,6 +121,14 @@ epic (it has sub-issues, or a task list) shows its own progress even when it has
 pinned issue shows its parent's epic, as work on it does. The refresher asks GitHub about it once
 (3 points) and again only after the 30-minute cache of its resolution.
 
+**The whole tree.** A sub-issue that has sub-issues of its own is a sub-epic, and it is followed: an
+epic shows every level below it, however deep, down to GitHub's own limit of eight levels. Its counts,
+percentage and bar count the items at the bottom of the tree (an item with nothing under it), not its
+direct children, so a sub-epic with ten tasks weighs ten, not one. Each sub-epic shows its own
+percentage and counts. A sub-epic closed as not planned counts as one dropped item, and what is under
+it is not counted. Sub-epics are refreshed every six minutes, the epic at the top every two, so a deep
+tree does not spend the hourly budget in minutes. Each epic in the tree costs 5 points to refresh.
+
 ## What it costs a session
 
 epic-pulse makes one promise about speed: the hook that follows a tool call runs in the background and
@@ -193,8 +201,8 @@ Every state of the status line says what it is:
 | `epic-pulse: hook inactive` | the hook has recorded nothing for this session |
 | `epic-pulse: unsupported host (no sub-issues)` | a GitHub Enterprise Server without sub-issues |
 
-A `+` after the count means the epic has more than 100 sub-issues, or a task list of more than 500
-boxes, and only the first 100 sub-issues or 500 boxes are counted.
+A `+` after the count means an epic in the tree has more than 100 sub-issues, or a task list of more
+than 500 boxes, and only the first 100 sub-issues or 500 boxes of it are counted.
 
 ## Configuration: `.epic-pulse.json`
 
@@ -407,6 +415,8 @@ about it.
 - The VS Code **Claude panel** may not show the status line. Use the VS Code extension there.
 - On Windows the tests run in CI, but the hooks and the status line in a real Claude Code session are
   checked by hand only.
+- A tree is followed down eight levels of sub-epics and at most 2000 items; a hierarchy that loops back
+  on itself stops where it repeats.
 - An epic's first 100 sub-issues, or the first 500 boxes of its task list, are counted; a larger epic
   is marked with `+`, not paged through.
 - Statuses come from issues, pull requests and assignees; GitHub Projects fields are not read yet.

@@ -13,19 +13,28 @@ function newest(copies: readonly JsonEpic[]): JsonEpic {
 
 // Per copy, the first child with a key decides: a checklist that lists one
 // issue twice must not count its sessions twice.
+function everyChild(children: readonly JsonChild[]): readonly JsonChild[] {
+  return children.flatMap((child) => [child, ...everyChild(child.children)]);
+}
+
 function countsByChild(epic: JsonEpic): ReadonlyMap<string, number> {
-  return new Map([...epic.children].reverse().map((child) => [childKey(child), child.sessionCount] as const));
+  return new Map([...everyChild(epic.children)].reverse().map((child) => [childKey(child), child.sessionCount] as const));
+}
+
+// Every level: a sub-epic's own items are other copies' items too.
+function withCounts(children: readonly JsonChild[], others: readonly ReadonlyMap<string, number>[]): readonly JsonChild[] {
+  return children.map((child) => ({
+    ...child,
+    sessionCount: others.reduce((sum, counts) => sum + (counts.get(childKey(child)) ?? 0), child.sessionCount),
+    children: withCounts(child.children, others),
+  }));
 }
 
 // The newest copy is shown, and every copy's sessions are counted on it.
 function mergeCopies(copies: readonly JsonEpic[]): JsonEpic {
   const shown = newest(copies);
   const others = copies.filter((copy) => copy !== shown).map(countsByChild);
-  const children = shown.children.map((child) => ({
-    ...child,
-    sessionCount: others.reduce((sum, counts) => sum + (counts.get(childKey(child)) ?? 0), child.sessionCount),
-  }));
-  return { ...shown, children };
+  return { ...shown, children: withCounts(shown.children, others) };
 }
 
 // One epic can reach a multi-root window through two registries: two clones
