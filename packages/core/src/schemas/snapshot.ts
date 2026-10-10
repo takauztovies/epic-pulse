@@ -15,6 +15,9 @@ export const ChildSchema = z
     title: z.string().max(300),
     url: z.string().max(500).nullable(),
     status: StatusSchema,
+    // How many sub-issues it has, when it has any: it is then an epic of its own, whose
+    // entry in the snapshot holds its children. Absent: a leaf.
+    subCount: z.number().int().positive().optional(),
     // The labels on the item, lowercased, so a size can be read from them under
     // whatever table the repository configures; absent: it has none.
     labels: z.array(z.string().max(60)).max(20).readonly().optional(),

@@ -73,6 +73,10 @@ Under an epic, its issues are grouped by status, in workflow order. All five gro
 | Done | It is closed (not as *not planned* or *duplicate*). Starts expanded. |
 | Dropped | It was closed as *not planned* or *duplicate*. Starts collapsed. |
 
+A row with items under it is a **sub-epic**: it shows its own `40% · 2/5` and opens onto its own status
+groups, however deep the tree goes. The epic's percentage counts the items at the bottom of the tree,
+not the sub-epics themselves.
+
 Watching an issue move from Todo to In progress to Done is the point of the view: statuses come from
 GitHub itself, so they change when the issue, its assignee or its pull request does.
 

@@ -48,6 +48,17 @@ export function demoSnapshot(now: number): Snapshot {
   return applyEpics(resolved, [[demo(1), subIssues.value.epics.get(1) ?? null], [demo(8), checklist.value.epics.get(8) ?? null]], now);
 }
 
+// The recorded demo tree: program #43, sub-epic #44 holding sub-epic #45 (leaf #48)
+// and the closed #47, and a plain task #46. Pinned as #43.
+export function nestedSnapshot(now: number): Snapshot {
+  const answers = [43, 44, 45].map((n) => {
+    const parsed = parsePhaseB(loadFixture(`phase-b-nested-${n}`));
+    assert.ok(parsed.ok);
+    return [demo(n), parsed.value.epics.get(n) ?? null] as const;
+  });
+  return applyEpics(emptySnapshot(now), answers, now);
+}
+
 export interface SessionSpec {
   readonly id: string;
   readonly binds: readonly IssueRef[];

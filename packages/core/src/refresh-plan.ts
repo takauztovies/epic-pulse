@@ -3,11 +3,15 @@ import { activeBindings, isLive, type SessionState } from './registry.js';
 import type { IssueRef, RepoRef } from './schemas/common.js';
 import type { Pin } from './schemas/registry.js';
 import type { Snapshot } from './schemas/snapshot.js';
+import { descendantEpics, subEpicKeys } from './tree.js';
 
 // Phase A answers "which epic is this issue in", which rarely changes. Phase B
 // fetches the epic's children, which is what moves while people work.
 export const RESOLUTION_TTL_MS = 30 * 60 * 1000;
 export const EPIC_TTL_MS = 2 * 60 * 1000;
+// An epic below another one is refreshed less often: a tree of many sub-epics at
+// the top epic's pace would spend the hourly budget (300 points) in minutes.
+export const SUB_EPIC_TTL_MS = 6 * 60 * 1000;
 // Our own ceiling, far below GitHub's 5,000 an hour, so the user's other tools
 // keep theirs. Every session of a repository shares it through the snapshot,
 // and every repository of the user through the usage ledger (usage-ledger.ts).
@@ -94,21 +98,24 @@ export function probeTargets(snapshot: Snapshot, pinned: readonly IssueRef[]): r
 // What Phase B keeps current: the epics the refs resolved to, then the pinned
 // issues that may be epics themselves.
 export function epicsToWatch(snapshot: Snapshot, refs: readonly IssueRef[], pinned: readonly IssueRef[]): readonly IssueRef[] {
-  return unique([...epicRefsOf(snapshot, refs), ...probeTargets(snapshot, pinned)]);
+  const top = unique([...epicRefsOf(snapshot, refs), ...probeTargets(snapshot, pinned)]);
+  return unique([...top, ...descendantEpics(snapshot, top)]);
 }
 
 // Oldest first, so a tight budget refreshes whatever has waited longest.
 export function needsFetch(snapshot: Snapshot, epics: readonly IssueRef[], now: number): readonly IssueRef[] {
   const fetchedAt = (epic: IssueRef) => snapshot.epics[refKey(epic)]?.fetchedAt ?? Number.NEGATIVE_INFINITY;
-  return epics.filter((epic) => now - fetchedAt(epic) >= EPIC_TTL_MS).sort((a, b) => fetchedAt(a) - fetchedAt(b));
+  const subs = subEpicKeys(snapshot);
+  const ttl = (epic: IssueRef) => (subs.has(refKey(epic)) ? SUB_EPIC_TTL_MS : EPIC_TTL_MS);
+  return epics.filter((epic) => now - fetchedAt(epic) >= ttl(epic)).sort((a, b) => fetchedAt(a) - fetchedAt(b));
 }
 
 // GitHub's formula for the Phase B document: each epic asks for 100 sub-issues
-// with four nested connections each, 401 requests; the total over 100,
+// with five nested connections each (the sub-issue count is one), 501 requests; the total over 100,
 // rounded, is the cost, and it is never below 1. The fixtures were recorded
-// before labels were asked for and say 3; the live document costs 4.
+// before labels were asked for and say 3; the live document costs 5.
 export function phaseBCost(epics: number): number {
-  return Math.max(1, Math.round((epics * 401) / 100));
+  return Math.max(1, Math.round((epics * 501) / 100));
 }
 
 // How many epics the next Phase B request may carry within the hourly budget.

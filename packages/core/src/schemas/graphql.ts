@@ -72,6 +72,8 @@ export const SubIssueNodeSchema = z.object({
     nodes: z.array(z.object({ login: z.string() }).nullable()).optional(),
   }),
   closedAt: z.string().nullable().optional(),
+  // Optional so an answer cached or recorded before sub-epics were walked still parses.
+  subIssues: z.object({ totalCount: z.number().int().nonnegative() }).optional(),
   // Optional so an answer cached or recorded before labels were asked for still parses.
   labels: z.object({ nodes: z.array(z.object({ name: z.string() }).nullable()) }).optional(),
   closedByPullRequestsReferences: z.object({ nodes: z.array(PrNodeSchema.nullable()) }),
