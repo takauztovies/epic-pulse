@@ -68,7 +68,9 @@ function issuesNamedIn(body: string): number {
 export function mentioningOpenPrs(node: SubIssueNode, repo: RepoRef): readonly PrNode[] {
   return node.timelineItems.nodes.flatMap((item) => {
     const source = item?.source;
-    return source && isOpenSameRepo(source, repo) && issuesNamedIn(source.body ?? '') <= MAX_MENTIONS ? [source] : [];
+    // From a branch in this repository only: anyone can open a PR from a fork that mentions any issue.
+    const own = source?.isCrossRepository === false;
+    return source && own && isOpenSameRepo(source, repo) && issuesNamedIn(source.body ?? '') <= MAX_MENTIONS ? [source] : [];
   });
 }
 

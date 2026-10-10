@@ -49,6 +49,9 @@ export const PrNodeSchema = z.object({
   body: z.string().optional(),
   // Optional: read only where the branch matters (the repository's open pull requests).
   headRefName: z.string().optional(),
+  // false: the PR's branch is in this repository. A fork's PR reports this repository as
+  // its `repository` too, so only this says who could open it. Absent: not asked.
+  isCrossRepository: z.boolean().optional(),
   repository: RepoNameSchema,
 });
 

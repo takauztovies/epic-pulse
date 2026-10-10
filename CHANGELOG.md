@@ -11,7 +11,9 @@ Every notable change to epic-pulse is listed here. Versions follow
   (`123-login`) counts as its work even when it never mentions the issue: in review when ready, in
   progress as a draft. An open pull request that mentions an issue without closing it moves it to in
   progress (never to review); one that names more than three issues moves none. The query reads the
-  repository's 100 most recently updated open pull requests, at no extra cost (measured).
+  repository's 100 most recently updated open pull requests, at no extra cost (measured). Both new
+  routes count only pull requests from a branch in the repository itself, never from a fork, which
+  anyone can open.
 
 ### Added
 

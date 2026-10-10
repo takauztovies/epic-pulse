@@ -57,3 +57,24 @@ test('the epic built from the recording carries these statuses and the PR count'
   const epic = buildEpic(program(), demo(43))!;
   assert.deepEqual(epic.children.map((c) => [c.number, c.status, c.openPrs ?? 0]), [[44, 'todo', 0], [46, 'in_review', 1], [50, 'in_progress', 0]]);
 });
+
+// A fork's PR reports this repository as its `repository`, so only isCrossRepository
+// tells who could open it: on a public repository, anyone. Found by the commit
+// security review.
+test('a pull request from a fork moves nothing, whatever its branch is called or whatever it mentions', () => {
+  const fromFork = <T extends SubIssueNode>(node: T): T => ({
+    ...node,
+    timelineItems: { nodes: node.timelineItems.nodes.map((item) => (item?.source ? { ...item, source: { ...item.source, isCrossRepository: true } } : item)) },
+  });
+  const mentioned = child(program(), 50);
+  assert.equal(deriveStatus(fromFork(mentioned), demo(50)), 'todo');
+  const recorded = parsePhaseB(loadFixture('phase-b-nested-43'));
+  assert.ok(recorded.ok);
+  const body = loadFixture('phase-b-nested-43').body as { data: { repository: { openPrs: { nodes: { isCrossRepository: boolean }[] } } } };
+  const forked = { ...body, data: { ...body.data, repository: { ...body.data.repository, openPrs: { nodes: body.data.repository.openPrs.nodes.map((pr) => ({ ...pr, isCrossRepository: true })) } } } };
+  const parsed = parsePhaseB({ ...loadFixture('phase-b-nested-43'), body: forked });
+  assert.ok(parsed.ok);
+  const branchOnly = child(parsed.value.epics.get(43)!, 46);
+  assert.deepEqual(branchOnly.branchPullRequests, []);
+  assert.equal(deriveStatus(branchOnly, demo(46)), 'todo');
+});
