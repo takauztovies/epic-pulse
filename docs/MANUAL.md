@@ -190,6 +190,13 @@ own settings, `--dry-run` to see the change first). It shows the session's own e
 `rev` is issues in review, `wip` is in progress, and `(+1)` is one more epic. When the line is too
 narrow the bar goes first, then the counts. Like the views it counts Done only.
 
+### Near the usage limit
+
+From 90% of the account's 5-hour or weekly usage, every session's Claude Code status line starts with
+a red `⚠ 91% 5h limit, resets in 2h10m · /compact`, and on your next prompt each session's agent is
+told once to wrap up the step it is on and not start new work. Run `/compact` in the sessions you keep
+going. `EPIC_PULSE_LIMIT_WARN=80` warns from 80% instead. It needs the epic-pulse status line.
+
 ## 6. Command reference
 
 | Command | What it does |

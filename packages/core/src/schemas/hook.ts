@@ -23,6 +23,8 @@ export const HookPayloadSchema = z.looseObject({
   hook_event_name: z.string().optional().catch(undefined),
   tool_name: z.string().optional().catch(undefined),
   tool_input: ToolInputSchema.optional().catch(undefined),
+  // Read by the status line only (limits.ts), and never stored as it came.
+  rate_limits: z.unknown().optional(),
   workspace: z
     .looseObject({ current_dir: z.string().optional().catch(undefined) })
     .optional()

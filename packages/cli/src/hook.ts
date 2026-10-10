@@ -1,5 +1,6 @@
 import {
-  appendRegistryLine, extract, fail, HookPayloadSchema, ok, parseJson, pathsFor, registryDirFor,
+  agentNote, appendRegistryLine, claimNotice, extract, fail, HookPayloadSchema, limitWarning, ok, parseJson, pathsFor, readLimits, registryDirFor,
+  userCacheDir, warnAt,
   type Extraction, type HookPayload, type Result,
 } from '@epic-pulse/core';
 import { logHookError, type HookErrorCode } from './hook-log.js';
@@ -44,24 +45,45 @@ async function startErrors(payload: Result<HookPayload, HookErrorCode>, env: Nod
   return (await syncRuntime(env)).ok ? [] : ['runtime_copy_failed'];
 }
 
-async function handle(env: NodeJS.ProcessEnv): Promise<void> {
+// On a prompt, once per step of a usage window per session: the note that the
+// account is near its limit, from the reading a status line saved. Anything that
+// goes wrong means no note, never an error the user sees.
+async function limitNote(payload: Result<HookPayload, HookErrorCode>, env: NodeJS.ProcessEnv): Promise<string | undefined> {
+  if (!payload.ok || payload.value.hook_event_name !== 'UserPromptSubmit') return undefined;
+  try {
+    const cache = userCacheDir(env);
+    const now = Date.now();
+    const reading = cache === undefined ? undefined : await readLimits(cache, now);
+    const warning = reading && limitWarning(reading, warnAt(env), now);
+    if (!cache || !warning || !(await claimNotice(cache, payload.value.session_id, { ...warning, now }))) return undefined;
+    return agentNote(warning, now);
+  } catch {
+    return undefined;
+  }
+}
+
+async function handle(env: NodeJS.ProcessEnv): Promise<string | undefined> {
   const payload = parsePayload(await readStdin(MAX_PAYLOAD_BYTES));
+  const note = await limitNote(payload, env);
   const errors = [...(await startErrors(payload, env))];
   const cwd = payload.ok ? (payload.value.cwd ?? payload.value.workspace?.current_dir) : undefined;
   const dir = await registryDirFor(cwd ?? process.cwd(), env);
-  if (dir === undefined) return; // not a repository: nothing to record, nowhere to log
+  if (dir === undefined) return note; // not a repository: nothing to record, nowhere to log
   const recorded = payload.ok ? await record(dir, payload.value) : payload;
   if (!recorded.ok) errors.push(recorded.error);
   for (const code of errors) await logHookError(dir, code, Date.now());
+  return note;
 }
 
-// Always 0 and never a byte on stdout: Claude Code reads a hook's stdout as
-// instructions and shows a failing hook to the user. Problems go to the log.
+// Always 0, and nothing on stdout but the one documented note: Claude Code reads
+// a hook's stdout as instructions and shows a failing hook to the user. Problems
+// go to the log. The note is the UserPromptSubmit JSON that adds context.
 export async function runHook(env: NodeJS.ProcessEnv): Promise<number> {
   const deadline = setTimeout(() => process.exit(0), DEADLINE_MS);
   deadline.unref();
   try {
-    await handle(env);
+    const note = await handle(env);
+    if (note !== undefined) process.stdout.write(`${JSON.stringify({ hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: note } })}\n`);
   } catch {
     // Nowhere left to report it: stdout and stderr belong to Claude Code, and
     // a log write that failed is what usually lands here.

@@ -1,5 +1,5 @@
 {
-  "description": "Records which GitHub issues a session works on (refs and timestamps only, offline) and keeps the status-line runtime copy current.",
+  "description": "Records which GitHub issues a session works on (refs and timestamps only, offline), keeps the status-line runtime copy current, and on a prompt tells the session once when the account nears its usage limit.",
   "hooks": {
     "SessionStart": [
       {
@@ -26,6 +26,17 @@
       }
     ],
     "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/dist/epic-pulse.mjs\" hook",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
       {
         "hooks": [
           {
