@@ -34,7 +34,8 @@ test('the recorded program epic comes back as the whole tree, however deep', () 
   const epic = view(nested());
   assert.deepEqual(shape(epic.children), [
     ['#44', 'in_progress', [['#45', 'in_progress', [['#48', 'in_progress', []]]], ['#47', 'done', []]]],
-    ['#46', 'todo', []],
+    ['#46', 'in_review', []],
+    ['#50', 'in_progress', []],
   ]);
   const [a] = epic.children;
   assert.deepEqual([a?.subCount, a?.percent, counts(a!)], [2, 50, { in_progress: 1, done: 1 }]);
@@ -43,7 +44,7 @@ test('the recorded program epic comes back as the whole tree, however deep', () 
 
 test('an epic counts the leaves of its whole tree, not its direct children', () => {
   const epic = view(nested());
-  assert.deepEqual([counts(epic), epic.percent, epic.children.length], [{ todo: 1, in_progress: 1, done: 1 }, 33, 2]);
+  assert.deepEqual([counts(epic), epic.percent, epic.children.length], [{ in_progress: 2, in_review: 1, done: 1 }, 25, 3]);
   assert.equal(epic.truncated, false);
 });
 
@@ -51,8 +52,8 @@ test('a sub-epic not fetched yet counts as one item until its own entry arrives'
   const snapshot = nested();
   const onlyTop = Object.fromEntries(Object.entries(snapshot.epics).filter(([key]) => key === refKey(demo(43))));
   const epic = view({ ...snapshot, epics: onlyTop });
-  assert.deepEqual(shape(epic.children), [['#44', 'todo', []], ['#46', 'todo', []]]);
-  assert.deepEqual([epic.children[0]?.subCount, epic.children[0]?.counts, counts(epic)], [2, null, { todo: 2 }]);
+  assert.deepEqual(shape(epic.children), [['#44', 'todo', []], ['#46', 'in_review', []], ['#50', 'in_progress', []]]);
+  assert.deepEqual([epic.children[0]?.subCount, epic.children[0]?.counts, counts(epic)], [2, null, { todo: 1, in_progress: 1, in_review: 1 }]);
 });
 
 // GitHub says a closed item is closed; a dropped sub-epic is work nobody will do,
@@ -62,7 +63,7 @@ test('a dropped sub-epic counts as one dropped item and its children do not coun
   const top = snapshot.epics[refKey(demo(43))]!;
   const dropped: EpicEntry = { ...top, children: top.children.map((c) => (c.number === 44 ? { ...c, status: 'dropped' as const } : c)) };
   const epic = view({ ...snapshot, epics: { ...snapshot.epics, [refKey(demo(43))]: dropped } });
-  assert.deepEqual([counts(epic), epic.percent], [{ todo: 1, dropped: 1 }, 0]);
+  assert.deepEqual([counts(epic), epic.percent], [{ in_progress: 1, in_review: 1, dropped: 1 }, 0]);
   assert.deepEqual(epic.children[0]?.children, []);
 });
 
