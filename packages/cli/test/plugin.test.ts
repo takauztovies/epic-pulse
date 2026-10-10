@@ -56,7 +56,15 @@ test('PostToolUse fires, asynchronously, on the tools that change things and on 
   assert.deepEqual(['Bash', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit'].filter((tool) => !matcher.test(tool)), []);
   assert.deepEqual(['Read', 'Grep', 'Glob', 'WebFetch', 'Task', 'TodoWrite'].filter((tool) => matcher.test(tool)), []);
   assert.deepEqual([hook('PostToolUse').async, hook('PostToolUse').timeout], [true, 5]);
-  assert.deepEqual(Object.keys(hooks).sort(), ['PostToolUse', 'SessionEnd', 'SessionStart']);
+  assert.deepEqual(Object.keys(hooks).sort(), ['PostToolUse', 'SessionEnd', 'SessionStart', 'UserPromptSubmit']);
+});
+
+// What a hook prints reaches the model only when Claude Code waits for it: an
+// async UserPromptSubmit hook could never deliver the usage-limit note.
+test('UserPromptSubmit runs the same command, synchronously, for every prompt', () => {
+  const prompt = hook('UserPromptSubmit');
+  assert.deepEqual([prompt.command, prompt.async, prompt.timeout], [hook('SessionStart').command, undefined, 5]);
+  assert.equal(hooks['UserPromptSubmit']?.[0]?.matcher, undefined);
 });
 
 test('each hook command does its job when a shell runs it the way Claude Code does', { skip: NO_SH }, (t) => {
