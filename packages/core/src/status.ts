@@ -35,14 +35,17 @@ function isOpenSameRepo(pr: PrNode, repo: RepoRef): boolean {
   return pr.state === 'OPEN' && pr.repository.nameWithOwner.toLowerCase() === slugOf(repo);
 }
 
-// Two routes to "a PR will close this issue":
+// Three routes to "a PR is this issue's work":
 //  1. closedByPullRequestsReferences, GitHub's own link;
 //  2. an open same-repository PR that cross-references the issue and whose body
 //     has a closing keyword for exactly this number. GitHub does not always
-//     populate route 1 for a plain "Fixes #N" body, so route 2 is not optional.
+//     populate route 1 for a plain "Fixes #N" body, so route 2 is not optional;
+//  3. an open same-repository PR whose branch is named for the issue
+//     (`123-login`), which leaves no trace on the issue at all unless it also
+//     mentions it (parsePhaseB attaches these).
 // A merged or closed PR is not "in flight"; a merge closes the issue anyway.
 export function linkedOpenPrs(node: SubIssueNode, repo: RepoRef): readonly PrNode[] {
-  const linked = node.closedByPullRequestsReferences.nodes.filter((pr): pr is PrNode => pr !== null);
+  const linked = [...node.closedByPullRequestsReferences.nodes.filter((pr): pr is PrNode => pr !== null), ...(node.branchPullRequests ?? [])];
   const crossed = node.timelineItems.nodes.flatMap((item) => {
     const source = item?.source;
     return source && bodyClosesIssue(source.body ?? '', node.number, repo) ? [source] : [];
@@ -51,13 +54,35 @@ export function linkedOpenPrs(node: SubIssueNode, repo: RepoRef): readonly PrNod
   return [...byNumber.values()].filter((pr) => isOpenSameRepo(pr, repo));
 }
 
-// Precedence for an open issue: a ready PR (in review) beats a draft PR or an
-// assignee (in progress), which beats nothing (todo).
+// A PR that names more issues than this is a release note or a sweep, not work
+// on any one of them (the hook draws the same line for a single tool call).
+export const MAX_MENTIONS = 3;
+const MENTION = /(?:^|[^\w/#])#(\d+)(?!\d)|\/issues\/(\d+)(?!\d)/g;
+
+function issuesNamedIn(body: string): number {
+  return new Set([...body.slice(0, 20_000).matchAll(MENTION)].map((match) => match[1] ?? match[2])).size;
+}
+
+// An open same-repository PR that mentions the issue without closing it: work
+// under way, but not proof it will close it, so it counts as in progress only.
+export function mentioningOpenPrs(node: SubIssueNode, repo: RepoRef): readonly PrNode[] {
+  return node.timelineItems.nodes.flatMap((item) => {
+    const source = item?.source;
+    // From a branch in this repository only: anyone can open a PR from a fork that mentions any issue.
+    const own = source?.isCrossRepository === false;
+    return source && own && isOpenSameRepo(source, repo) && issuesNamedIn(source.body ?? '') <= MAX_MENTIONS ? [source] : [];
+  });
+}
+
+// Precedence for an open issue: a ready PR that is its work (in review) beats a
+// draft one, a PR that only mentions it, or an assignee (in progress), which
+// beat nothing (todo).
 export function deriveStatus(node: SubIssueNode, repo: RepoRef): Status {
   if (node.state === 'CLOSED') return DROPPED_REASONS.has(node.stateReason ?? '') ? 'dropped' : 'done';
   const prs = linkedOpenPrs(node, repo);
   if (prs.some((pr) => !pr.isDraft)) return 'in_review';
-  return prs.length > 0 || node.assignees.totalCount > 0 ? 'in_progress' : 'todo';
+  const moving = prs.length > 0 || mentioningOpenPrs(node, repo).length > 0 || node.assignees.totalCount > 0;
+  return moving ? 'in_progress' : 'todo';
 }
 
 // The status counts again, but summed in points instead of items: an item is
