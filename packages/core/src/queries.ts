@@ -74,7 +74,7 @@ const EPIC_FRAGMENT = `fragment EpicFields on Issue {
           ... on CrossReferencedEvent {
             source {
               __typename
-              ... on PullRequest { number state isDraft url body repository { nameWithOwner } }
+              ... on PullRequest { number state isDraft url body isCrossRepository repository { nameWithOwner } }
             }
           }
         }
@@ -87,7 +87,7 @@ const EPIC_FRAGMENT = `fragment EpicFields on Issue {
 // named for an issue: such a pull request leaves no trace on the issue unless it
 // also mentions it. A connection with nothing nested costs GitHub one request,
 // not 100, so it adds no points (refresh-plan.ts).
-const OPEN_PRS = 'openPrs: pullRequests(states: OPEN, first: 100, orderBy: { field: UPDATED_AT, direction: DESC }) { nodes { number state isDraft url headRefName repository { nameWithOwner } } }';
+const OPEN_PRS = 'openPrs: pullRequests(states: OPEN, first: 100, orderBy: { field: UPDATED_AT, direction: DESC }) { nodes { number state isDraft url headRefName isCrossRepository repository { nameWithOwner } } }';
 
 export function phaseBDocument(numbers: readonly number[]): string {
   return `query PhaseB($owner: String!, $name: String!) {
@@ -149,7 +149,9 @@ function withBranchPrs(epics: ReadonlyMap<number, EpicNode | null>, prs: readonl
   const byIssue = new Map<number, PrNode[]>();
   for (const pr of prs) {
     const number = pr?.headRefName === undefined ? undefined : branchIssueNumber(pr.headRefName, DEFAULT_BRANCH_PATTERN);
-    if (pr && number !== undefined) byIssue.set(number, [...(byIssue.get(number) ?? []), pr]);
+    // Anyone can open a PR from a fork, with any branch name: only a branch pushed to
+    // this repository, by someone who can push here, speaks for an issue.
+    if (pr && pr.isCrossRepository === false && number !== undefined) byIssue.set(number, [...(byIssue.get(number) ?? []), pr]);
   }
   return new Map([...epics].map(([number, epic]) => [number, epic && {
     ...epic,

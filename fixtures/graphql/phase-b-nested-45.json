@@ -1,15 +1,15 @@
 {
-  "recordedAt": "2026-10-10T19:20:45.828Z",
+  "recordedAt": "2026-10-10T20:37:57.872Z",
   "note": "sub-epic B, the deepest: one leaf (#48)",
   "status": 200,
-  "remaining": 4480,
+  "remaining": 4700,
   "retryAfter": false,
   "body": {
     "data": {
       "rateLimit": {
         "cost": 5,
-        "remaining": 4480,
-        "resetAt": "2026-10-10T19:42:25Z"
+        "remaining": 4700,
+        "resetAt": "2026-10-10T20:43:03Z"
       },
       "repository": {
         "e45": {
@@ -58,6 +58,7 @@
                         "isDraft": false,
                         "url": "https://github.com/takauztovies/epic-pulse/pull/49",
                         "body": "## Summary\n- A sub-issue with its own sub-issues is followed as a **sub-epic**, at every level down to GitHub's limit of eight. The VS Code view opens each sub-epic onto its own status groups, with its own `40% · 2/5`.\n- An epic now counts the **leaves** of its whole tree, not its direct children: a sub-epic with ten tasks weighs ten, not one. A dropped sub-epic counts as one dropped item.\n- A refresh walks the tree a level per round, so a new tree arrives in one refresh. Sub-epics refresh every 6 minutes (top epic every 2) to stay inside the 300-point hour.\n- Cost: the query asks each child for its sub-issue count; GitHub bills **5 points per epic** (was 4). Confirmed live: the demo refresh costs 11 (1 + 2×5).\n- `epic-pulse json`: children gain `subCount`, `counts`, `percent` and their own `children` (additive).\n\n## Safety\n- A hierarchy that loops back stops where it repeats; 8 levels and 2000 nodes are the backstop. The view and the refresh use the same depth limit (I found and fixed an off-by-one where the deepest fetched sub-epic was never shown).\n\n## Verification\n- Real recordings of a three-level demo tree I created in this repo (#43 → #44 → #45 → #48, plus #46 and closed #47).\n- lint, typecheck, 480 tests; live 483 pass.\n- Mutation-verified: cycle stop, leaf counting, sub-epic TTL, pruning of sub-epics, depth cap.\n\n## Not verified\n- Not looked at in a running VS Code. None of the real AnypointConnect epics I checked (#6509, #6217, #6243, #5684) has sub-epics today, so on that repository this changes only the cost and nothing visible.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+                        "isCrossRepository": false,
                         "repository": {
                           "nameWithOwner": "takauztovies/epic-pulse"
                         }
@@ -72,11 +73,23 @@
         "openPrs": {
           "nodes": [
             {
+              "number": 53,
+              "state": "OPEN",
+              "isDraft": false,
+              "url": "https://github.com/takauztovies/epic-pulse/pull/53",
+              "headRefName": "feat/pr-status",
+              "isCrossRepository": false,
+              "repository": {
+                "nameWithOwner": "takauztovies/epic-pulse"
+              }
+            },
+            {
               "number": 51,
               "state": "OPEN",
               "isDraft": false,
               "url": "https://github.com/takauztovies/epic-pulse/pull/51",
               "headRefName": "46-demo-branch-link",
+              "isCrossRepository": false,
               "repository": {
                 "nameWithOwner": "takauztovies/epic-pulse"
               }
@@ -87,6 +100,7 @@
               "isDraft": true,
               "url": "https://github.com/takauztovies/epic-pulse/pull/52",
               "headRefName": "demo-mention-fixture",
+              "isCrossRepository": false,
               "repository": {
                 "nameWithOwner": "takauztovies/epic-pulse"
               }
@@ -97,6 +111,7 @@
               "isDraft": false,
               "url": "https://github.com/takauztovies/epic-pulse/pull/49",
               "headRefName": "feat/full-tree",
+              "isCrossRepository": false,
               "repository": {
                 "nameWithOwner": "takauztovies/epic-pulse"
               }

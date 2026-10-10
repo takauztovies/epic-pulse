@@ -157,7 +157,7 @@ only limit is a 1.5-second tripwire that catches a render waiting on the network
 | Status | A sub-issue that is |
 | --- | --- |
 | Todo | open, with nobody assigned and no pull request on the way |
-| In progress | open and assigned, or with a draft pull request that will close it, or with any open pull request that mentions it (one that names more than three issues does not count) |
+| In progress | open and assigned, or with a draft pull request that will close it, or with any open pull request that mentions it (one that names more than three issues does not count). Only pull requests from a branch in the repository itself count this way: anyone can open one from a fork |
 | In review | open, with a ready pull request that will close it: one with a closing keyword, GitHub's own link, or one from a branch named for the issue (`123-login`) |
 | Done | closed as completed, or closed without a reason |
 | Dropped | closed as not planned, or as a duplicate |
