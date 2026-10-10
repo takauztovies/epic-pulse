@@ -5,6 +5,16 @@ Every notable change to epic-pulse is listed here. Versions follow
 
 ## Unreleased
 
+### Added
+
+- **The whole tree.** A sub-issue that has sub-issues is followed as a sub-epic, at every level down to
+  GitHub's limit of eight: the VS Code view opens each one onto its own status groups with its own
+  percentage, and an epic counts the items at the bottom of its tree rather than its direct children.
+  Sub-epics refresh every six minutes (the top epic every two) to keep a deep tree inside the hourly
+  budget, and a refresh fetches a whole new tree at once rather than a level per refresh. Each epic now
+  costs 5 points (the query asks each child for its sub-issue count). `epic-pulse json` children gain
+  `subCount`, `counts`, `percent` and their own `children`.
+
 ## 0.3.5
 
 ### Fixed

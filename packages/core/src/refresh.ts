@@ -9,7 +9,9 @@ import {
   chunk, epicRefsOf, epicsToWatch, gatherRefs, groupByRepo, needsFetch, needsResolution, PHASE_A_BATCH, PHASE_A_COST,
   phaseBBatchSize, pinnedRefs, rollUsage, withSession, type RepoGroup,
 } from './refresh-plan.js';
+import { refKey } from './ref.js';
 import { updateTime } from './time-store.js';
+import { MAX_TREE_DEPTH, subEpicRefs } from './tree.js';
 import { pruneSessions, readLiveSessions, readSession, type SessionState } from './registry.js';
 import { unfetchedEpics, unresolvedRefs } from './resolve.js';
 import type { ErrorCode, IssueRef } from './schemas/common.js';
@@ -91,10 +93,28 @@ async function fetchGroup(run: Run, group: RepoGroup, ctx: Context): Promise<Run
   return current;
 }
 
+// The sub-epics of the epics just fetched that are due, which are only known once
+// their parents' children are. Paced runs fetch only what was never fetched.
+function dueBelow(run: Run, fetched: readonly IssueRef[], done: ReadonlySet<string>): readonly IssueRef[] {
+  const below = fetched.flatMap((ref) => {
+    const entry = run.snapshot.epics[refKey(ref)];
+    return entry ? subEpicRefs(entry) : [];
+  }).filter((ref) => !done.has(refKey(ref)));
+  const unique = [...new Map(below.map((ref) => [refKey(ref), ref] as const)).values()];
+  return run.paced ? unfetchedEpics(unique, run.snapshot) : needsFetch(run.snapshot, unique, run.now);
+}
+
+// One level of the tree per round, down to MAX_TREE_DEPTH, so a whole tree is
+// there after one refresh instead of one level per refresh. An epic is fetched
+// at most once per run, which also ends a cycle.
 async function runPhaseB(run: Run, refs: readonly IssueRef[], ctx: Context): Promise<Run> {
   let current = run;
-  for (const group of groupByRepo(toFetch(run, refs))) {
-    current = await fetchGroup(current, group, ctx);
+  const done = new Set<string>();
+  let targets = toFetch(run, refs);
+  for (let depth = 0; targets.length > 0 && depth <= MAX_TREE_DEPTH; depth += 1) {
+    for (const group of groupByRepo(targets)) current = await fetchGroup(current, group, ctx);
+    targets.forEach((ref) => done.add(refKey(ref)));
+    targets = dueBelow(current, targets, done);
   }
   return current;
 }

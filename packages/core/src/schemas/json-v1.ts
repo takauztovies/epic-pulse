@@ -5,29 +5,58 @@ import { EpicKindSchema } from './snapshot.js';
 // The public, versioned contract behind `epic-pulse json`, read by the VS Code
 // extension and by anyone scripting against the CLI. Additive changes keep
 // `version: 1`; renames or removals require `version: 2`.
-export const JsonChildSchema = z
-  .object({
-    number: IssueNumberSchema.nullable(),
-    // What to call it: `#12`, or `PROJ-12` on Jira; null for a plain checklist line.
-    key: z.string().nullable(),
-    title: z.string(),
-    url: z.string().nullable(),
-    status: StatusSchema,
-    sessionCount: z.number().int().nonnegative(),
-    // The live sessions bound to this child, most recent binding first.
-    // sessionCount is their length, kept so a reader of only the count need
-    // not change.
-    sessionIds: z.array(z.string()).readonly(),
-    // Who it is assigned to (logins, up to three) and how many open pull requests will close it.
-    assignees: z.array(z.string()).readonly(),
-    openPullRequests: z.number().int().nonnegative(),
-    // Active session time on this item, in seconds, with when and in which
-    // session it was last worked on (null: never).
-    activeSeconds: z.number().int().nonnegative(),
-    lastActivityAt: z.iso.datetime().nullable(),
-    lastSessionId: z.string().nullable(),
-  })
-  .readonly();
+export interface JsonChild {
+  readonly number: number | null;
+  // What to call it: `#12`, or `PROJ-12` on Jira; null for a plain checklist line.
+  readonly key: string | null;
+  readonly title: string;
+  readonly url: string | null;
+  readonly status: z.infer<typeof StatusSchema>;
+  // How many sub-issues it has (0: a leaf). When they have been fetched they are `children`.
+  readonly subCount: number;
+  readonly sessionCount: number;
+  // The live sessions bound to this item or anything below it, most recent binding first.
+  // sessionCount is their length, kept so a reader of only the count need not change.
+  readonly sessionIds: readonly string[];
+  // Who it is assigned to (logins, up to five, below it too) and how many open pull requests
+  // will close it or anything below it.
+  readonly assignees: readonly string[];
+  readonly openPullRequests: number;
+  // Active session time on this item and everything below it, in seconds, with when and in
+  // which session it was last worked on (null: never).
+  readonly activeSeconds: number;
+  readonly lastActivityAt: string | null;
+  readonly lastSessionId: string | null;
+  // For an item with items below it: the status counts of its leaves and the percent done.
+  // null for a leaf.
+  readonly counts: z.infer<typeof StatusCountsSchema> | null;
+  readonly percent: number | null;
+  // The items below it, however deep. Empty for a leaf, and until a sub-epic has been fetched.
+  readonly children: readonly JsonChild[];
+}
+
+export const JsonChildSchema: z.ZodType<JsonChild> = z.lazy(() =>
+  z
+    .object({
+      number: IssueNumberSchema.nullable(),
+      key: z.string().nullable(),
+      title: z.string(),
+      url: z.string().nullable(),
+      status: StatusSchema,
+      subCount: z.number().int().nonnegative(),
+      sessionCount: z.number().int().nonnegative(),
+      sessionIds: z.array(z.string()).readonly(),
+      assignees: z.array(z.string()).readonly(),
+      openPullRequests: z.number().int().nonnegative(),
+      activeSeconds: z.number().int().nonnegative(),
+      lastActivityAt: z.iso.datetime().nullable(),
+      lastSessionId: z.string().nullable(),
+      counts: StatusCountsSchema.nullable(),
+      percent: z.number().int().min(0).max(100).nullable(),
+      children: z.array(JsonChildSchema).readonly(),
+    })
+    .readonly(),
+);
 
 export const JsonEpicSchema = z
   .object({
@@ -84,6 +113,5 @@ export const JsonV1Schema = z
   })
   .readonly();
 
-export type JsonChild = z.infer<typeof JsonChildSchema>;
 export type JsonEpic = z.infer<typeof JsonEpicSchema>;
 export type JsonV1 = z.infer<typeof JsonV1Schema>;
