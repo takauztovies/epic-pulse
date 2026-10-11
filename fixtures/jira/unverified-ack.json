@@ -1,4 +1,4 @@
 {
-  "version": "0.3.5",
-  "note": "Jira support ships experimental in this version: its fixtures are hand-written from Atlassian's documentation, not recorded from a Jira site. Acknowledged by the repository owner on 2026-10-08. A later version needs recorded fixtures (pnpm record-fixtures jira) or its own acknowledgement."
+  "version": "0.3.6",
+  "note": "Jira support still ships experimental in this version: its fixtures are hand-written from Atlassian's documentation, not recorded from a Jira site. Acknowledged again for 0.3.6 on 2026-10-11 (the owner chose to ship Jira as experimental in 0.3.5). A later version needs recorded fixtures (pnpm record-fixtures jira) or its own acknowledgement."
 }

@@ -5,6 +5,8 @@ Every notable change to epic-pulse is listed here. Versions follow
 
 ## Unreleased
 
+## 0.3.6
+
 ### Added
 
 - **Usage-limit warning.** From 90% of the account's 5-hour or weekly usage, the status line of every
