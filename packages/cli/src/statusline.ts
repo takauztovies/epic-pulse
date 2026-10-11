@@ -45,9 +45,15 @@ async function readOrigin(): Promise<Origin> {
 const LINE_WIDTH = 80;
 const WARNING_MAX = 44;
 
-// Red unless NO_COLOR is set (https://no-color.org). Only the warning is coloured.
+// Colour unless NO_COLOR is set (https://no-color.org); an empty one is not set.
+// The warning and the epic's bar, which render.ts paints, ask this one question.
+function colorOn(env: NodeJS.ProcessEnv): boolean {
+  return !env['NO_COLOR'];
+}
+
+// The usage warning is red.
 function paint(text: string, env: NodeJS.ProcessEnv): string {
-  return env['NO_COLOR'] ? text : `\x1b[1;31m${text}\x1b[0m`;
+  return colorOn(env) ? `\x1b[1;31m${text}\x1b[0m` : text;
 }
 
 // The usage warning in front of the line, at most WARNING_MAX characters, and the
@@ -86,7 +92,7 @@ async function render(env: NodeJS.ProcessEnv, now: number): Promise<Rendered> {
   const pins = pinsOf(read);
   const view = buildView({ snapshot, sessions: session ? [session] : [], pins, now, scope: { session }, progress });
   const due = session !== undefined && refreshDue({ snapshot, session, pins, now, attempt });
-  return { line: withWarning((width) => renderStatusLine(view, { width })), refresh: due ? { dir: registry, session: session.id, jira } : undefined };
+  return { line: withWarning((width) => renderStatusLine(view, { width, color: colorOn(env) })), refresh: due ? { dir: registry, session: session.id, jira } : undefined };
 }
 
 // Never throws and never prints nothing: every outcome is one explicit line.

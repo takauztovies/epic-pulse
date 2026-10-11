@@ -12,6 +12,10 @@ two are in progress, and this session is also working on one more epic. epic-pul
 epic a session is on by itself, from what the session does, and reads everything else from GitHub.
 It never changes anything on GitHub.
 
+The status line colours the bar's cells by status: green for Done, cyan for In review, yellow for
+In progress, and dim for the rest. The characters are the same, so the line is as wide as without
+colour; set `NO_COLOR` for the plain line shown above.
+
 MIT licensed. For macOS, Linux and Windows, with Node 22 or newer (see [Limitations](#limitations) for Windows).
 
 ## Install

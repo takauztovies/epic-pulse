@@ -5,6 +5,12 @@ Every notable change to epic-pulse is listed here. Versions follow
 
 ## Unreleased
 
+### Added
+
+- **Colour in the status line's bar.** The bar's cells are coloured by status: green for Done, cyan
+  for In review, yellow for In progress, dim for the rest. The characters are unchanged, so the line
+  is as wide as before, and `NO_COLOR` gives the plain line it has always been.
+
 ### Fixed
 
 - **A pull request from a fork no longer moves a sub-issue to In review.** A fork's PR reports the

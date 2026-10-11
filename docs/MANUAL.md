@@ -190,6 +190,9 @@ own settings, `--dry-run` to see the change first). It shows the session's own e
 `rev` is issues in review, `wip` is in progress, and `(+1)` is one more epic. When the line is too
 narrow the bar goes first, then the counts. Like the views it counts Done only.
 
+The bar's cells are coloured by status: green is Done, cyan In review, yellow In progress, and dim
+the rest. The characters do not change, so neither does the width. `NO_COLOR` turns the colour off.
+
 ### Near the usage limit
 
 From 90% of the account's 5-hour or weekly usage, every session's Claude Code status line starts with
