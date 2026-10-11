@@ -1,15 +1,15 @@
 {
-  "recordedAt": "2026-10-08T12:32:57.837Z",
+  "recordedAt": "2026-10-11T18:03:27.396Z",
   "note": "both demo epics with creation, closing dates, assignee logins and bodies",
   "status": 200,
-  "remaining": 4592,
+  "remaining": 4976,
   "retryAfter": false,
   "body": {
     "data": {
       "rateLimit": {
-        "cost": 8,
-        "remaining": 4592,
-        "resetAt": "2026-10-08T13:00:50Z"
+        "cost": 10,
+        "remaining": 4976,
+        "resetAt": "2026-10-11T19:03:13Z"
       },
       "repository": {
         "e1": {
@@ -34,6 +34,9 @@
                 "assignees": {
                   "totalCount": 0,
                   "nodes": []
+                },
+                "subIssues": {
+                  "totalCount": 0
                 },
                 "labels": {
                   "nodes": [
@@ -63,6 +66,9 @@
                   "totalCount": 0,
                   "nodes": []
                 },
+                "subIssues": {
+                  "totalCount": 0
+                },
                 "labels": {
                   "nodes": [
                     {
@@ -91,6 +97,9 @@
                   "totalCount": 0,
                   "nodes": []
                 },
+                "subIssues": {
+                  "totalCount": 0
+                },
                 "labels": {
                   "nodes": [
                     {
@@ -99,7 +108,18 @@
                   ]
                 },
                 "closedByPullRequestsReferences": {
-                  "nodes": []
+                  "nodes": [
+                    {
+                      "number": 9,
+                      "state": "OPEN",
+                      "isDraft": true,
+                      "url": "https://github.com/takauztovies/epic-pulse/pull/9",
+                      "isCrossRepository": false,
+                      "repository": {
+                        "nameWithOwner": "takauztovies/epic-pulse"
+                      }
+                    }
+                  ]
                 },
                 "timelineItems": {
                   "nodes": [
@@ -107,10 +127,11 @@
                       "source": {
                         "__typename": "PullRequest",
                         "number": 9,
-                        "state": "CLOSED",
+                        "state": "OPEN",
                         "isDraft": true,
                         "url": "https://github.com/takauztovies/epic-pulse/pull/9",
                         "body": "Fixes #4\n\nPublic demo fixture for epic-pulse live tests (draft PR → sub-issue shows In progress). Do not merge.",
+                        "isCrossRepository": false,
                         "repository": {
                           "nameWithOwner": "takauztovies/epic-pulse"
                         }
@@ -133,6 +154,9 @@
                   "totalCount": 0,
                   "nodes": []
                 },
+                "subIssues": {
+                  "totalCount": 0
+                },
                 "labels": {
                   "nodes": [
                     {
@@ -141,7 +165,18 @@
                   ]
                 },
                 "closedByPullRequestsReferences": {
-                  "nodes": []
+                  "nodes": [
+                    {
+                      "number": 10,
+                      "state": "OPEN",
+                      "isDraft": false,
+                      "url": "https://github.com/takauztovies/epic-pulse/pull/10",
+                      "isCrossRepository": false,
+                      "repository": {
+                        "nameWithOwner": "takauztovies/epic-pulse"
+                      }
+                    }
+                  ]
                 },
                 "timelineItems": {
                   "nodes": [
@@ -149,10 +184,11 @@
                       "source": {
                         "__typename": "PullRequest",
                         "number": 10,
-                        "state": "CLOSED",
+                        "state": "OPEN",
                         "isDraft": false,
                         "url": "https://github.com/takauztovies/epic-pulse/pull/10",
                         "body": "Fixes #5\n\nPublic demo fixture for epic-pulse live tests (ready PR → sub-issue shows In review). Do not merge.",
+                        "isCrossRepository": false,
                         "repository": {
                           "nameWithOwner": "takauztovies/epic-pulse"
                         }
@@ -178,6 +214,9 @@
                       "login": "takauztovies"
                     }
                   ]
+                },
+                "subIssues": {
+                  "totalCount": 0
                 },
                 "labels": {
                   "nodes": [
@@ -207,6 +246,9 @@
                   "totalCount": 0,
                   "nodes": []
                 },
+                "subIssues": {
+                  "totalCount": 0
+                },
                 "labels": {
                   "nodes": [
                     {
@@ -234,6 +276,54 @@
             "totalCount": 0,
             "nodes": []
           }
+        },
+        "openPrs": {
+          "nodes": [
+            {
+              "number": 10,
+              "state": "OPEN",
+              "isDraft": false,
+              "url": "https://github.com/takauztovies/epic-pulse/pull/10",
+              "headRefName": "demo/ready-pr-fixture",
+              "isCrossRepository": false,
+              "repository": {
+                "nameWithOwner": "takauztovies/epic-pulse"
+              }
+            },
+            {
+              "number": 9,
+              "state": "OPEN",
+              "isDraft": true,
+              "url": "https://github.com/takauztovies/epic-pulse/pull/9",
+              "headRefName": "demo/draft-pr-fixture",
+              "isCrossRepository": false,
+              "repository": {
+                "nameWithOwner": "takauztovies/epic-pulse"
+              }
+            },
+            {
+              "number": 52,
+              "state": "OPEN",
+              "isDraft": true,
+              "url": "https://github.com/takauztovies/epic-pulse/pull/52",
+              "headRefName": "demo-mention-fixture",
+              "isCrossRepository": false,
+              "repository": {
+                "nameWithOwner": "takauztovies/epic-pulse"
+              }
+            },
+            {
+              "number": 51,
+              "state": "OPEN",
+              "isDraft": false,
+              "url": "https://github.com/takauztovies/epic-pulse/pull/51",
+              "headRefName": "46-demo-branch-link",
+              "isCrossRepository": false,
+              "repository": {
+                "nameWithOwner": "takauztovies/epic-pulse"
+              }
+            }
+          ]
         }
       }
     }

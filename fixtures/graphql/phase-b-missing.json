@@ -1,18 +1,66 @@
 {
-  "recordedAt": "2026-10-02T05:49:20.016Z",
+  "recordedAt": "2026-10-11T18:03:29.509Z",
   "note": "issue that does not exist",
   "status": 200,
-  "remaining": 4985,
+  "remaining": 4948,
   "retryAfter": false,
   "body": {
     "data": {
       "rateLimit": {
-        "cost": 3,
-        "remaining": 4985,
-        "resetAt": "2026-10-02T06:45:06Z"
+        "cost": 5,
+        "remaining": 4948,
+        "resetAt": "2026-10-11T19:03:13Z"
       },
       "repository": {
-        "e9999": null
+        "e9999": null,
+        "openPrs": {
+          "nodes": [
+            {
+              "number": 10,
+              "state": "OPEN",
+              "isDraft": false,
+              "url": "https://github.com/takauztovies/epic-pulse/pull/10",
+              "headRefName": "demo/ready-pr-fixture",
+              "isCrossRepository": false,
+              "repository": {
+                "nameWithOwner": "takauztovies/epic-pulse"
+              }
+            },
+            {
+              "number": 9,
+              "state": "OPEN",
+              "isDraft": true,
+              "url": "https://github.com/takauztovies/epic-pulse/pull/9",
+              "headRefName": "demo/draft-pr-fixture",
+              "isCrossRepository": false,
+              "repository": {
+                "nameWithOwner": "takauztovies/epic-pulse"
+              }
+            },
+            {
+              "number": 52,
+              "state": "OPEN",
+              "isDraft": true,
+              "url": "https://github.com/takauztovies/epic-pulse/pull/52",
+              "headRefName": "demo-mention-fixture",
+              "isCrossRepository": false,
+              "repository": {
+                "nameWithOwner": "takauztovies/epic-pulse"
+              }
+            },
+            {
+              "number": 51,
+              "state": "OPEN",
+              "isDraft": false,
+              "url": "https://github.com/takauztovies/epic-pulse/pull/51",
+              "headRefName": "46-demo-branch-link",
+              "isCrossRepository": false,
+              "repository": {
+                "nameWithOwner": "takauztovies/epic-pulse"
+              }
+            }
+          ]
+        }
       }
     },
     "errors": [

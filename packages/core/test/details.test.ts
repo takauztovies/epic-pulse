@@ -38,7 +38,8 @@ test('the view says how old an epic is and how much was finished this week, agai
   const week = at(Date.parse('2026-10-05T00:00:00Z'));
   assert.deepEqual([week.createdAt, week.doneLast7Days], ['2026-09-30T13:13:05.000Z', 1]);
   assert.equal(at(Date.parse('2026-10-08T12:00:00Z')).doneLast7Days, 0, 'eight days on, it is no longer this week');
-  assert.deepEqual([week.assignees, week.openPullRequests], [['takauztovies'], 0]);
+  // #4's draft PR #9 and #5's ready PR #10, both from branches in the demo repository.
+  assert.deepEqual([week.assignees, week.openPullRequests], [['takauztovies'], 2]);
   assert.match(week.summary ?? '', /^Public demo epic/);
 });
 

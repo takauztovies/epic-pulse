@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { classifyHttp } from '../src/gql-errors.js';
 import { parsePhaseA, parsePhaseB, phaseADocument, phaseBDocument } from '../src/queries.js';
+import { phaseBCost } from '../src/refresh-plan.js';
 import { loadFixture } from './helpers.js';
 
 test('phase A: sub-issue resolves to its parent, epics and missing issues are reported', () => {
@@ -17,7 +18,8 @@ test('phase A: sub-issue resolves to its parent, epics and missing issues are re
 test('phase B: the sub-issue epic keeps every child with its link evidence', () => {
   const parsed = parsePhaseB(loadFixture('phase-b-subissues'));
   assert.ok(parsed.ok);
-  assert.equal(parsed.value.rate?.cost, 3);
+  // What GitHub billed for one epic is what the refresh planner budgets for it.
+  assert.equal(parsed.value.rate?.cost, phaseBCost(1));
   const epic = parsed.value.epics.get(1);
   assert.equal(epic?.subIssues.totalCount, 6);
   assert.deepEqual(epic?.subIssues.nodes.map((n) => n?.number), [2, 3, 4, 5, 6, 7]);

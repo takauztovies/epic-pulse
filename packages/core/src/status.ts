@@ -44,6 +44,9 @@ function isOpenSameRepo(pr: PrNode, repo: RepoRef): boolean {
 //     (`123-login`), which leaves no trace on the issue at all unless it also
 //     mentions it (parsePhaseB attaches these).
 // A merged or closed PR is not "in flight"; a merge closes the issue anyway.
+// Every route needs a branch in this repository: a fork's PR reports this
+// repository as its own, and on a public one anyone can open it with
+// "Fixes #N". A PR whose origin is unknown counts as a fork's.
 export function linkedOpenPrs(node: SubIssueNode, repo: RepoRef): readonly PrNode[] {
   const linked = [...node.closedByPullRequestsReferences.nodes.filter((pr): pr is PrNode => pr !== null), ...(node.branchPullRequests ?? [])];
   const crossed = node.timelineItems.nodes.flatMap((item) => {
@@ -51,7 +54,7 @@ export function linkedOpenPrs(node: SubIssueNode, repo: RepoRef): readonly PrNod
     return source && bodyClosesIssue(source.body ?? '', node.number, repo) ? [source] : [];
   });
   const byNumber = new Map([...linked, ...crossed].map((pr) => [pr.number, pr] as const));
-  return [...byNumber.values()].filter((pr) => isOpenSameRepo(pr, repo));
+  return [...byNumber.values()].filter((pr) => pr.isCrossRepository === false && isOpenSameRepo(pr, repo));
 }
 
 // A PR that names more issues than this is a release note or a sweep, not work

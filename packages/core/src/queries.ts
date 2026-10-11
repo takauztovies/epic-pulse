@@ -67,7 +67,7 @@ const EPIC_FRAGMENT = `fragment EpicFields on Issue {
       subIssues(first: 1) { totalCount }
       labels(first: 20) { nodes { name } }
       closedByPullRequestsReferences(first: 5) {
-        nodes { number state isDraft url repository { nameWithOwner } }
+        nodes { number state isDraft url isCrossRepository repository { nameWithOwner } }
       }
       timelineItems(last: 10, itemTypes: [CROSS_REFERENCED_EVENT]) {
         nodes {
