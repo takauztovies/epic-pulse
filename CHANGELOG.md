@@ -5,6 +5,15 @@ Every notable change to epic-pulse is listed here. Versions follow
 
 ## Unreleased
 
+### Added
+
+- **Usage-limit warning.** From 90% of the account's 5-hour or weekly usage, the status line of every
+  session starts with a red `⚠ 91% 5h limit, resets in 2h10m · /compact`, and a new prompt hook tells
+  each session's agent once (again at 95% and 99%) to finish its step, write a handoff and start no new
+  work. `EPIC_PULSE_LIMIT_WARN` moves the threshold, `NO_COLOR` drops the colour. The status line keeps
+  the latest reading in `limits.json` and the hook remembers whom it told in `limits-notified.json`,
+  both in the user cache directory.
+
 ### Changed
 
 - Statuses follow pull requests more closely. An open pull request from a branch named for the issue

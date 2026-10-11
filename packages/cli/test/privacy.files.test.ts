@@ -14,6 +14,8 @@ const NOT_IN_THIS_RUN: ReadonlyMap<string, string> = new Map([
   ['<git-common-dir>/epic-pulse/refresh.lock', 'held only while a refresh runs, so it must be gone afterwards'],
   ['<user-cache-dir>/epic-pulse/usage.jsonl', 'charged only by a request, and this refresh is served from cache; the token test sends one'],
   ['<user-cache-dir>/epic-pulse/usage.lock', 'held only while the ledger is written'],
+  ['<user-cache-dir>/epic-pulse/limits.json', 'written only from a payload with rate_limits; limits-cli.test.ts covers it'],
+  ['<user-cache-dir>/epic-pulse/limits-notified.json', 'written only when a session is told about the limit; limits-cli.test.ts covers it'],
 ]);
 
 test('a session\'s hook calls, a pin, a cached refresh and the status line write exactly the documented files', async (t) => {
