@@ -3113,13 +3113,13 @@ var CC_SANITIZE = /[- ]/g;
 function isLuhnAlgo(digits) {
   let length = digits.length;
   let bit = 1;
-  let sum = 0;
+  let sum2 = 0;
   while (length) {
     const value = digits.charCodeAt(--length) - 48;
     bit ^= 1;
-    sum += bit ? [0, 2, 4, 6, 8, 1, 3, 5, 7, 9][value] : value;
+    sum2 += bit ? [0, 2, 4, 6, 8, 1, 3, 5, 7, 9][value] : value;
   }
-  return sum % 10 === 0;
+  return sum2 % 10 === 0;
 }
 function isValidCreditCard(input2) {
   if (!creditCard.test(input2))
@@ -20456,12 +20456,12 @@ async function contextFor(info) {
   return { info, config: config2, branch, remote };
 }
 async function worktreeContexts(paths) {
-  const unique2 = [...new Set(paths)];
-  const infos = await Promise.all(unique2.map((path) => findWorktree(path)));
+  const unique3 = [...new Set(paths)];
+  const infos = await Promise.all(unique3.map((path) => findWorktree(path)));
   const byRoot = new Map(infos.flatMap((info) => info ? [[info.root, info]] : []));
   const contexts = new Map(await Promise.all([...byRoot.values()].map(async (info) => [info.root, await contextFor(info)])));
   return new Map(
-    unique2.flatMap((path, i) => {
+    unique3.flatMap((path, i) => {
       const context = contexts.get(infos[i]?.root ?? "");
       return context ? [[path, context]] : [];
     })
@@ -20674,7 +20674,7 @@ function isOpenSameRepo(pr, repo) {
   return pr.state === "OPEN" && pr.repository.nameWithOwner.toLowerCase() === slugOf(repo);
 }
 function linkedOpenPrs(node2, repo) {
-  const linked = node2.closedByPullRequestsReferences.nodes.filter((pr) => pr !== null);
+  const linked = [...node2.closedByPullRequestsReferences.nodes.filter((pr) => pr !== null), ...node2.branchPullRequests ?? []];
   const crossed = node2.timelineItems.nodes.flatMap((item) => {
     const source = item?.source;
     return source && bodyClosesIssue(source.body ?? "", node2.number, repo) ? [source] : [];
@@ -20682,11 +20682,24 @@ function linkedOpenPrs(node2, repo) {
   const byNumber = new Map([...linked, ...crossed].map((pr) => [pr.number, pr]));
   return [...byNumber.values()].filter((pr) => isOpenSameRepo(pr, repo));
 }
+var MAX_MENTIONS = 3;
+var MENTION = /(?:^|[^\w/#])#(\d+)(?!\d)|\/issues\/(\d+)(?!\d)/g;
+function issuesNamedIn(body) {
+  return new Set([...body.slice(0, 2e4).matchAll(MENTION)].map((match) => match[1] ?? match[2])).size;
+}
+function mentioningOpenPrs(node2, repo) {
+  return node2.timelineItems.nodes.flatMap((item) => {
+    const source = item?.source;
+    const own2 = source?.isCrossRepository === false;
+    return source && own2 && isOpenSameRepo(source, repo) && issuesNamedIn(source.body ?? "") <= MAX_MENTIONS ? [source] : [];
+  });
+}
 function deriveStatus(node2, repo) {
   if (node2.state === "CLOSED") return DROPPED_REASONS.has(node2.stateReason ?? "") ? "dropped" : "done";
   const prs = linkedOpenPrs(node2, repo);
   if (prs.some((pr) => !pr.isDraft)) return "in_review";
-  return prs.length > 0 || node2.assignees.totalCount > 0 ? "in_progress" : "todo";
+  const moving = prs.length > 0 || mentioningOpenPrs(node2, repo).length > 0 || node2.assignees.totalCount > 0;
+  return moving ? "in_progress" : "todo";
 }
 function pointsByStatus(children, progress = DEFAULT_PROGRESS) {
   const zero = { todo: 0, in_progress: 0, in_review: 0, done: 0, dropped: 0 };
@@ -20698,12 +20711,12 @@ function countStatuses(children) {
   return children.reduce((counts, child) => ({ ...counts, [child.status]: counts[child.status] + 1 }), zero);
 }
 function percentDone(counts) {
-  const total2 = STATUSES.reduce((sum, status) => sum + counts[status], 0);
+  const total2 = STATUSES.reduce((sum2, status) => sum2 + counts[status], 0);
   const denominator = total2 - counts.dropped;
   return denominator <= 0 ? 0 : Math.floor(counts.done * 100 / denominator);
 }
 function weightedPercentDone(points, progress = DEFAULT_PROGRESS) {
-  const total2 = STATUSES.reduce((sum, status) => sum + points[status], 0);
+  const total2 = STATUSES.reduce((sum2, status) => sum2 + points[status], 0);
   const denominator = total2 - points.dropped;
   if (denominator <= 0) return 0;
   const credited = points.done * 100 + points.in_review * progress.inReview + points.in_progress * progress.inProgress;
@@ -21146,6 +21159,11 @@ var PrNodeSchema = external_exports.object({
   isDraft: external_exports.boolean(),
   url: external_exports.string(),
   body: external_exports.string().optional(),
+  // Optional: read only where the branch matters (the repository's open pull requests).
+  headRefName: external_exports.string().optional(),
+  // false: the PR's branch is in this repository. A fork's PR reports this repository as
+  // its `repository` too, so only this says who could open it. Absent: not asked.
+  isCrossRepository: external_exports.boolean().optional(),
   repository: RepoNameSchema
 });
 var PrSourceSchema = PrNodeSchema.extend({ __typename: external_exports.literal("PullRequest") });
@@ -21163,10 +21181,15 @@ var SubIssueNodeSchema = external_exports.object({
     nodes: external_exports.array(external_exports.object({ login: external_exports.string() }).nullable()).optional()
   }),
   closedAt: external_exports.string().nullable().optional(),
+  // Optional so an answer cached or recorded before sub-epics were walked still parses.
+  subIssues: external_exports.object({ totalCount: external_exports.number().int().nonnegative() }).optional(),
   // Optional so an answer cached or recorded before labels were asked for still parses.
   labels: external_exports.object({ nodes: external_exports.array(external_exports.object({ name: external_exports.string() }).nullable()) }).optional(),
   closedByPullRequestsReferences: external_exports.object({ nodes: external_exports.array(PrNodeSchema.nullable()) }),
-  timelineItems: external_exports.object({ nodes: external_exports.array(TimelineNodeSchema.nullable()) })
+  timelineItems: external_exports.object({ nodes: external_exports.array(TimelineNodeSchema.nullable()) }),
+  // Never in a GitHub answer: parsePhaseB fills it with the repository's open pull
+  // requests whose branch is named for this issue (`123-login`).
+  branchPullRequests: external_exports.array(PrNodeSchema).readonly().optional()
 });
 var EpicNodeSchema = external_exports.object({
   number: IssueNumberSchema,
@@ -21181,8 +21204,9 @@ var EpicNodeSchema = external_exports.object({
 });
 var PhaseBDataSchema = external_exports.object({
   rateLimit: RateLimitNodeSchema.nullable(),
-  repository: external_exports.record(external_exports.string(), EpicNodeSchema.nullable()).nullable()
+  repository: external_exports.record(external_exports.string(), external_exports.unknown()).nullable()
 });
+var OpenPrsSchema = external_exports.object({ nodes: external_exports.array(PrNodeSchema.nullable()) });
 
 // packages/core/src/queries.ts
 var RATE = "rateLimit { cost remaining resetAt }";
@@ -21205,6 +21229,7 @@ var EPIC_FRAGMENT = `fragment EpicFields on Issue {
     nodes {
       number title url state stateReason closedAt repository { nameWithOwner }
       assignees(first: 3) { totalCount nodes { login } }
+      subIssues(first: 1) { totalCount }
       labels(first: 20) { nodes { name } }
       closedByPullRequestsReferences(first: 5) {
         nodes { number state isDraft url repository { nameWithOwner } }
@@ -21214,7 +21239,7 @@ var EPIC_FRAGMENT = `fragment EpicFields on Issue {
           ... on CrossReferencedEvent {
             source {
               __typename
-              ... on PullRequest { number state isDraft url body repository { nameWithOwner } }
+              ... on PullRequest { number state isDraft url body isCrossRepository repository { nameWithOwner } }
             }
           }
         }
@@ -21222,11 +21247,13 @@ var EPIC_FRAGMENT = `fragment EpicFields on Issue {
     }
   }
 }`;
+var OPEN_PRS = "openPrs: pullRequests(states: OPEN, first: 100, orderBy: { field: UPDATED_AT, direction: DESC }) { nodes { number state isDraft url headRefName isCrossRepository repository { nameWithOwner } } }";
 function phaseBDocument(numbers) {
   return `query PhaseB($owner: String!, $name: String!) {
   ${RATE}
   repository(owner: $owner, name: $name) {
     ${aliased("e", numbers, "{ ...EpicFields }")}
+    ${OPEN_PRS}
   }
 }
 ${EPIC_FRAGMENT}`;
@@ -21254,12 +21281,30 @@ function parsePhaseA(res) {
   if (!data.success || !data.data.repository) return fail({ code: "invalid_response", detail: "phase_a_shape" });
   return ok({ rate: toRate(data.data.rateLimit), issues: keyed("i", data.data.repository) });
 }
+function withBranchPrs(epics, prs) {
+  const byIssue = /* @__PURE__ */ new Map();
+  for (const pr of prs) {
+    const number4 = pr?.headRefName === void 0 ? void 0 : branchIssueNumber(pr.headRefName, DEFAULT_BRANCH_PATTERN);
+    if (pr && pr.isCrossRepository === false && number4 !== void 0) byIssue.set(number4, [...byIssue.get(number4) ?? [], pr]);
+  }
+  return new Map([...epics].map(([number4, epic]) => [number4, epic && {
+    ...epic,
+    subIssues: { ...epic.subIssues, nodes: epic.subIssues.nodes.map((node2) => node2 && { ...node2, branchPullRequests: byIssue.get(node2.number) ?? [] }) }
+  }]));
+}
 function parsePhaseB(res) {
   const opened = openEnvelope(res);
   if (!opened.ok) return opened;
   const data = PhaseBDataSchema.safeParse(opened.value.data);
   if (!data.success || !data.data.repository) return fail({ code: "invalid_response", detail: "phase_b_shape" });
-  return ok({ rate: toRate(data.data.rateLimit), epics: keyed("e", data.data.repository) });
+  const epics = /* @__PURE__ */ new Map();
+  for (const [number4, raw] of keyed("e", data.data.repository)) {
+    const epic = EpicNodeSchema.nullable().safeParse(raw ?? null);
+    if (!epic.success) return fail({ code: "invalid_response", detail: "phase_b_shape" });
+    epics.set(number4, epic.data);
+  }
+  const prs = OpenPrsSchema.safeParse(data.data.repository["openPrs"]);
+  return ok({ rate: toRate(data.data.rateLimit), epics: withBranchPrs(epics, prs.success ? prs.data.nodes : []) });
 }
 
 // packages/core/src/registry.ts
@@ -21280,6 +21325,8 @@ var HookPayloadSchema = external_exports.looseObject({
   hook_event_name: external_exports.string().optional().catch(void 0),
   tool_name: external_exports.string().optional().catch(void 0),
   tool_input: ToolInputSchema.optional().catch(void 0),
+  // Read by the status line only (limits.ts), and never stored as it came.
+  rate_limits: external_exports.unknown().optional(),
   workspace: external_exports.looseObject({ current_dir: external_exports.string().optional().catch(void 0) }).optional().catch(void 0)
 });
 
@@ -21388,9 +21435,51 @@ async function pruneSessions(paths, now) {
   return removed.filter(Boolean).length;
 }
 
+// packages/core/src/tree.ts
+var MAX_TREE_DEPTH = 8;
+var MAX_TREE_NODES = 2e3;
+function childRefOf(child, epic) {
+  if (kindOf(epic) === "jira") {
+    const parts = child.key === void 0 ? null : JIRA_KEY.exec(child.key);
+    return parts ? makeJiraRef({ host: epic.host, project: parts[1] ?? "", number: Number(parts[2]) }) : void 0;
+  }
+  const target = child.url === null ? void 0 : parseIssueTarget(child.url);
+  const own2 = target?.repo;
+  if (target && own2) return makeRef({ host: own2.host ?? epic.host, owner: own2.owner, repo: own2.repo, number: target.number });
+  return child.number === null ? void 0 : makeRef({ ...epic, number: child.number });
+}
+function subEpicRefs(entry) {
+  return entry.children.flatMap((child) => {
+    const ref = (child.subCount ?? 0) > 0 ? childRefOf(child, entry.ref) : void 0;
+    return ref ? [ref] : [];
+  });
+}
+function unique(refs) {
+  return [...new Map(refs.map((ref) => [refKey(ref), ref])).values()];
+}
+function descendantEpics(snapshot, roots) {
+  const seen = new Set(roots.map(refKey));
+  const found = [];
+  let level = roots;
+  for (let depth = 0; depth < MAX_TREE_DEPTH && level.length > 0 && found.length < MAX_TREE_NODES; depth += 1) {
+    const next = unique(level.flatMap((ref) => {
+      const entry = snapshot.epics[refKey(ref)];
+      return entry ? subEpicRefs(entry) : [];
+    })).filter((ref) => !seen.has(refKey(ref)));
+    next.forEach((ref) => seen.add(refKey(ref)));
+    found.push(...next);
+    level = next;
+  }
+  return found;
+}
+function subEpicKeys(snapshot) {
+  return new Set(Object.values(snapshot.epics).flatMap((entry) => subEpicRefs(entry).map(refKey)));
+}
+
 // packages/core/src/refresh-plan.ts
 var RESOLUTION_TTL_MS = 30 * 60 * 1e3;
 var EPIC_TTL_MS = 2 * 60 * 1e3;
+var SUB_EPIC_TTL_MS = 6 * 60 * 1e3;
 var HOURLY_BUDGET_POINTS = 300;
 var BUDGET_WINDOW_MS = 60 * 60 * 1e3;
 var MIN_REMAINING_POINTS = 1e3;
@@ -21399,20 +21488,20 @@ var RETAIN_MS = 6 * 60 * 60 * 1e3;
 var PHASE_A_BATCH = 50;
 var PHASE_A_COST = 1;
 var PHASE_B_BATCH = 10;
-function unique(refs) {
+function unique2(refs) {
   return [...new Map(refs.map((ref) => [refKey(ref), ref])).values()];
 }
 function gatherRefs(sessions, pins, now) {
   const bound = sessions.filter((session) => isLive(session, now)).flatMap((session) => activeBindings(session, now));
-  return unique([...bound.map((binding) => binding.ref), ...pins.map((pin) => pin.ref)]);
+  return unique2([...bound.map((binding) => binding.ref), ...pins.map((pin) => pin.ref)]);
 }
 function pinnedRefs(sessions, pins, now) {
   const bound = sessions.flatMap((session) => activeBindings(session, now)).filter((binding) => binding.via === "pin");
-  return unique([...bound.map((binding) => binding.ref), ...pins.map((pin) => pin.ref)]);
+  return unique2([...bound.map((binding) => binding.ref), ...pins.map((pin) => pin.ref)]);
 }
 function withSession(refs, session, now) {
   if (session === void 0) return refs;
-  return unique([...activeBindings(session, now).map((binding) => binding.ref), ...refs]);
+  return unique2([...activeBindings(session, now).map((binding) => binding.ref), ...refs]);
 }
 function groupByRepo(refs) {
   const groups = /* @__PURE__ */ new Map();
@@ -21430,23 +21519,27 @@ function needsResolution(snapshot, refs, now) {
   });
 }
 function epicRefsOf(snapshot, refs) {
-  return unique(refs.flatMap((ref) => snapshot.issues[refKey(ref)]?.epic ?? []));
+  return unique2(refs.flatMap((ref) => snapshot.issues[refKey(ref)]?.epic ?? []));
 }
 function probeTargets(snapshot, pinned) {
-  return unique(pinned.filter((ref) => {
+  return unique2(pinned.filter((ref) => {
     const resolution = snapshot.issues[refKey(ref)];
     return resolution?.epic != null && refKey(resolution.epic) !== refKey(ref) && resolution.isEpic !== false;
   }));
 }
 function epicsToWatch(snapshot, refs, pinned) {
-  return unique([...epicRefsOf(snapshot, refs), ...probeTargets(snapshot, pinned)]);
+  const top = unique2([...epicRefsOf(snapshot, refs), ...probeTargets(snapshot, pinned)]);
+  return unique2([...top, ...descendantEpics(snapshot, top)]);
 }
 function needsFetch(snapshot, epics, now) {
   const fetchedAt = (epic) => snapshot.epics[refKey(epic)]?.fetchedAt ?? Number.NEGATIVE_INFINITY;
-  return epics.filter((epic) => now - fetchedAt(epic) >= EPIC_TTL_MS).sort((a, b) => fetchedAt(a) - fetchedAt(b));
+  const subs = subEpicKeys(snapshot);
+  const ttl = (epic) => subs.has(refKey(epic)) ? SUB_EPIC_TTL_MS : EPIC_TTL_MS;
+  return epics.filter((epic) => now - fetchedAt(epic) >= ttl(epic)).sort((a, b) => fetchedAt(a) - fetchedAt(b));
 }
+var OPEN_PR_REQUESTS = 1;
 function phaseBCost(epics) {
-  return Math.max(1, Math.round(epics * 401 / 100));
+  return Math.max(1, Math.round((epics * 501 + OPEN_PR_REQUESTS) / 100));
 }
 function phaseBBatchSize(usage) {
   let size = 0;
@@ -21474,6 +21567,9 @@ var ChildSchema = external_exports.object({
   title: external_exports.string().max(300),
   url: external_exports.string().max(500).nullable(),
   status: StatusSchema,
+  // How many sub-issues it has, when it has any: it is then an epic of its own, whose
+  // entry in the snapshot holds its children. Absent: a leaf.
+  subCount: external_exports.number().int().positive().optional(),
   // The labels on the item, lowercased, so a size can be read from them under
   // whatever table the repository configures; absent: it has none.
   labels: external_exports.array(external_exports.string().max(60)).max(20).readonly().optional(),
@@ -21553,6 +21649,7 @@ function subIssueChild(node2, epic) {
   const status = deriveStatus(node2, ownRepo(node2, epic));
   const openPrs = status === "done" || status === "dropped" ? 0 : linkedOpenPrs(node2, ownRepo(node2, epic)).length;
   const closedAt = status === "done" ? timeOf(node2.closedAt) : void 0;
+  const subCount = node2.subIssues?.totalCount ?? 0;
   return {
     number: node2.number,
     title: node2.title.slice(0, 300),
@@ -21561,7 +21658,8 @@ function subIssueChild(node2, epic) {
     ...labels.length === 0 ? {} : { labels },
     ...assignees.length === 0 ? {} : { assignees },
     ...openPrs === 0 ? {} : { openPrs },
-    ...closedAt === void 0 ? {} : { closedAt }
+    ...closedAt === void 0 ? {} : { closedAt },
+    ...subCount === 0 ? {} : { subCount }
   };
 }
 function buildEpic(node2, ref) {
@@ -21636,7 +21734,9 @@ function pruneSnapshot(snapshot, refs, now) {
   const wanted = new Set(refs.map(refKey));
   const issues = Object.entries(snapshot.issues).filter(([key, r]) => wanted.has(key) || now - r.resolvedAt < RETAIN_MS);
   const epicKeys = new Set(issues.flatMap(([key, r]) => [...r.epic ? [refKey(r.epic)] : [], ...r.isEpic ? [key] : []]));
-  const epics = Object.entries(snapshot.epics).filter(([key]) => epicKeys.has(key));
+  const roots = Object.entries(snapshot.epics).filter(([key]) => epicKeys.has(key)).map(([, entry]) => entry.ref);
+  const reachable = /* @__PURE__ */ new Set([...epicKeys, ...descendantEpics(snapshot, roots).map(refKey)]);
+  const epics = Object.entries(snapshot.epics).filter(([key]) => reachable.has(key));
   return { ...snapshot, issues: Object.fromEntries(issues), epics: Object.fromEntries(epics) };
 }
 
@@ -21951,7 +22051,7 @@ function inWindow(line, now) {
   return Math.abs(now - line.ts) < BUDGET_WINDOW_MS;
 }
 function total(lines) {
-  return lines.reduce((sum, line) => sum + line.points, 0);
+  return lines.reduce((sum2, line) => sum2 + line.points, 0);
 }
 function spentIn(lines, now) {
   return total(lines.filter((line) => inWindow(line, now)));
@@ -22245,10 +22345,22 @@ async function fetchGroup(run4, group2, ctx) {
   }
   return current;
 }
+function dueBelow(run4, fetched, done) {
+  const below = fetched.flatMap((ref) => {
+    const entry = run4.snapshot.epics[refKey(ref)];
+    return entry ? subEpicRefs(entry) : [];
+  }).filter((ref) => !done.has(refKey(ref)));
+  const unique3 = [...new Map(below.map((ref) => [refKey(ref), ref])).values()];
+  return run4.paced ? unfetchedEpics(unique3, run4.snapshot) : needsFetch(run4.snapshot, unique3, run4.now);
+}
 async function runPhaseB(run4, refs, ctx) {
   let current = run4;
-  for (const group2 of groupByRepo(toFetch(run4, refs))) {
-    current = await fetchGroup(current, group2, ctx);
+  const done = /* @__PURE__ */ new Set();
+  let targets = toFetch(run4, refs);
+  for (let depth = 0; targets.length > 0 && depth <= MAX_TREE_DEPTH; depth += 1) {
+    for (const group2 of groupByRepo(targets)) current = await fetchGroup(current, group2, ctx);
+    targets.forEach((ref) => done.add(refKey(ref)));
+    targets = dueBelow(current, targets, done);
   }
   return current;
 }
@@ -22342,7 +22454,7 @@ function bar(percent) {
   return `${"\u2593".repeat(filled)}${"\u2591".repeat(BAR_CELLS - filled)}`;
 }
 function fraction(epic) {
-  const total2 = Object.values(epic.counts).reduce((sum, n) => sum + n, 0);
+  const total2 = Object.values(epic.counts).reduce((sum2, n) => sum2 + n, 0);
   return `${epic.counts.done}/${total2 - epic.counts.dropped}${epic.truncated ? "+" : ""}`;
 }
 function fit(variants, width) {
@@ -22379,27 +22491,26 @@ function renderStatusLine(view, options = {}) {
 }
 
 // packages/core/src/schemas/json-v1.ts
-var JsonChildSchema = external_exports.object({
-  number: IssueNumberSchema.nullable(),
-  // What to call it: `#12`, or `PROJ-12` on Jira; null for a plain checklist line.
-  key: external_exports.string().nullable(),
-  title: external_exports.string(),
-  url: external_exports.string().nullable(),
-  status: StatusSchema,
-  sessionCount: external_exports.number().int().nonnegative(),
-  // The live sessions bound to this child, most recent binding first.
-  // sessionCount is their length, kept so a reader of only the count need
-  // not change.
-  sessionIds: external_exports.array(external_exports.string()).readonly(),
-  // Who it is assigned to (logins, up to three) and how many open pull requests will close it.
-  assignees: external_exports.array(external_exports.string()).readonly(),
-  openPullRequests: external_exports.number().int().nonnegative(),
-  // Active session time on this item, in seconds, with when and in which
-  // session it was last worked on (null: never).
-  activeSeconds: external_exports.number().int().nonnegative(),
-  lastActivityAt: external_exports.iso.datetime().nullable(),
-  lastSessionId: external_exports.string().nullable()
-}).readonly();
+var JsonChildSchema = external_exports.lazy(
+  () => external_exports.object({
+    number: IssueNumberSchema.nullable(),
+    key: external_exports.string().nullable(),
+    title: external_exports.string(),
+    url: external_exports.string().nullable(),
+    status: StatusSchema,
+    subCount: external_exports.number().int().nonnegative(),
+    sessionCount: external_exports.number().int().nonnegative(),
+    sessionIds: external_exports.array(external_exports.string()).readonly(),
+    assignees: external_exports.array(external_exports.string()).readonly(),
+    openPullRequests: external_exports.number().int().nonnegative(),
+    activeSeconds: external_exports.number().int().nonnegative(),
+    lastActivityAt: external_exports.iso.datetime().nullable(),
+    lastSessionId: external_exports.string().nullable(),
+    counts: StatusCountsSchema.nullable(),
+    percent: external_exports.number().int().min(0).max(100).nullable(),
+    children: external_exports.array(JsonChildSchema).readonly()
+  }).readonly()
+);
 var JsonEpicSchema = external_exports.object({
   number: IssueNumberSchema,
   // What to call it: `#1`, or `PROJ-1` on Jira.
@@ -22474,6 +22585,63 @@ function mergeStatusLine(existingText, desired) {
 ${diffLine("+", desired)}` };
 }
 
+// packages/core/src/view-tree.ts
+function rolledStatus(own2, leaves) {
+  if (own2 === "done" || own2 === "dropped") return own2;
+  if (leaves.every((leaf) => leaf.status === "todo")) return own2;
+  return own2 === "in_review" ? "in_review" : "in_progress";
+}
+function sum(timeRefs, iso3) {
+  const present = timeRefs.filter((entry) => entry !== void 0);
+  const latest2 = present.reduce((best, entry) => best === void 0 || entry.lastTs > best.lastTs ? entry : best, void 0);
+  return {
+    activeSeconds: Math.floor(present.reduce((total2, entry) => total2 + entry.ms, 0) / 1e3),
+    lastActivityAt: latest2 ? iso3(latest2.lastTs) : null,
+    lastSessionId: latest2?.lastSession ?? null
+  };
+}
+function toJson(child, below, context) {
+  const { input: input2 } = context;
+  const all = [...new Set(context.keys)];
+  const sessionIds = input2.bound.filter((session) => all.some((key) => session.keys.has(key))).map((session) => session.sessionId);
+  const leaves = below.flatMap((node2) => node2.leaves);
+  const assignees = [.../* @__PURE__ */ new Set([...child.assignees ?? [], ...leaves.flatMap((leaf) => leaf.assignees ?? [])])].slice(0, 5);
+  const counts = below.length === 0 ? null : countStatuses(leaves);
+  const shown2 = counts === null ? null : Math.floor(counts.done * 100 / Math.max(1, leaves.length - counts.dropped));
+  return {
+    number: child.number,
+    key: child.key ?? (child.number === null ? null : `#${child.number}`),
+    title: child.title,
+    url: child.url,
+    status: below.length === 0 ? child.status : rolledStatus(child.status, leaves),
+    subCount: child.subCount ?? 0,
+    sessionCount: sessionIds.length,
+    sessionIds,
+    assignees,
+    openPullRequests: (child.openPrs ?? 0) + below.reduce((total2, node2) => total2 + node2.json.openPullRequests, 0),
+    ...sum(all.map((key) => input2.time?.refs[key]), input2.iso),
+    counts,
+    percent: shown2,
+    children: below.map((node2) => node2.json)
+  };
+}
+function build(child, entry, context) {
+  const { input: input2, trail, walk } = context;
+  walk.nodes += 1;
+  const ref = childRefOf(child, entry.ref);
+  const key = ref === void 0 ? void 0 : refKey(ref);
+  const sub = key === void 0 || trail.has(key) || trail.size > MAX_TREE_DEPTH || walk.nodes >= MAX_TREE_NODES || child.status === "dropped" ? void 0 : input2.snapshot?.epics[key];
+  const below = sub === void 0 || key === void 0 ? [] : sub.children.map((inner) => build(inner, sub, { input: input2, trail: /* @__PURE__ */ new Set([...trail, key]), walk }));
+  const keys = [...key === void 0 ? [] : [key], ...below.flatMap((node2) => node2.keys)];
+  const json2 = toJson(child, below, { keys, input: input2 });
+  return { json: json2, leaves: below.length === 0 ? [child] : below.flatMap((node2) => node2.leaves), keys };
+}
+function buildChildren(entry, input2) {
+  const walk = { nodes: 0 };
+  const trail = /* @__PURE__ */ new Set([refKey(entry.ref)]);
+  return entry.children.map((child) => build(child, entry, { input: input2, trail, walk }));
+}
+
 // packages/core/src/view.ts
 var MAX_DATE_MS = 864e13;
 function iso(ms) {
@@ -22526,53 +22694,36 @@ function stateOf(scoped) {
   if (error62 === "unsupported") return "unsupported";
   return error62 ? "error" : "loading";
 }
-function childKey(child, epic) {
-  if (kindOf(epic) === "jira") {
-    const parts = child.key === void 0 ? null : JIRA_KEY.exec(child.key);
-    const own3 = parts ? makeJiraRef({ host: epic.host, project: parts[1] ?? "", number: Number(parts[2]) }) : void 0;
-    return own3 ? refKey(own3) : void 0;
-  }
-  const target = child.url === null ? void 0 : parseIssueTarget(child.url);
-  const own2 = target?.repo;
-  const ref = target && own2 ? makeRef({ host: own2.host ?? epic.host, owner: own2.owner, repo: own2.repo, number: target.number }) : child.number === null ? void 0 : makeRef({ ...epic, number: child.number });
-  return ref ? refKey(ref) : void 0;
-}
-function childSessionIds(key, bound) {
-  return key === void 0 ? [] : bound.filter((session) => session.keys.has(key)).map((session) => session.sessionId);
-}
 function activityOf(entries) {
   const present = entries.filter((entry) => entry !== void 0);
   const latest2 = present.reduce((best, entry) => best === void 0 || entry.lastTs > best.lastTs ? entry : best, void 0);
   return {
-    activeSeconds: Math.floor(present.reduce((sum, entry) => sum + entry.ms, 0) / 1e3),
+    activeSeconds: Math.floor(present.reduce((sum2, entry) => sum2 + entry.ms, 0) / 1e3),
     lastActivityAt: latest2 ? iso(latest2.lastTs) : null,
     lastSessionId: latest2?.lastSession ?? null
   };
 }
-function epicActivity(entry, time3) {
-  const keys = new Set(entry.children.flatMap((child) => childKey(child, entry.ref) ?? []));
-  return activityOf([time3?.refs[refKey(entry.ref)], ...[...keys].map((key) => time3?.refs[key])]);
+function epicActivity(entry, keys, time3) {
+  return activityOf([time3?.refs[refKey(entry.ref)], ...[...new Set(keys)].map((key) => time3?.refs[key])]);
 }
 var WEEK_MS = 7 * 24 * 60 * 60 * 1e3;
-function epicDetails(entry, now) {
-  const assignees = [...new Set(entry.children.flatMap((child) => child.assignees ?? []))].slice(0, 5);
+function epicDetails(entry, leaves, now) {
+  const assignees = [...new Set(leaves.flatMap((child) => child.assignees ?? []))].slice(0, 5);
   return {
     summary: entry.summary ?? null,
     createdAt: entry.createdAt === void 0 ? null : iso(entry.createdAt),
-    doneLast7Days: entry.children.filter((child) => child.status === "done" && child.closedAt !== void 0 && now - child.closedAt >= 0 && now - child.closedAt <= WEEK_MS).length,
-    openPullRequests: entry.children.reduce((sum, child) => sum + (child.openPrs ?? 0), 0),
+    doneLast7Days: leaves.filter((child) => child.status === "done" && child.closedAt !== void 0 && now - child.closedAt >= 0 && now - child.closedAt <= WEEK_MS).length,
+    openPullRequests: leaves.reduce((sum2, child) => sum2 + (child.openPrs ?? 0), 0),
     assignees
   };
 }
-function jsonEpic(entry, bound, input2) {
-  const counts = countStatuses(entry.children);
-  const points = pointsByStatus(entry.children, input2.progress);
-  const children = entry.children.map((child) => {
-    const sessionIds = childSessionIds(childKey(child, entry.ref), bound);
-    const key = childKey(child, entry.ref);
-    const time3 = key === void 0 ? void 0 : input2.time?.refs[key];
-    return { number: child.number, key: child.key ?? (child.number === null ? null : `#${child.number}`), title: child.title, url: child.url, status: child.status, sessionCount: sessionIds.length, sessionIds, assignees: [...child.assignees ?? []], openPullRequests: child.openPrs ?? 0, ...activityOf([time3]) };
-  });
+function jsonEpic(entry, input2) {
+  const built = buildChildren(entry, { snapshot: input2.snapshot, bound: input2.bound, time: input2.time, iso });
+  const leaves = built.flatMap((node2) => node2.leaves);
+  const keys = built.flatMap((node2) => node2.keys);
+  const children = built.map((node2) => node2.json);
+  const counts = countStatuses(leaves);
+  const points = pointsByStatus(leaves, input2.progress);
   const epicSessionIds = [...new Set(children.flatMap((child) => child.sessionIds))];
   return {
     number: entry.ref.number,
@@ -22584,8 +22735,8 @@ function jsonEpic(entry, bound, input2) {
     percent: percentDone(points),
     weightedPercent: weightedPercentDone(points, input2.progress),
     sessionIds: epicSessionIds,
-    ...epicActivity(entry, input2.time),
-    ...epicDetails(entry, input2.now),
+    ...epicActivity(entry, keys, input2.time),
+    ...epicDetails(entry, leaves, input2.now),
     children,
     fetchedAt: iso(entry.fetchedAt),
     stale: isStale(entry, input2.now),
@@ -22606,8 +22757,108 @@ function buildView(input2) {
     liveSessions: live.length,
     pending: pendingCount(scoped),
     snapshot: { state: stateOf(scoped), fetchedAt: snapshot ? iso(snapshot.updatedAt) : null, error: errorOf(scoped) },
-    epics: entries.map((entry) => jsonEpic(entry, bound, { now: input2.now, progress: input2.progress ?? DEFAULT_PROGRESS, time: input2.time }))
+    epics: entries.map((entry) => jsonEpic(entry, { now: input2.now, progress: input2.progress ?? DEFAULT_PROGRESS, time: input2.time, snapshot, bound }))
   };
+}
+
+// packages/core/src/limits.ts
+var DEFAULT_WARN_AT = 90;
+var MIN_WARN_AT = 50;
+var WindowSchema = external_exports.looseObject({
+  used_percentage: external_exports.number().min(0).max(1e3),
+  resets_at: external_exports.number().nonnegative().optional().catch(void 0)
+}).optional().catch(void 0);
+var PayloadLimitsSchema = external_exports.looseObject({ five_hour: WindowSchema, seven_day: WindowSchema }).optional().catch(void 0);
+function windowOf(raw) {
+  if (raw === void 0) return null;
+  const seconds = raw.resets_at;
+  return { pct: Math.min(100, raw.used_percentage), resetsAt: seconds === void 0 ? null : Math.round(seconds * 1e3) };
+}
+function readingFrom(raw, now) {
+  const parsed = PayloadLimitsSchema.parse(raw);
+  const fiveHour = windowOf(parsed?.five_hour);
+  const sevenDay = windowOf(parsed?.seven_day);
+  return fiveHour === null && sevenDay === null ? void 0 : { v: 1, at: now, fiveHour, sevenDay };
+}
+function warnAt(env) {
+  const value = Number(env["EPIC_PULSE_LIMIT_WARN"]);
+  return Number.isInteger(value) && value >= MIN_WARN_AT && value <= 100 ? value : DEFAULT_WARN_AT;
+}
+function bandOf(pct, threshold) {
+  return [99, 95, threshold].filter((step) => step >= threshold).sort((a, b) => b - a).find((step) => pct >= step) ?? threshold;
+}
+function limitWarning(reading, threshold, now) {
+  const windows = [["5h", reading.fiveHour], ["week", reading.sevenDay]];
+  const open4 = windows.flatMap(([window, value]) => value && (value.resetsAt === null || value.resetsAt > now) && value.pct >= threshold ? [{ window, ...value }] : []);
+  const worst = open4.sort((a, b) => b.pct - a.pct)[0];
+  return worst && { window: worst.window, pct: Math.floor(worst.pct), resetsAt: worst.resetsAt, band: bandOf(worst.pct, threshold) };
+}
+function resetText(resetsAt, now) {
+  if (resetsAt === null) return "";
+  const minutes = Math.max(1, Math.ceil((resetsAt - now) / 6e4));
+  if (minutes < 60) return `resets in ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  return hours < 48 ? `resets in ${hours}h${String(minutes % 60).padStart(2, "0")}m` : `resets in ${Math.floor(hours / 24)} days`;
+}
+function warningVariants(warning, now) {
+  const label = warning.window === "5h" ? "5h limit" : "weekly limit";
+  const resets = resetText(warning.resetsAt, now);
+  return [
+    `\u26A0 ${warning.pct}% ${label}${resets ? `, ${resets}` : ""} \xB7 /compact`,
+    `\u26A0 ${warning.pct}% ${label} \xB7 /compact`,
+    `\u26A0 ${warning.pct}%`
+  ];
+}
+function agentNote(warning, now) {
+  const label = warning.window === "5h" ? "the 5-hour usage limit" : "the weekly usage limit";
+  const resets = resetText(warning.resetsAt, now);
+  return [
+    `epic-pulse: this Claude account is at ${warning.pct}% of ${label}${resets ? ` (${resets})` : ""}, shared by every session.`,
+    "Wrap up: finish the step you are on, write a short handoff of where things stand,",
+    "and do not start new subagents, workflows or long-running work.",
+    `Tell the user it is at ${warning.pct}% and suggest /compact when this step is done.`
+  ].join(" ");
+}
+
+// packages/core/src/limits-store.ts
+import { readFile as readFile7, stat as stat8 } from "node:fs/promises";
+import { join as join7 } from "node:path";
+var LIMITS_FILE = "limits.json";
+var NOTIFIED_FILE = "limits-notified.json";
+var READING_FRESH_MS = 10 * 60 * 1e3;
+var MAX_BYTES = 64 * 1024;
+var MAX_SESSIONS = 200;
+var WindowSchema2 = external_exports.object({ pct: external_exports.number().min(0).max(100), resetsAt: external_exports.number().int().nonnegative().nullable() }).nullable();
+var ReadingSchema = external_exports.object({ v: external_exports.literal(1), at: external_exports.number().int().nonnegative(), fiveHour: WindowSchema2, sevenDay: WindowSchema2 });
+var NoticeSchema = external_exports.object({ band: external_exports.number().int(), resetsAt: external_exports.number().int().nullable(), at: external_exports.number().int().nonnegative() });
+var NotifiedSchema = external_exports.object({ v: external_exports.literal(1), sessions: external_exports.record(external_exports.string(), NoticeSchema) });
+async function readJson(file2) {
+  try {
+    return (await stat8(file2)).size > MAX_BYTES ? void 0 : parseJson(await readFile7(file2, "utf8"));
+  } catch {
+    return void 0;
+  }
+}
+async function writeLimits(cacheDir, reading) {
+  await atomicWriteFile(join7(cacheDir, LIMITS_FILE), `${JSON.stringify(ReadingSchema.parse(reading))}
+`);
+}
+async function readLimits(cacheDir, now) {
+  const parsed = ReadingSchema.safeParse(await readJson(join7(cacheDir, LIMITS_FILE)));
+  return parsed.success && now - parsed.data.at <= READING_FRESH_MS && parsed.data.at <= now + 6e4 ? parsed.data : void 0;
+}
+async function claimNotice(cacheDir, sessionId, warning) {
+  if (!SessionIdSchema.safeParse(sessionId).success) return false;
+  const file2 = join7(cacheDir, NOTIFIED_FILE);
+  const parsed = NotifiedSchema.safeParse(await readJson(file2));
+  const sessions = parsed.success ? parsed.data.sessions : {};
+  const told = sessions[sessionId];
+  if (told && told.resetsAt === warning.resetsAt && told.band >= warning.band) return false;
+  const next = { ...sessions, [sessionId]: { band: warning.band, resetsAt: warning.resetsAt, at: warning.now } };
+  const kept = Object.entries(next).sort((a, b) => b[1].at - a[1].at).slice(0, MAX_SESSIONS);
+  await atomicWriteFile(file2, `${JSON.stringify({ v: 1, sessions: Object.fromEntries(kept) })}
+`);
+  return true;
 }
 
 // packages/cli/src/args.ts
@@ -22632,15 +22883,15 @@ function parseCommandArgs(args, spec) {
 }
 
 // packages/cli/src/doctor-checks.ts
-import { readFile as readFile9 } from "node:fs/promises";
+import { readFile as readFile10 } from "node:fs/promises";
 
 // packages/cli/src/activity.ts
-import { readdir as readdir3, stat as stat8 } from "node:fs/promises";
-import { join as join7 } from "node:path";
+import { readdir as readdir3, stat as stat9 } from "node:fs/promises";
+import { join as join8 } from "node:path";
 async function lastHookActivity(paths) {
   const names = await readdir3(paths.sessionsDir).catch(() => []);
   const times = await Promise.all(
-    names.filter((name) => name.endsWith(".jsonl")).map((name) => stat8(join7(paths.sessionsDir, name)).then((info) => info.mtimeMs, () => 0))
+    names.filter((name) => name.endsWith(".jsonl")).map((name) => stat9(join8(paths.sessionsDir, name)).then((info) => info.mtimeMs, () => 0))
   );
   const newest = times.reduce((latest2, time3) => Math.max(latest2, time3), 0);
   return newest > 0 ? newest : void 0;
@@ -22648,16 +22899,16 @@ async function lastHookActivity(paths) {
 
 // packages/cli/src/claude-home.ts
 import { homedir as homedir2 } from "node:os";
-import { join as join8, resolve as resolve7 } from "node:path";
+import { join as join9, resolve as resolve7 } from "node:path";
 function claudeConfigDir(env) {
   const override = env["CLAUDE_CONFIG_DIR"]?.trim();
-  return override ? resolve7(override) : join8(homedir2(), ".claude");
+  return override ? resolve7(override) : join9(homedir2(), ".claude");
 }
 function runtimeFile(env) {
-  return join8(claudeConfigDir(env), "epic-pulse", "runtime.mjs");
+  return join9(claudeConfigDir(env), "epic-pulse", "runtime.mjs");
 }
 function settingsFile(scope, env, cwd) {
-  return scope === "user" ? join8(claudeConfigDir(env), "settings.json") : join8(cwd, ".claude", "settings.json");
+  return scope === "user" ? join9(claudeConfigDir(env), "settings.json") : join9(cwd, ".claude", "settings.json");
 }
 var SHARED_SCRIPT = [
   "p=require('path')",
@@ -22672,8 +22923,8 @@ function desiredStatusLine(scope, env) {
 }
 
 // packages/cli/src/hook-log.ts
-import { appendFile as appendFile2, readFile as readFile7, rename as rename2, stat as stat9 } from "node:fs/promises";
-import { join as join9 } from "node:path";
+import { appendFile as appendFile2, readFile as readFile8, rename as rename2, stat as stat10 } from "node:fs/promises";
+import { join as join10 } from "node:path";
 var HOOK_LOG = "hook.log";
 var MAX_LOG_BYTES = 64 * 1024;
 var HOOK_ERROR_CODES = [
@@ -22688,15 +22939,15 @@ var HOOK_ERROR_CODES = [
 ];
 var LogLineSchema = external_exports.object({ ts: external_exports.number().int().nonnegative(), code: external_exports.enum(HOOK_ERROR_CODES) });
 async function logHookError(dir, code, now) {
-  const file2 = join9(dir, HOOK_LOG);
-  const size = await stat9(file2).then((info) => info.size, () => 0);
+  const file2 = join10(dir, HOOK_LOG);
+  const size = await stat10(file2).then((info) => info.size, () => 0);
   if (size >= MAX_LOG_BYTES) await rename2(file2, `${file2}.1`).catch(() => void 0);
   await ensureDir(dir);
   await appendFile2(file2, `${JSON.stringify({ ts: now, code })}
 `, { mode: 384 });
 }
 async function lastHookError(dir) {
-  const text2 = await readFile7(join9(dir, HOOK_LOG), "utf8").catch(() => "");
+  const text2 = await readFile8(join10(dir, HOOK_LOG), "utf8").catch(() => "");
   const lines = text2.split("\n").filter(Boolean).reverse();
   for (const line of lines) {
     const parsed = LogLineSchema.safeParse(parseJson(line));
@@ -22706,20 +22957,20 @@ async function lastHookError(dir) {
 }
 
 // packages/cli/src/runtime.ts
-import { readFile as readFile8 } from "node:fs/promises";
+import { readFile as readFile9 } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 function bundlePath() {
   return fileURLToPath(import.meta.url);
 }
 async function runtimeState(env) {
-  const [own2, copy] = await Promise.all([readFile8(bundlePath()), readFile8(runtimeFile(env)).catch(() => void 0)]);
+  const [own2, copy] = await Promise.all([readFile9(bundlePath()), readFile9(runtimeFile(env)).catch(() => void 0)]);
   if (copy === void 0) return "missing";
   return copy.equals(own2) ? "current" : "outdated";
 }
 async function syncRuntime(env) {
   try {
     const target = runtimeFile(env);
-    const [own2, copy] = await Promise.all([readFile8(bundlePath()), readFile8(target).catch(() => void 0)]);
+    const [own2, copy] = await Promise.all([readFile9(bundlePath()), readFile9(target).catch(() => void 0)]);
     if (copy?.equals(own2)) return ok("unchanged");
     await atomicWriteFile(target, own2.toString("utf8"));
     return ok("copied");
@@ -22783,7 +23034,7 @@ async function registryChecks(cwd, env, now) {
 }
 async function statusLineCheck(scope, env, cwd) {
   const file2 = settingsFile(scope, env, cwd);
-  const text2 = await readFile9(file2, "utf8").catch((error62) => errnoOf(error62) === "ENOENT" ? void 0 : null);
+  const text2 = await readFile10(file2, "utf8").catch((error62) => errnoOf(error62) === "ENOENT" ? void 0 : null);
   const state = text2 === null ? "the file can not be read" : STATUS_LINE_STATES[mergeStatusLine(text2, desiredStatusLine(scope, env)).action];
   return [`statusLine (${scope})`, `${state}: ${file2}`];
 }
@@ -22869,21 +23120,38 @@ async function startErrors(payload, env) {
   if (!payload.ok || payload.value.hook_event_name !== "SessionStart") return [];
   return (await syncRuntime(env)).ok ? [] : ["runtime_copy_failed"];
 }
+async function limitNote(payload, env) {
+  if (!payload.ok || payload.value.hook_event_name !== "UserPromptSubmit") return void 0;
+  try {
+    const cache = userCacheDir(env);
+    const now = Date.now();
+    const reading = cache === void 0 ? void 0 : await readLimits(cache, now);
+    const warning = reading && limitWarning(reading, warnAt(env), now);
+    if (!cache || !warning || !await claimNotice(cache, payload.value.session_id, { ...warning, now })) return void 0;
+    return agentNote(warning, now);
+  } catch {
+    return void 0;
+  }
+}
 async function handle(env) {
   const payload = parsePayload(await readStdin(MAX_PAYLOAD_BYTES));
+  const note = await limitNote(payload, env);
   const errors = [...await startErrors(payload, env)];
   const cwd = payload.ok ? payload.value.cwd ?? payload.value.workspace?.current_dir : void 0;
   const dir = await registryDirFor(cwd ?? process.cwd(), env);
-  if (dir === void 0) return;
+  if (dir === void 0) return note;
   const recorded = payload.ok ? await record2(dir, payload.value) : payload;
   if (!recorded.ok) errors.push(recorded.error);
   for (const code of errors) await logHookError(dir, code, Date.now());
+  return note;
 }
 async function runHook(env) {
   const deadline = setTimeout(() => process.exit(0), DEADLINE_MS);
   deadline.unref();
   try {
-    await handle(env);
+    const note = await handle(env);
+    if (note !== void 0) process.stdout.write(`${JSON.stringify({ hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: note } })}
+`);
   } catch {
   } finally {
     clearTimeout(deadline);
@@ -22892,10 +23160,10 @@ async function runHook(env) {
 }
 
 // packages/cli/src/install.ts
-import { readFile as readFile10, writeFile as writeFile2 } from "node:fs/promises";
+import { readFile as readFile11, writeFile as writeFile2 } from "node:fs/promises";
 async function readSettings(file2) {
   try {
-    return ok(await readFile10(file2));
+    return ok(await readFile11(file2));
   } catch (error62) {
     return errnoOf(error62) === "ENOENT" ? ok(void 0) : fail("io");
   }
@@ -22980,17 +23248,17 @@ async function runJson(args, env) {
 }
 
 // packages/cli/src/refresh-attempt.ts
-import { readFile as readFile11, stat as stat10 } from "node:fs/promises";
-import { join as join10 } from "node:path";
+import { readFile as readFile12, stat as stat11 } from "node:fs/promises";
+import { join as join11 } from "node:path";
 var ATTEMPT_FILE = "refresh-attempt.json";
 var RETRY_AFTER_MS = 6e4;
 var MAX_ATTEMPT_BYTES = 1024;
 var AttemptSchema = external_exports.object({ v: external_exports.literal(1), at: external_exports.number().int().nonnegative(), code: ErrorCodeSchema.nullable() }).readonly();
 async function readAttempt(dir) {
-  const file2 = join10(dir, ATTEMPT_FILE);
+  const file2 = join11(dir, ATTEMPT_FILE);
   try {
-    if ((await stat10(file2)).size > MAX_ATTEMPT_BYTES) return void 0;
-    const parsed = AttemptSchema.safeParse(parseJson(await readFile11(file2, "utf8")));
+    if ((await stat11(file2)).size > MAX_ATTEMPT_BYTES) return void 0;
+    const parsed = AttemptSchema.safeParse(parseJson(await readFile12(file2, "utf8")));
     return parsed.success ? parsed.data : void 0;
   } catch {
     return void 0;
@@ -22998,7 +23266,7 @@ async function readAttempt(dir) {
 }
 async function recordAttempt(dir, at, code) {
   const attempt = { v: 1, at, code };
-  await atomicWriteFile(join10(dir, ATTEMPT_FILE), `${JSON.stringify(AttemptSchema.parse(attempt))}
+  await atomicWriteFile(join11(dir, ATTEMPT_FILE), `${JSON.stringify(AttemptSchema.parse(attempt))}
 `);
 }
 function retryingLater(attempt, now) {
@@ -23077,15 +23345,32 @@ var BROKEN = {
 };
 async function readOrigin() {
   const parsed = HookPayloadSchema.safeParse(parseJson((await readStdin(MAX_PAYLOAD_BYTES2)).text));
-  if (!parsed.success) return { dir: process.cwd(), sessionId: void 0 };
-  const { workspace, cwd, session_id: sessionId } = parsed.data;
-  return { dir: workspace?.current_dir ?? cwd ?? process.cwd(), sessionId };
+  if (!parsed.success) return { dir: process.cwd(), sessionId: void 0, limits: void 0 };
+  const { workspace, cwd, session_id: sessionId, rate_limits: limits } = parsed.data;
+  return { dir: workspace?.current_dir ?? cwd ?? process.cwd(), sessionId, limits };
+}
+var LINE_WIDTH = 80;
+var WARNING_MAX = 44;
+function paint(text2, env) {
+  return env["NO_COLOR"] ? text2 : `\x1B[1;31m${text2}\x1B[0m`;
+}
+async function warned(origin, env, now) {
+  const reading = readingFrom(origin.limits, now);
+  const cache = userCacheDir(env);
+  if (reading && cache) await writeLimits(cache, reading).catch(() => void 0);
+  const warning = reading && limitWarning(reading, warnAt(env), now);
+  if (!warning) return (line) => line(LINE_WIDTH);
+  const variants = warningVariants(warning, now);
+  const prefix = variants.find((text2) => text2.length <= WARNING_MAX) ?? variants.at(-1) ?? "";
+  return (line) => `${paint(prefix, env)} \xB7 ${line(Math.max(8, LINE_WIDTH - prefix.length - 3))}`;
 }
 async function render(env, now) {
   const origin = await readOrigin();
+  const withWarning = await warned(origin, env, now);
   const registry2 = await registryDirFor(origin.dir, env);
   if (registry2 === void 0) {
-    return { line: renderStatusLine(buildView({ snapshot: { status: "missing" }, sessions: [], pins: [], now })), refresh: void 0 };
+    const empty = buildView({ snapshot: { status: "missing" }, sessions: [], pins: [], now });
+    return { line: withWarning((width) => renderStatusLine(empty, { width })), refresh: void 0 };
   }
   const paths = pathsFor(registry2);
   const [session, snapshot, read, attempt, progress, jira] = await Promise.all([
@@ -23099,7 +23384,7 @@ async function render(env, now) {
   const pins = pinsOf(read);
   const view = buildView({ snapshot, sessions: session ? [session] : [], pins, now, scope: { session }, progress });
   const due = session !== void 0 && refreshDue({ snapshot, session, pins, now, attempt });
-  return { line: renderStatusLine(view), refresh: due ? { dir: registry2, session: session.id, jira } : void 0 };
+  return { line: withWarning((width) => renderStatusLine(view, { width })), refresh: due ? { dir: registry2, session: session.id, jira } : void 0 };
 }
 async function runStatusline(env) {
   const rendered = await render(env, Date.now()).catch(() => ({ line: renderStatusLine(BROKEN), refresh: void 0 }));
