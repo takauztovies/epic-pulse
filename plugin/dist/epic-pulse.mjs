@@ -20680,7 +20680,7 @@ function linkedOpenPrs(node2, repo) {
     return source && bodyClosesIssue(source.body ?? "", node2.number, repo) ? [source] : [];
   });
   const byNumber = new Map([...linked, ...crossed].map((pr) => [pr.number, pr]));
-  return [...byNumber.values()].filter((pr) => isOpenSameRepo(pr, repo));
+  return [...byNumber.values()].filter((pr) => pr.isCrossRepository === false && isOpenSameRepo(pr, repo));
 }
 var MAX_MENTIONS = 3;
 var MENTION = /(?:^|[^\w/#])#(\d+)(?!\d)|\/issues\/(\d+)(?!\d)/g;
@@ -21232,7 +21232,7 @@ var EPIC_FRAGMENT = `fragment EpicFields on Issue {
       subIssues(first: 1) { totalCount }
       labels(first: 20) { nodes { name } }
       closedByPullRequestsReferences(first: 5) {
-        nodes { number state isDraft url repository { nameWithOwner } }
+        nodes { number state isDraft url isCrossRepository repository { nameWithOwner } }
       }
       timelineItems(last: 10, itemTypes: [CROSS_REFERENCED_EVENT]) {
         nodes {

@@ -1,15 +1,15 @@
 {
-  "recordedAt": "2026-10-11T12:40:31.065Z",
+  "recordedAt": "2026-10-11T18:03:28.057Z",
   "note": "program epic whose sub-issue #44 has sub-issues of its own",
   "status": 200,
-  "remaining": 4950,
+  "remaining": 4971,
   "retryAfter": false,
   "body": {
     "data": {
       "rateLimit": {
         "cost": 5,
-        "remaining": 4950,
-        "resetAt": "2026-10-11T13:02:45Z"
+        "remaining": 4971,
+        "resetAt": "2026-10-11T19:03:13Z"
       },
       "repository": {
         "e43": {
@@ -167,22 +167,22 @@
         "openPrs": {
           "nodes": [
             {
-              "number": 56,
+              "number": 10,
               "state": "OPEN",
               "isDraft": false,
-              "url": "https://github.com/takauztovies/epic-pulse/pull/56",
-              "headRefName": "release/v0.3.6",
+              "url": "https://github.com/takauztovies/epic-pulse/pull/10",
+              "headRefName": "demo/ready-pr-fixture",
               "isCrossRepository": false,
               "repository": {
                 "nameWithOwner": "takauztovies/epic-pulse"
               }
             },
             {
-              "number": 51,
+              "number": 9,
               "state": "OPEN",
-              "isDraft": false,
-              "url": "https://github.com/takauztovies/epic-pulse/pull/51",
-              "headRefName": "46-demo-branch-link",
+              "isDraft": true,
+              "url": "https://github.com/takauztovies/epic-pulse/pull/9",
+              "headRefName": "demo/draft-pr-fixture",
               "isCrossRepository": false,
               "repository": {
                 "nameWithOwner": "takauztovies/epic-pulse"
@@ -194,6 +194,17 @@
               "isDraft": true,
               "url": "https://github.com/takauztovies/epic-pulse/pull/52",
               "headRefName": "demo-mention-fixture",
+              "isCrossRepository": false,
+              "repository": {
+                "nameWithOwner": "takauztovies/epic-pulse"
+              }
+            },
+            {
+              "number": 51,
+              "state": "OPEN",
+              "isDraft": false,
+              "url": "https://github.com/takauztovies/epic-pulse/pull/51",
+              "headRefName": "46-demo-branch-link",
               "isCrossRepository": false,
               "repository": {
                 "nameWithOwner": "takauztovies/epic-pulse"

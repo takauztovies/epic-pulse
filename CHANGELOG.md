@@ -5,6 +5,13 @@ Every notable change to epic-pulse is listed here. Versions follow
 
 ## Unreleased
 
+### Fixed
+
+- **A pull request from a fork no longer moves a sub-issue to In review.** A fork's PR reports the
+  repository as its own, so a "Fixes #N" body or GitHub's own closing link from one counted as the
+  issue's review. Every route now needs a branch in the repository itself, as branch-named and
+  mentioning PRs already did. An outside contributor's PR no longer shows its issue as In review.
+
 ## 0.3.6
 
 ### Added
