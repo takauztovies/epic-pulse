@@ -6,7 +6,7 @@ import type { TestContext } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
   addPin, appendRegistryLine, applyEpics, applyResolutions, emptySnapshot, makeRef, parsePhaseA, parsePhaseB, pathsFor,
-  writeSnapshot, type IssueRef, type RawResponse, type Snapshot,
+  refKey, writeSnapshot, type IssueRef, type RawResponse, type Snapshot,
 } from '@epic-pulse/core';
 import { z } from 'zod';
 import type { RepoTarget } from '../src/repos.js';
@@ -59,6 +59,22 @@ export function nestedSnapshot(now: number): Snapshot {
   return applyEpics(emptySnapshot(now), answers, now);
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// demoSnapshot with epic #1's done #2 closed a day before `now` and its todo #7
+// closed three days before: two done in the last 14 days, three still open.
+export function pacedSnapshot(now: number): Snapshot {
+  const base = demoSnapshot(now);
+  const key = refKey(demo(1));
+  const entry = base.epics[key]!;
+  const closedAt = new Map([[2, now - DAY_MS], [7, now - 3 * DAY_MS]]);
+  const children = entry.children.map((child) => {
+    const at = closedAt.get(child.number ?? 0);
+    return at === undefined ? child : { ...child, status: 'done' as const, closedAt: at };
+  });
+  return { ...base, epics: { ...base.epics, [key]: { ...entry, children } } };
+}
+
 export interface SessionSpec {
   readonly id: string;
   readonly binds: readonly IssueRef[];
@@ -97,4 +113,17 @@ export function filesUnder(dir: string): readonly string[] {
     const path = join(dir, entry.name);
     return entry.isDirectory() ? filesUnder(path) : [path];
   });
+}
+
+// Moves the machine to another time zone for the rest of the test, as often as it
+// is called, and puts back the zone it had once the test is over.
+export function zoneFor(t: TestContext): (zone: string) => void {
+  const before = process.env['TZ'];
+  t.after(() => {
+    if (before === undefined) delete process.env['TZ'];
+    else process.env['TZ'] = before;
+  });
+  return (zone) => {
+    process.env['TZ'] = zone;
+  };
 }

@@ -1,3 +1,4 @@
+import { etaOf } from './eta.js';
 import { displayKey, refKey } from './ref.js';
 import { activeBindings, isHookInactive, isLive, type Binding, type SessionState } from './registry.js';
 import type { ErrorCode, IssueRef, StateKind } from './schemas/common.js';
@@ -139,16 +140,18 @@ function epicActivity(entry: EpicEntry, keys: readonly string[], time: TimeFile 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 // What the hover says besides progress: the description's opening lines, how
-// old the epic is, how many items under it were finished this week, and who and
-// what is in flight. All of it was stored by the refresh; only the week is
-// worked out here, against the clock the view was built with. `leaves` is every
-// item that counts, from every level.
-function epicDetails(entry: EpicEntry, leaves: readonly Child[], now: number): Pick<JsonEpic, 'summary' | 'createdAt' | 'doneLast7Days' | 'openPullRequests' | 'assignees'> {
+// old the epic is, how many items under it were finished this week and when it
+// is on course to finish, and who and what is in flight. All of it was stored
+// by the refresh; only the week and the ETA are worked out here, against the
+// clock the view was built with. `leaves` is every item that counts, from every
+// level.
+function epicDetails(entry: EpicEntry, leaves: readonly Child[], now: number): Pick<JsonEpic, 'summary' | 'createdAt' | 'doneLast7Days' | 'eta' | 'openPullRequests' | 'assignees'> {
   const assignees = [...new Set(leaves.flatMap((child) => child.assignees ?? []))].slice(0, 5);
   return {
     summary: entry.summary ?? null,
     createdAt: entry.createdAt === undefined ? null : iso(entry.createdAt),
     doneLast7Days: leaves.filter((child) => child.status === 'done' && child.closedAt !== undefined && now - child.closedAt >= 0 && now - child.closedAt <= WEEK_MS).length,
+    eta: etaOf(leaves, now),
     openPullRequests: leaves.reduce((sum, child) => sum + (child.openPrs ?? 0), 0),
     assignees,
   };

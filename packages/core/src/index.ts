@@ -3,6 +3,7 @@ export * from './branch-pattern.js';
 export * from './canonical-path.js';
 export * from './checklist.js';
 export * from './config.js';
+export * from './eta.js';
 export * from './extract.js';
 export * from './extract-commands.js';
 export * from './extract-paths.js';

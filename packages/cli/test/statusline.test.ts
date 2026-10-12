@@ -29,8 +29,9 @@ async function boundSession(t: TestContext): Promise<Bound> {
   return { repo, box, paths: registryOf(repo) };
 }
 
+// NO_COLOR: the bar is coloured by default, and these tests read the plain text.
 async function statusLine(where: Pick<Bound, 'repo' | 'box'>, input = statusPayload(where.repo)): Promise<CliRun> {
-  const run = await runCli(['statusline'], { cwd: where.repo, env: cliEnv(where.box), input });
+  const run = await runCli(['statusline'], { cwd: where.repo, env: cliEnv(where.box, { NO_COLOR: '1' }), input });
   assert.deepEqual([run.code, run.stderr], [0, '']);
   return run;
 }
@@ -65,6 +66,27 @@ test('a fresh snapshot renders the session\'s epic from disk and starts no refre
   // A spawned refresh would prune the canary within this second; none may.
   await new Promise((resolve) => setTimeout(resolve, 1000));
   assert.equal(existsSync(canary), true);
+});
+
+// The bar's cells by status, as Claude Code draws them: Done green, In review
+// cyan, In progress yellow, the rest dim. Whatever NO_COLOR holds, an empty one
+// is not set (https://no-color.org).
+const ESC = String.fromCharCode(27);
+const run = (code: number, cells: string) => `${ESC}[${code}m${cells}${ESC}[0m`;
+const COLORED_LINE = `#1 ${run(32, '▓▓')}${run(36, '░░')}${run(33, '░░░░')}${run(2, '░░')} 20% 1/5 · rev 1 · wip 2`;
+
+test('the bar is coloured unless NO_COLOR is set, and then the line is the plain one', async (t) => {
+  const bound = await boundSession(t);
+  await writeSnapshot(bound.paths.snapshotFile, demoSnapshot(Date.now()));
+  const lineWith = async (noColor: string | undefined): Promise<string> => {
+    const env = cliEnv(bound.box, { NO_COLOR: noColor });
+    const result = await runCli(['statusline'], { cwd: bound.repo, env, input: statusPayload(bound.repo) });
+    assert.deepEqual([result.code, result.stderr], [0, '']);
+    return result.stdout;
+  };
+  assert.equal(await lineWith(undefined), `${COLORED_LINE}\n`);
+  assert.equal(await lineWith('1'), `${EPIC_LINE}\n`);
+  assert.equal(await lineWith(''), `${COLORED_LINE}\n`, 'an empty NO_COLOR is not set');
 });
 
 // weightedPercent (what the repository's progress config tunes) is in the JSON

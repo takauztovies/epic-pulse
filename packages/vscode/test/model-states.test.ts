@@ -7,7 +7,7 @@ import { activityLines, barText, detailLines, durationText, epicSessionsText, is
 import { statusBarOf } from '../src/status-model.js';
 import { childrenOf, treeOf, type TreeNode } from '../src/tree-model.js';
 import { modelOf, surface } from './model-helpers.js';
-import { demo, demoSnapshot, makeRegistry, nestedSnapshot, SESSION_A, tempDir } from './registry-helpers.js';
+import { demo, demoSnapshot, makeRegistry, nestedSnapshot, SESSION_A, tempDir, zoneFor } from './registry-helpers.js';
 
 // Every state, from real registry and snapshot files read through core's
 // buildView. Signed-out needs a real refresh and is in signed-out.test.ts.
@@ -154,13 +154,15 @@ test('the hover says what sessions spent and when one was last on it', () => {
   assert.deepEqual(activityLines(busy, now), ['Session time: 2 h 5 min', 'Last active 12 min ago (session 0f8e7c1a)']);
 });
 
-test('the epic hover gives its summary, what is in flight, who has it, how old it is and whether it moves', () => {
+test('the epic hover gives its summary, what is in flight, who has it, how old it is, whether it moves and its ETA', (t) => {
+  zoneFor(t)('Europe/Berlin');
   const now = Date.parse('2026-10-08T12:00:00.000Z');
-  const epic = { summary: 'Ship the import wizard.', createdAt: '2026-09-26T12:00:00.000Z', doneLast7Days: 3, openPullRequests: 2, assignees: ['ana', 'bo'] };
+  const epic = { summary: 'Ship the import wizard.', createdAt: '2026-09-26T12:00:00.000Z', doneLast7Days: 3, eta: '2026-10-29T12:00:00.000Z', openPullRequests: 2, assignees: ['ana', 'bo'] };
   assert.deepEqual(detailLines(epic, now), [
     'Summary: Ship the import wizard.', 'Open pull requests: 2 · Assigned: @ana, @bo', 'Opened 12 days ago · 3 done in the last 7 days',
+    'ETA: 29.10. (at the pace of the last 14 days)',
   ]);
-  assert.deepEqual(detailLines({ ...epic, summary: null, createdAt: null, assignees: [], openPullRequests: 0, doneLast7Days: 0 }, now), [
+  assert.deepEqual(detailLines({ ...epic, summary: null, createdAt: null, assignees: [], openPullRequests: 0, doneLast7Days: 0, eta: null }, now), [
     'Open pull requests: 0', '0 done in the last 7 days',
   ]);
   assert.deepEqual(issueDetailLines({ assignees: ['ana'], openPullRequests: 1 }), ['Assigned: @ana', 'Open pull requests: 1']);

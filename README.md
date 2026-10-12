@@ -12,6 +12,10 @@ two are in progress, and this session is also working on one more epic. epic-pul
 epic a session is on by itself, from what the session does, and reads everything else from GitHub.
 It never changes anything on GitHub.
 
+The status line colours the bar's cells by status: green for Done, cyan for In review, yellow for
+In progress, and dim for the rest. The characters are the same, so the line is as wide as without
+colour; set `NO_COLOR` for the plain line shown above.
+
 MIT licensed. For macOS, Linux and Windows, with Node 22 or newer (see [Limitations](#limitations) for Windows).
 
 ## Install
@@ -203,6 +207,27 @@ epic's), and either GitHub links it as closing the issue or its body closes the 
 **% = done / (total − dropped)**, rounded down, so 100% always means finished. Dropped work leaves
 the count instead of holding the epic below 100% forever.
 
+### Delivery ETA
+
+An epic that is moving gets an estimate of when it finishes: the items still open (Todo, In progress
+and In review, at every level of the tree; Dropped work is not left to do) at the pace of the last 14
+days, which is the items closed as done in them, divided by 14 days. The result is in whole days from
+now, rounded up, so it is never sooner than the pace allows. It is shown as a day on your own
+calendar, in your machine's time zone: `29.10.`, with the year (`09.01.2027`) when it falls in
+another year than today.
+
+It needs at least two items closed as done in those 14 days: one close is an accident, not a pace.
+An item with no recorded close date, such as a box in a task list, adds nothing to the pace, and an epic
+with nothing left to do has no ETA. The status line shows it as ` · ETA 29.10.` after the other
+details, only when the whole line fits; in VS Code the epic hover, the status bar hover and the
+Overview card end with an `ETA:` line. In `epic-pulse json` each epic has `eta`, an ISO datetime (now
+plus those whole days, like `2026-10-29T12:00:00.000Z`) or `null`. It extrapolates the recent past; it
+does not promise anything.
+
+Stale data still shows its ETA: the status line has it after `stale`, worked out from that older
+data. An epic marked `+` (too large to read in full) shows its ETA too, with no mark of its own: it is
+worked out only from the items that were read, so treat it with care.
+
 An epic that tracks its work as a task list instead of sub-issues counts its boxes: a checked box is
 done, an unchecked one is todo, and a box whose whole text is struck through (`~~like this~~`) is
 dropped. Task lists inside code blocks and HTML comments are ignored.
@@ -214,6 +239,7 @@ Every state of the status line says what it is:
 | `#1 … 20% 1/5` | the session's epic, from fresh data |
 | `… · stale` | data over ten minutes old, or a refresh failed (`stale (network)` says why); it stays shown |
 | `… · 2 loading` | two more bindings or pins of the session have not been answered yet (`pending` in `epic-pulse json`); the epic it already has stays shown. Not counted once a refresh has failed: the error says that |
+| `… · ETA 29.10.` | the epic is on course to finish on 29 October at the pace of the last 14 days (see [Delivery ETA](#delivery-eta)). Shown only when the whole line fits, and the first thing to go when it does not |
 | `epic-pulse: loading…` | the first refresh has not finished yet |
 | `epic-pulse: no epic` | nothing bound or pinned belongs to an epic |
 | `epic-pulse: error (no_token)` | nothing could be fetched; the code says why |
