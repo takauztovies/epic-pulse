@@ -81,18 +81,21 @@ test('a pull request from a fork moves nothing, whatever its branch is called or
 
 // #5 of the demo epic is closed by the ready PR #10, which GitHub links both
 // ways: closedByPullRequestsReferences and a cross-reference whose body says
-// "Fixes #5". A fork can write the same body, so neither route may trust it.
-test('a pull request from a fork that says "Fixes #N" does not put the issue in review', () => {
+// "Fixes #5". A fork can write the same body, so neither route may trust it,
+// and a response that does not say where the PR comes from counts as a fork's.
+test('a pull request from a fork, or of unknown origin, that says "Fixes #N" does not put the issue in review', () => {
   const parsed = parsePhaseB(loadFixture('phase-b-subissues'));
   assert.ok(parsed.ok);
   const node = child(parsed.value.epics.get(1)!, 5);
   assert.equal(deriveStatus(node, demo(5)), 'in_review', 'from a branch in this repository it is the issue\'s review');
-  const forked = <T extends { isCrossRepository?: boolean | undefined }>(pr: T): T => ({ ...pr, isCrossRepository: true });
-  const fromFork: SubIssueNode = {
-    ...node,
-    closedByPullRequestsReferences: { nodes: node.closedByPullRequestsReferences.nodes.map((pr) => (pr ? forked(pr) : pr)) },
-    timelineItems: { nodes: node.timelineItems.nodes.map((item) => (item?.source ? { ...item, source: forked(item.source) } : item)) },
-  };
-  assert.deepEqual(linkedOpenPrs(fromFork, demo(5)), []);
-  assert.equal(deriveStatus(fromFork, demo(5)), 'todo');
+  for (const origin of [true, undefined]) {
+    const from = <T extends { isCrossRepository?: boolean | undefined }>(pr: T): T => ({ ...pr, isCrossRepository: origin });
+    const elsewhere: SubIssueNode = {
+      ...node,
+      closedByPullRequestsReferences: { nodes: node.closedByPullRequestsReferences.nodes.map((pr) => (pr ? from(pr) : pr)) },
+      timelineItems: { nodes: node.timelineItems.nodes.map((item) => (item?.source ? { ...item, source: from(item.source) } : item)) },
+    };
+    assert.deepEqual(linkedOpenPrs(elsewhere, demo(5)), [], `isCrossRepository: ${origin}`);
+    assert.equal(deriveStatus(elsewhere, demo(5)), 'todo', `isCrossRepository: ${origin}`);
+  }
 });

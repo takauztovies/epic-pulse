@@ -74,6 +74,10 @@ test('every GraphQL document is a read-only query with validated numbers', () =>
   }
   assert.match(phaseADocument([4]), /i4: issue\(number: 4\)/);
   assert.match(phaseBDocument([8]), /e8: issue\(number: 8\)/);
+  // A PR whose origin the response omits counts as a fork's, so every route
+  // into linkedOpenPrs has to ask for it.
+  assert.match(phaseBDocument([8]), /closedByPullRequestsReferences\([^)]*\) \{\s*nodes \{[^}]*\bisCrossRepository\b/);
+  assert.match(phaseBDocument([8]), /\.\.\. on PullRequest \{[^}]*\bisCrossRepository\b/);
 });
 
 test('an invalid issue number can not be interpolated into a document', () => {
