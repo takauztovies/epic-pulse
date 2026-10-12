@@ -37,6 +37,7 @@ test('fewer than two items done in the window is no pace, so no ETA', () => {
 test('the window is the last 14 days, both ends in, and a close after now is no pace', () => {
   const closed = (...done: number[]) => etaOf(pacedSnapshot(NOW, { done, todo: 1 }));
   assert.equal(closed(DAY, 14 * DAY), '2026-10-15T12:00:00.000Z', 'closed exactly 14 days ago still counts');
+  assert.equal(closed(0, DAY), '2026-10-15T12:00:00.000Z', 'closed exactly now counts');
   assert.equal(closed(DAY, 14 * DAY + 1), null, 'a millisecond older does not');
   assert.equal(closed(DAY, -1), null, 'closed after now does not');
 });
