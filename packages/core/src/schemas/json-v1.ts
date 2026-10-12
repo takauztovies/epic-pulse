@@ -83,6 +83,9 @@ export const JsonEpicSchema = z
     createdAt: z.iso.datetime().nullable(),
     // Issues closed as done in the last seven days: is it moving?
     doneLast7Days: z.number().int().nonnegative(),
+    // When it is on course to finish, as a calendar day (UTC): the issues still open at the pace of
+    // the last 14 days. null when fewer than two were closed as done in them, or none is left.
+    eta: z.iso.date().nullable(),
     // Open pull requests across its issues, and who its issues are assigned to (up to five logins).
     openPullRequests: z.number().int().nonnegative(),
     assignees: z.array(z.string()).readonly(),

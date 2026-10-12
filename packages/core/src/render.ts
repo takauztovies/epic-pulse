@@ -1,3 +1,4 @@
+import { etaLabel } from './eta.js';
 import type { JsonEpic, JsonV1 } from './schemas/json-v1.js';
 
 // One line for Claude Code's status line, from a view that is already scoped
@@ -85,9 +86,11 @@ function fit(variants: readonly string[], width: number): string {
   return width <= 1 ? shortest.slice(0, width) : `${shortest.slice(0, width - 1)}…`;
 }
 
-// Detail goes before anything is cut: first the bar, then review and progress
-// counts, then the loading count and the other-epics count. The stale marker is
-// in every variant.
+// Detail goes before anything is cut: first the ETA, then the bar, then review
+// and progress counts, then the loading count and the other-epics count. The
+// ETA is the one thing the line can do without, so it is shown only when all the
+// rest fits beside it, and the line without it is exactly what it was. The stale
+// marker is in every variant.
 function epicLine(epic: JsonEpic, options: { readonly more: number; readonly pending: number; readonly width: number }): string {
   const { in_review: review, in_progress: progress } = epic.counts;
   const detail = [review > 0 ? `rev ${review}` : '', progress > 0 ? `wip ${progress}` : ''].filter(Boolean);
@@ -96,7 +99,9 @@ function epicLine(epic: JsonEpic, options: { readonly more: number; readonly pen
   const extra = options.more > 0 ? ` (+${options.more})` : '';
   const head = `${epic.key} ${epic.percent}% ${fraction(epic)}`;
   const withBar = `${epic.key} ${bar(epic.percent)} ${epic.percent}% ${fraction(epic)}`;
+  const timed = epic.eta === null ? [] : [[withBar, ...detail, ...stale, ...loading, `ETA ${etaLabel(epic.eta)}`].join(' · ') + extra];
   return fit([
+    ...timed,
     [withBar, ...detail, ...stale, ...loading].join(' · ') + extra,
     [head, ...detail, ...stale, ...loading].join(' · ') + extra,
     [head, ...stale, ...loading].join(' · ') + extra,

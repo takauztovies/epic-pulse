@@ -1,4 +1,4 @@
-import { STATUSES, type JsonEpic, type Status } from '@epic-pulse/core';
+import { etaLabel, PACE_DAYS, STATUSES, type JsonEpic, type Status } from '@epic-pulse/core';
 import type { DisplayState } from './model.js';
 
 // Every word the tree, the status bar and the details view use for a state or
@@ -147,6 +147,13 @@ export function detailLines(epic: Details, now: number): readonly string[] {
   const age = epic.createdAt === null ? [] : [`Opened ${ageOnlyText(epic.createdAt, now)}`];
   const moving = [...age, `${epic.doneLast7Days} done in the last 7 days`].join(' · ');
   return [...(epic.summary === null ? [] : [`Summary: ${epic.summary}`]), flight, moving];
+}
+
+// The hover's line for when the epic is on course to finish, with what it is
+// worked out from. Left out, like any line with nothing to say, when there is no
+// pace to project.
+export function etaLines(epic: Pick<JsonEpic, 'eta'>): readonly string[] {
+  return epic.eta === null ? [] : [`ETA: ${etaLabel(epic.eta)} (at the pace of the last ${PACE_DAYS} days)`];
 }
 
 // The same for an issue: who has it and what is in flight on it.
