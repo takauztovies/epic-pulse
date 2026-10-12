@@ -90,8 +90,9 @@ function fit(variants: readonly string[], width: number): string {
 // and progress counts, then the loading count and the other-epics count. The
 // ETA is the one thing the line can do without, so it is shown only when all the
 // rest fits beside it, and the line without it is exactly what it was. The stale
-// marker is in every variant.
-function epicLine(epic: JsonEpic, options: { readonly more: number; readonly pending: number; readonly width: number }): string {
+// marker is in every variant. `now` is the clock the view was built with, so the
+// ETA names its year when that is another one.
+function epicLine(epic: JsonEpic, options: { readonly more: number; readonly pending: number; readonly width: number; readonly now: number }): string {
   const { in_review: review, in_progress: progress } = epic.counts;
   const detail = [review > 0 ? `rev ${review}` : '', progress > 0 ? `wip ${progress}` : ''].filter(Boolean);
   const stale = epic.stale ? [epic.error === null ? 'stale' : `stale (${epic.error})`] : [];
@@ -99,7 +100,7 @@ function epicLine(epic: JsonEpic, options: { readonly more: number; readonly pen
   const extra = options.more > 0 ? ` (+${options.more})` : '';
   const head = `${epic.key} ${epic.percent}% ${fraction(epic)}`;
   const withBar = `${epic.key} ${bar(epic.percent)} ${epic.percent}% ${fraction(epic)}`;
-  const timed = epic.eta === null ? [] : [[withBar, ...detail, ...stale, ...loading, `ETA ${etaLabel(epic.eta)}`].join(' · ') + extra];
+  const timed = epic.eta === null ? [] : [[withBar, ...detail, ...stale, ...loading, `ETA ${etaLabel(epic.eta, options.now)}`].join(' · ') + extra];
   return fit([
     ...timed,
     [withBar, ...detail, ...stale, ...loading].join(' · ') + extra,
@@ -120,6 +121,6 @@ export function renderStatusLine(view: JsonV1, options: RenderOptions = {}): str
   const [primary, ...rest] = view.epics;
   const showsEpic = view.snapshot.state === 'ok' || view.snapshot.state === 'stale';
   if (!showsEpic || !primary) return fit([stateText(view)], width);
-  const line = epicLine(primary, { more: rest.length, pending: view.pending, width });
+  const line = epicLine(primary, { more: rest.length, pending: view.pending, width, now: Date.parse(view.generatedAt) });
   return options.color === true ? withColor(line, primary) : line;
 }

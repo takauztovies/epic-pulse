@@ -1,6 +1,6 @@
 import { STATUSES, type JsonChild, type JsonEpic, type Status } from '@epic-pulse/core';
 import { COMMAND } from './ids.js';
-import { activityLines, ageText, barText, branchProgressText, countsText, detailLines, epicSessionsText, etaLines, issueDetailLines, progressText, sessionsText, STATE_TEXT, STATUS_TEXT } from './labels.js';
+import { activityLines, ageText, barText, branchProgressText, countsText, detailLines, epicSessionsText, issueDetailLines, progressText, sessionsText, STATE_TEXT, STATUS_TEXT } from './labels.js';
 import type { DisplayState, Model } from './model.js';
 
 // The Epics tree as plain data: Epic → status group → issue, with one notice
@@ -119,7 +119,7 @@ function epicNode(epic: JsonEpic, now: number): EpicNode {
     url: epic.url,
     label: `${epic.key} ${barText(epic.percent)} ${epic.percent}% ${epic.title}`,
     description: [progress, epicSessionsText(epic), ...stale].join(' · '),
-    tooltip: [`${epic.key} ${epic.title}`, `${progress}: ${countsText(epic)}`, ...detailLines(epic, now), ...etaLines(epic), epicSessionsText(epic), ...activityLines(epic, now), ageText(epic.fetchedAt, now)].join('\n'),
+    tooltip: [`${epic.key} ${epic.title}`, `${progress}: ${countsText(epic)}`, ...detailLines(epic, now), epicSessionsText(epic), ...activityLines(epic, now), ageText(epic.fetchedAt, now)].join('\n'),
     icon: 'milestone',
     iconColor: epic.percent === 100 ? 'charts.green' : undefined,
     ...spreadCommand(clickCommand(epic.url, epic.sessionIds)),

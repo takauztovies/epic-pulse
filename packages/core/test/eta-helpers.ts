@@ -1,3 +1,4 @@
+import type { TestContext } from 'node:test';
 import { refKey } from '../src/ref.js';
 import type { Status } from '../src/schemas/common.js';
 import { SnapshotSchema, type Child, type Snapshot } from '../src/schemas/snapshot.js';
@@ -39,4 +40,17 @@ export function pacedSnapshot(now: number, own: Items, below?: Items): Snapshot 
   const children = [...itemsOf(now, own, 100), ...(below === undefined ? [] : [sub])];
   const underneath = below === undefined ? {} : { [refKey(demo(4))]: { ...entry, ref: demo(4), children: itemsOf(now, below, 200) } };
   return SnapshotSchema.parse({ ...base, epics: { ...base.epics, [key]: { ...entry, children }, ...underneath } });
+}
+
+// Moves the machine to another time zone for the rest of the test, as often as it
+// is called, and puts back the zone it had once the test is over.
+export function zoneFor(t: TestContext): (zone: string) => void {
+  const before = process.env['TZ'];
+  t.after(() => {
+    if (before === undefined) delete process.env['TZ'];
+    else process.env['TZ'] = before;
+  });
+  return (zone) => {
+    process.env['TZ'] = zone;
+  };
 }

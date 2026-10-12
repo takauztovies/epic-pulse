@@ -11,10 +11,12 @@ Every notable change to epic-pulse is listed here. Versions follow
   for In review, yellow for In progress, dim for the rest. The characters are unchanged, so the line
   is as wide as before, and `NO_COLOR` gives the plain line it has always been.
 - **Delivery ETA.** An epic with at least two issues closed as done in the last 14 days gets an
-  estimate: the issues still open, at that pace, as a day in UTC. The status line ends with
-  `· ETA 29.10.` when the whole line fits, and the VS Code epic hover has an `ETA:` line. Each epic
-  in `epic-pulse json` gains `eta`, a `YYYY-MM-DD` date or `null` (fewer than two closed in the
-  window, or nothing left to do); the change is additive, so the JSON stays version 1.
+  estimate: the issues still open, at that pace, shown as a day in the viewer's own time zone
+  (`29.10.`, or `09.01.2027` in another year). The status line ends with `· ETA 29.10.` when the
+  whole line fits, and in VS Code the epic hover, the status bar hover and the Overview card end
+  with an `ETA:` line. Stale data and epics marked `+` keep their ETA. Each epic in
+  `epic-pulse json` gains `eta`, an ISO datetime or `null` (fewer than two closed in the window, or
+  nothing left to do); the change is additive, so the JSON stays version 1.
 
 ### Fixed
 

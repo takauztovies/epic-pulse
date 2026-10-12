@@ -134,26 +134,23 @@ interface Details {
   readonly summary: string | null;
   readonly createdAt: string | null;
   readonly doneLast7Days: number;
+  readonly eta: string | null;
   readonly openPullRequests: number;
   readonly assignees: readonly string[];
 }
 
 // The hover's extra lines for an epic: its description's opening lines, how
-// many pull requests are open and who is assigned, and how old it is with
-// how much of it was finished this week. A line with nothing to say is left out.
+// many pull requests are open and who is assigned, how old it is with how much
+// of it was finished this week, and when it is on course to finish with what that
+// is worked out from. A line with nothing to say is left out, the ETA too when
+// there is no pace to project.
 export function detailLines(epic: Details, now: number): readonly string[] {
   const people = epic.assignees.length === 0 ? [] : [`Assigned: ${epic.assignees.map((login) => `@${login}`).join(', ')}`];
   const flight = [`Open pull requests: ${epic.openPullRequests}`, ...people].join(' · ');
   const age = epic.createdAt === null ? [] : [`Opened ${ageOnlyText(epic.createdAt, now)}`];
   const moving = [...age, `${epic.doneLast7Days} done in the last 7 days`].join(' · ');
-  return [...(epic.summary === null ? [] : [`Summary: ${epic.summary}`]), flight, moving];
-}
-
-// The hover's line for when the epic is on course to finish, with what it is
-// worked out from. Left out, like any line with nothing to say, when there is no
-// pace to project.
-export function etaLines(epic: Pick<JsonEpic, 'eta'>): readonly string[] {
-  return epic.eta === null ? [] : [`ETA: ${etaLabel(epic.eta)} (at the pace of the last ${PACE_DAYS} days)`];
+  const eta = epic.eta === null ? [] : [`ETA: ${etaLabel(epic.eta, now)} (at the pace of the last ${PACE_DAYS} days)`];
+  return [...(epic.summary === null ? [] : [`Summary: ${epic.summary}`]), flight, moving, ...eta];
 }
 
 // The same for an issue: who has it and what is in flight on it.

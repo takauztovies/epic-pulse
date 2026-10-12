@@ -114,3 +114,16 @@ export function filesUnder(dir: string): readonly string[] {
     return entry.isDirectory() ? filesUnder(path) : [path];
   });
 }
+
+// Moves the machine to another time zone for the rest of the test, as often as it
+// is called, and puts back the zone it had once the test is over.
+export function zoneFor(t: TestContext): (zone: string) => void {
+  const before = process.env['TZ'];
+  t.after(() => {
+    if (before === undefined) delete process.env['TZ'];
+    else process.env['TZ'] = before;
+  });
+  return (zone) => {
+    process.env['TZ'] = zone;
+  };
+}

@@ -26,8 +26,9 @@ then the title. Its description adds `1/5`, the first eight characters of each l
   are green once it is 100% done.
 - **Hover** an epic for the first lines of its description, its open pull requests and who is
   assigned, how old it is, how many issues were finished in the last 7 days and, once two were closed
-  in the last 14, when it is on course to finish (ETA); an issue for who has
-  it and its open pull requests. Both show their **session time** (how long Claude Code sessions actively worked on
+  in the last 14, when it is on course to finish (`ETA: 29.10.`, a day in your own time zone, with the
+  year when it is another one), which the status bar hover and the Overview card show too; an issue
+  for who has it and its open pull requests. Both show their **session time** (how long Claude Code sessions actively worked on
   it, idle gaps over ten minutes not counted) and when a session was last on it.
 - The groups In progress, In review and Done start expanded; Todo and Dropped start collapsed.
 

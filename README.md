@@ -212,14 +212,21 @@ the count instead of holding the epic below 100% forever.
 An epic that is moving gets an estimate of when it finishes: the items still open (Todo, In progress
 and In review, at every level of the tree; Dropped work is not left to do) at the pace of the last 14
 days, which is the items closed as done in them, divided by 14 days. The result is in whole days from
-now, rounded up, so it is never sooner than the pace allows. It is a day in UTC.
+now, rounded up, so it is never sooner than the pace allows. It is shown as a day on your own
+calendar, in your machine's time zone: `29.10.`, with the year (`09.01.2027`) when it falls in
+another year than today.
 
 It needs at least two items closed as done in those 14 days: one close is an accident, not a pace.
 An item with no recorded close date, such as a box in a task list, adds nothing to the pace, and an epic
 with nothing left to do has no ETA. The status line shows it as ` · ETA 29.10.` after the other
-details, only when the whole line fits; the VS Code epic hover has an `ETA:` line. In `epic-pulse json`
-each epic has `eta`, a `YYYY-MM-DD` date or `null`. It extrapolates the recent past; it does not
-promise anything.
+details, only when the whole line fits; in VS Code the epic hover, the status bar hover and the
+Overview card end with an `ETA:` line. In `epic-pulse json` each epic has `eta`, an ISO datetime (now
+plus those whole days, like `2026-10-29T12:00:00.000Z`) or `null`. It extrapolates the recent past; it
+does not promise anything.
+
+Stale data still shows its ETA: the status line has it after `stale`, worked out from that older
+data. An epic marked `+` (too large to read in full) shows its ETA too, with no mark of its own: it is
+worked out only from the items that were read, so treat it with care.
 
 An epic that tracks its work as a task list instead of sub-issues counts its boxes: a checked box is
 done, an unchecked one is todo, and a box whose whole text is struck through (`~~like this~~`) is

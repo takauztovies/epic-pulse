@@ -107,7 +107,9 @@ updated just now
   has its issues (up to five people).
 - **Opened … · N done in the last 7 days** answers "is it moving?".
 - **ETA: 29.10. (at the pace of the last 14 days)** is when the issues still open are on course to be
-  done. It appears only when at least two issues were closed as done in the last 14 days.
+  done, as a day in your own time zone, with the year (`09.01.2027`) when it is another one. It
+  appears only when at least two issues were closed as done in the last 14 days, and it is the last
+  line of the epic's details in the status bar hover and on its Overview card too.
 
 An issue's hover shows who has it and its open pull requests. Both also show: counts per status, the sessions, **session time**, when a session was
 last on it, and when it was last refreshed.
@@ -196,8 +198,10 @@ The bar's cells are coloured by status: green is Done, cyan In review, yellow In
 the rest. The characters do not change, so neither does the width. `NO_COLOR` turns the colour off.
 
 When at least two issues of the epic were closed as done in the last 14 days, the line ends with
-`· ETA 29.10.`: the day the issues still open are on course to be done, at that pace. It is the first
-thing the line drops when it is too narrow. The README explains how it is worked out.
+`· ETA 29.10.`: the day the issues still open are on course to be done, at that pace, in your own
+time zone (`09.01.2027` when it is another year). It is the first thing the line drops when it is too
+narrow. Stale data keeps it, after `stale`, and so does an epic marked `+`, unmarked. The README
+explains how it is worked out.
 
 ### Near the usage limit
 
