@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { parseProject } from '../src/board-config.js';
 import { boardDocument, parseBoardPage, type BoardPage } from '../src/board-query.js';
 import { BOARD_MAX_PAGES, BOARD_RETRY_MS, boardDue, boardEntry, boardFailed, boardFor, nextCursor } from '../src/board.js';
+import type { RawResponse } from '../src/github.js';
 import { EPIC_TTL_MS } from '../src/refresh-plan.js';
 import { SnapshotSchema } from '../src/schemas/snapshot.js';
 import { emptySnapshot } from '../src/snapshot.js';
@@ -93,6 +94,26 @@ test('a network failure keeps the last board and is asked again with the epics',
   assert.equal(boardDue(failed, T0 + 1 + EPIC_TTL_MS), true);
   assert.equal(boardDue(read, T0 + EPIC_TTL_MS - 1), false);
   assert.equal(boardDue(undefined, T0), true);
+});
+
+// GitHub's answer to a query past the token's hour: a 200 whose one error is
+// RATE_LIMITED, with x-ratelimit-remaining at 0. Constructed, since recording
+// one would spend the hour. A rate-limit 403 and a 429 mean the same.
+const RATE_LIMITED: RawResponse = {
+  status: 200, body: { errors: [{ type: 'RATE_LIMITED', message: 'API rate limit exceeded for user ID 0.' }] }, remaining: 0, retryAfter: false,
+};
+const RATE_LIMITS: readonly RawResponse[] = [RATE_LIMITED, { ...RATE_LIMITED, status: 403 }, { ...RATE_LIMITED, status: 403, remaining: 4000, retryAfter: true }, { ...RATE_LIMITED, status: 429, remaining: undefined }];
+
+test('a rate-limited board read keeps the last board, marked rate_limited, and is asked again with the epics', () => {
+  const read = boardEntry(PROJECT, [page('board-demo')], T0);
+  for (const res of RATE_LIMITS) {
+    const answer = parseBoardPage(res);
+    assert.ok(!answer.ok, `HTTP ${res.status}`);
+    const limited = boardFailed(read, PROJECT, { failure: answer.error, now: T0 + 1 });
+    assert.deepEqual(limited, { ...read, fetchedAt: T0 + 1, error: 'rate_limited' }, `HTTP ${res.status}`);
+    assert.equal(boardDue(limited, T0 + EPIC_TTL_MS), false, `HTTP ${res.status}`);
+    assert.equal(boardDue(limited, T0 + 1 + EPIC_TTL_MS), true, `HTTP ${res.status}`);
+  }
 });
 
 test('a board for another project block, or for none, is dropped when a refresh starts', () => {
