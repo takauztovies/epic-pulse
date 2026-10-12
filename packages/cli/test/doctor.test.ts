@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { test, type TestContext } from 'node:test';
+import { writeLimits, type LimitsReading, type LimitWindow } from '@epic-pulse/core';
+import { limitsCheck } from '../src/doctor-checks.js';
 import { eventPayload } from './fixtures.js';
 import { cliEnv, demoRepo, registryOf, runCli, sandbox, tempDir, type Sandbox } from './helpers.js';
 
@@ -81,4 +85,61 @@ test('doctor does not print an ignored entry that looks like a token', async (t)
   const run = await runCli(['doctor'], { cwd: demoRepo(t), env: cliEnv(sandbox(t), { EPIC_PULSE_HOSTS: secret }) });
   assert.equal(run.stdout.includes(secret) || run.stderr.includes(secret), false);
   assert.match(run.stdout, /^ {2}EPIC_PULSE_HOSTS: +ignored "\(not shown: it looks like a token\)": a host name has only /m);
+});
+
+const HOUR = 3_600_000;
+// One five-hour window, written out here and not read from the source, so that a
+// changed threshold fails the boundary test instead of moving with it.
+const FIVE_HOURS = 5 * HOUR;
+const NO_READING = 'no reading yet: Claude Code reports usage only to a terminal status line (2.1.80+, on a paid plan)';
+const used = (pct: number): LimitWindow => ({ pct, resetsAt: null });
+const reading = (at: number, fiveHour: LimitWindow | null, sevenDay: LimitWindow | null): LimitsReading => ({ v: 1, at, fiveHour, sevenDay });
+
+// A cache directory of its own, holding what a terminal status line would have saved.
+async function cacheWith(t: TestContext, saved: LimitsReading): Promise<string> {
+  const cache = tempDir(t);
+  await writeLimits(cache, saved);
+  return cache;
+}
+
+// Run from outside a repository: nothing else `doctor` reports matters here.
+async function usageLine(t: TestContext, cache: string): Promise<string | undefined> {
+  return (await doctor(tempDir(t), sandbox(t), { EPIC_PULSE_CACHE_DIR: cache })).get('usage limit');
+}
+
+// Only a terminal status line is ever handed the usage (the VS Code panel and the
+// Desktop app run none), so a session with no terminal beside it has no reading:
+// a fact to report, not a fault. `doctor` still exits 0 with nothing on stderr.
+test('doctor says no usage reading has arrived, for an empty cache and for a damaged file alike', async (t) => {
+  assert.equal(await usageLine(t, tempDir(t)), NO_READING);
+  const damaged = tempDir(t);
+  writeFileSync(join(damaged, 'limits.json'), '{"v":1,"at":');
+  assert.equal(await usageLine(t, damaged), NO_READING);
+});
+
+test('doctor shows when the usage was last read and each window it reported, leaving out one it did not', async (t) => {
+  const at = Date.now() - HOUR; // older than the ten minutes the prompt hook trusts a reading, well inside the five hours doctor does
+  const when = new Date(at).toISOString();
+  const line = async (five: LimitWindow | null, seven: LimitWindow | null) => usageLine(t, await cacheWith(t, reading(at, five, seven)));
+  assert.equal(await line(used(42), used(12)), `last reading ${when} (5h 42%, 7d 12%)`);
+  assert.equal(await line(used(91.9), null), `last reading ${when} (5h 91%)`, 'a whole percent, cut as the status line cuts it');
+  assert.equal(await line(null, used(12)), `last reading ${when} (7d 12%)`);
+  assert.equal(await line(null, null), `last reading ${when}`, 'no empty brackets');
+});
+
+test('doctor calls a reading from before the last five hours stale, and quotes no percentages from it', async (t) => {
+  const at = Date.now() - 6 * HOUR;
+  const cache = await cacheWith(t, reading(at, used(97), used(60)));
+  assert.equal(await usageLine(t, cache), `stale: last reading ${new Date(at).toISOString()}`);
+});
+
+// The tests above run the built program, which reads its own clock, so none can
+// land on the boundary: `now` is an argument of the check, and is given here.
+test('a reading is stale only once it is older than one five-hour window', async (t) => {
+  const now = Date.parse('2026-10-12T12:00:00.000Z');
+  const at = now - FIVE_HOURS;
+  const env = { EPIC_PULSE_CACHE_DIR: await cacheWith(t, reading(at, used(42), null)) };
+  const when = new Date(at).toISOString();
+  assert.deepEqual(await limitsCheck(env, now), ['usage limit', `last reading ${when} (5h 42%)`], 'exactly one window old');
+  assert.deepEqual(await limitsCheck(env, now + 1), ['usage limit', `stale: last reading ${when}`]);
 });

@@ -205,10 +205,14 @@ explains how it is worked out.
 
 ### Near the usage limit
 
-From 90% of the account's 5-hour or weekly usage, every session's Claude Code status line starts with
-a red `⚠ 91% 5h limit, resets in 2h10m · /compact`, and on your next prompt each session's agent is
+Only a terminal session receives the reading; the VS Code panel and the Desktop app do not. Running one
+terminal session alongside lets the prompt hook warn the others.
+
+From 90% of the account's 5-hour or weekly usage, a terminal session's Claude Code status line starts
+with a red `⚠ 91% 5h limit, resets in 2h10m · /compact`, and on your next prompt each session's agent is
 told once to wrap up the step it is on and not start new work. Run `/compact` in the sessions you keep
-going. `EPIC_PULSE_LIMIT_WARN=80` warns from 80% instead. It needs the epic-pulse status line.
+going. `EPIC_PULSE_LIMIT_WARN=80` warns from 80% instead. It needs the epic-pulse status line, and
+`epic-pulse doctor` has a `usage limit` line that says whether a reading has arrived.
 
 ## 6. Command reference
 

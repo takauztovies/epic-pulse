@@ -38,6 +38,13 @@ export async function readLimits(cacheDir: string, now: number): Promise<LimitsR
   return parsed.success && now - parsed.data.at <= READING_FRESH_MS && parsed.data.at <= now + 60_000 ? parsed.data : undefined;
 }
 
+// The saved reading whatever its age: `epic-pulse doctor` says how old it is,
+// where readLimits decides it is too old to act on.
+export async function readSavedLimits(cacheDir: string): Promise<LimitsReading | undefined> {
+  const parsed = ReadingSchema.safeParse(await readJson(join(cacheDir, LIMITS_FILE)));
+  return parsed.success ? parsed.data : undefined;
+}
+
 // True once per session for each step of each window period: the first call that
 // sees the session past a step it was not told about claims it. Rewritten each
 // time with the newest MAX_SESSIONS entries.

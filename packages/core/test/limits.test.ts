@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import { agentNote, DEFAULT_WARN_AT, limitWarning, readingFrom, resetText, warnAt, warningVariants } from '../src/limits.js';
-import { claimNotice, readLimits, READING_FRESH_MS, writeLimits } from '../src/limits-store.js';
+import { claimNotice, LIMITS_FILE, readLimits, readSavedLimits, READING_FRESH_MS, writeLimits } from '../src/limits-store.js';
 import { tempDir } from './repo-helpers.js';
 
 // The shape Claude Code documents for the status-line payload's `rate_limits`:
@@ -44,6 +46,17 @@ test('the saved reading is used only while fresh, and a corrupt file is no readi
   assert.equal((await readLimits(cache, NOW + READING_FRESH_MS))?.fiveHour?.pct, 92);
   assert.equal(await readLimits(cache, NOW + READING_FRESH_MS + 1), undefined, 'no status line rendered for ten minutes');
   assert.equal(await readLimits(tempDir(t), NOW), undefined);
+});
+
+// `epic-pulse doctor` says how old the saved reading is, so it reads it whatever
+// its age: readLimits is the one that stops acting on it after ten minutes.
+test('the saved reading is read whatever its age, and a missing or cut-off file is no reading', async (t) => {
+  const cache = tempDir(t);
+  assert.equal(await readSavedLimits(cache), undefined, 'nothing saved yet');
+  await writeLimits(cache, readingFrom(payload(92), NOW)!);
+  assert.deepEqual(await readSavedLimits(cache), readingFrom(payload(92), NOW), 'saved on a fixed day, read on whichever day this runs');
+  writeFileSync(join(cache, LIMITS_FILE), '{"v":1,"at":');
+  assert.equal(await readSavedLimits(cache), undefined);
 });
 
 // Once per step and per window period, per session: a note on every prompt would

@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import {
-  DEFAULT_HOST, describeHostProblem, errnoOf, findWorktree, LIVE_WINDOW_MS, mergeStatusLine, parseHostList, pathsFor, readRemote, registryDirFor,
-  repoKey, resolveToken, type MergeResult, type RepoRef,
+  DEFAULT_HOST, describeHostProblem, errnoOf, findWorktree, LIVE_WINDOW_MS, mergeStatusLine, parseHostList, pathsFor, readRemote, readSavedLimits,
+  registryDirFor, repoKey, resolveToken, userCacheDir, type LimitsReading, type LimitWindow, type MergeResult, type RepoRef,
 } from '@epic-pulse/core';
 import { lastHookActivity } from './activity.js';
 import { desiredStatusLine, runtimeFile, settingsFile, type SettingsScope } from './claude-home.js';
@@ -24,6 +24,11 @@ const RUNTIME_STATES: Readonly<Record<RuntimeState, string>> = {
   current: 'present, the same build as this one',
   outdated: 'present, a different build from this one',
 };
+
+// One five-hour window on, the window a reading describes has reset: its
+// percentages say nothing about the account any more.
+const READING_STALE_MS = 5 * 60 * 60 * 1000;
+const NO_READING = 'no reading yet: Claude Code reports usage only to a terminal status line (2.1.80+, on a paid plan)';
 
 function iso(ms: number): string {
   return new Date(ms).toISOString();
@@ -85,4 +90,26 @@ export async function statusLineCheck(scope: SettingsScope, env: NodeJS.ProcessE
 
 export async function runtimeCheck(env: NodeJS.ProcessEnv): Promise<Check> {
   return ['runtime', `${RUNTIME_STATES[await runtimeState(env)]}: ${runtimeFile(env)}`];
+}
+
+// "5h 42%": the whole percent, cut as the status line cuts it in its warning, so
+// the two never disagree. Nothing for a window Claude Code did not report.
+function usedText(label: string, window: LimitWindow | null): readonly string[] {
+  return window ? [`${label} ${Math.floor(window.pct)}%`] : [];
+}
+
+function usageState(saved: LimitsReading | undefined, now: number): string {
+  if (!saved) return NO_READING;
+  if (now - saved.at > READING_STALE_MS) return `stale: last reading ${iso(saved.at)}`;
+  const windows = [...usedText('5h', saved.fiveHour), ...usedText('7d', saved.sevenDay)];
+  return `last reading ${iso(saved.at)}${windows.length > 0 ? ` (${windows.join(', ')})` : ''}`;
+}
+
+// Never a failure: only a terminal status line is handed the usage (the VS Code
+// panel and the Desktop app run none), so a session without a terminal beside it
+// has no reading and nothing to fix. The file is one per user, shared by every
+// session, which is how one terminal session feeds the prompt hook of the others.
+export async function limitsCheck(env: NodeJS.ProcessEnv, now: number): Promise<Check> {
+  const cache = userCacheDir(env);
+  return ['usage limit', usageState(cache === undefined ? undefined : await readSavedLimits(cache), now)];
 }
