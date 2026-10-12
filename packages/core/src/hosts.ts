@@ -1,4 +1,4 @@
-import { HostSchema } from './schemas/common.js';
+import { HostSchema, safeChars } from './schemas/common.js';
 
 // An entry of EPIC_PULSE_HOSTS that is not a host, as it is shown, and why it
 // is not one. Such an entry used to be dropped without a word, so a mistyped
@@ -43,10 +43,11 @@ function reasonFor(entry: string): string {
 // What is not a host may be anything pasted into the wrong variable, a token
 // included, and the report goes to a terminal and, from the VS Code extension,
 // to log files. So a value shaped like a secret is not shown at all, a long one
-// is cut, and a control character can not start a line of its own.
+// is cut, and a control character can not start a line of its own, nor a bidi
+// one reorder it (safeChars).
 function shown(entry: string): string {
   if (TOKEN_PREFIX.test(entry) || SECRET_SHAPE.test(entry)) return '(not shown: it looks like a token)';
-  const clean = [...entry].map((char) => (char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127 ? '?' : char)).join('');
+  const clean = safeChars(entry);
   return clean.length > MAX_SHOWN ? `${clean.slice(0, MAX_SHOWN)}...` : clean;
 }
 

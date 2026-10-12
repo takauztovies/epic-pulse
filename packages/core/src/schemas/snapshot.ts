@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { BoardSchema } from './board.js';
-import { ErrorCodeSchema, IssueNumberSchema, IssueRefSchema, StatusSchema } from './common.js';
+import { ErrorCodeSchema, IssueNumberSchema, IssueRefSchema, safeText, StatusSchema } from './common.js';
 
 export const EpicKindSchema = z.enum(['subissues', 'checklist']);
 
@@ -13,7 +13,7 @@ export const ChildSchema = z
     // A Jira issue's own key (PROJ-5): a child may be in another project than its epic,
     // so the number alone does not say. Absent on GitHub, where a child is #number.
     key: z.string().max(40).optional(),
-    title: z.string().max(300),
+    title: safeText(300),
     url: z.string().max(500).nullable(),
     status: StatusSchema,
     // How many sub-issues it has, when it has any: it is then an epic of its own, whose
@@ -41,7 +41,7 @@ export const MAX_CHILDREN = 500;
 export const EpicEntrySchema = z
   .object({
     ref: IssueRefSchema,
-    title: z.string().max(300),
+    title: safeText(300),
     url: z.string().max(500),
     kind: EpicKindSchema,
     children: z.array(ChildSchema).max(MAX_CHILDREN).readonly(),

@@ -44,6 +44,11 @@ Every notable change to epic-pulse is listed here. Versions follow
   repository as its own, so a "Fixes #N" body or GitHub's own closing link from one counted as the
   issue's review. Every route now needs a branch in the repository itself, as branch-named and
   mentioning PRs already did. An outside contributor's PR no longer shows its issue as In review.
+- **Control and bidi characters in titles and option names show as `?`.** Whoever can edit an issue
+  or a project board chooses its title or option names, and a C1 control or a bidi override in one
+  reached `epic-pulse json` and the VS Code views unchanged, as one in an `EPIC_PULSE_HOSTS` entry
+  reached `epic-pulse doctor`. Every control character (C0, DEL, C1) and bidi control is now stored
+  and shown as `?`, from a snapshot an older version wrote too; an emoji keeps its ZWJ and VS16.
 
 ## 0.3.6
 

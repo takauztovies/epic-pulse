@@ -52,6 +52,15 @@ test('an entry is shown as typed unless it could be a secret, is long, or holds 
   assert.equal(shown('a\u0007b c'), 'a?b c');
 });
 
+// The same pass as a title or a board option name gets (safeChars): a one-byte
+// CSI or a bidi override is shown as ?, while an emoji keeps its ZWJ.
+test('an entry shows its C1 and bidi controls as ?, and an emoji in it whole', () => {
+  const shown = (entry: string) => parseHostList(entry).problems[0]?.entry;
+  assert.equal(shown('ghe\u009b2J.example.com'), 'ghe?2J.example.com');
+  assert.equal(shown('\u202emoc.elpmaxe.ehg'), '?moc.elpmaxe.ehg');
+  assert.equal(shown('ghe.\u{1F469}\u200d\u{1F4BB}.com'), 'ghe.\u{1F469}\u200d\u{1F4BB}.com');
+});
+
 test('a problem reads as one line naming the entry and the reason', () => {
   const [problem] = parseHostList('https://ghe.example.com').problems;
   assert.ok(problem, 'no problem was reported');

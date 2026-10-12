@@ -17,6 +17,25 @@ export const RepoSchema = z
 
 export const IssueNumberSchema = z.number().int().positive().max(2_147_483_647);
 
+// Free text that is stored and then printed: titles, and a project board's
+// option names, which doctor writes to a terminal. Whoever can edit the issue
+// or the board chooses it, so a control character (C0, DEL or C1) could start
+// an escape sequence, and a bidi control could reorder what a line says: each
+// becomes `?`. The rest of \p{Cf} is left alone: an emoji needs its ZWJ
+// (U+200D), as it does its VS16 (U+FE0F).
+const UNSAFE_CHARS = /[\p{Cc}\u200E\u200F\u202A-\u202E\u2066-\u2069]/gu;
+
+// The character pass alone, for text that is cut its own way (hosts.ts).
+export function safeChars(text: string): string {
+  return text.replace(UNSAFE_CHARS, '?');
+}
+
+// The pass, then a cap at `max` rather than a refusal, so one long title can
+// not void the snapshot that holds it.
+export function safeText(max: number): z.ZodPipe<z.ZodString, z.ZodTransform<string, string>> {
+  return z.string().transform((text) => safeChars(text).slice(0, max));
+}
+
 // Which tracker a reference belongs to. Absent means GitHub, so every file
 // written before this field existed stays valid, byte for byte, and a GitHub
 // reference is still written without it. A Jira reference has the same four

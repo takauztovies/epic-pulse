@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ERROR_CODES, IssueNumberSchema, OwnerSchema, StatusSchema } from './common.js';
+import { ERROR_CODES, IssueNumberSchema, OwnerSchema, safeText, StatusSchema } from './common.js';
 
 // GitHub Project (v2) board Status, opt-in through the `project` block of
 // `.epic-pulse.json` (board-config.ts). Everything here crosses a boundary: the
@@ -29,6 +29,8 @@ export const BoardErrorSchema = z.enum(['scope', ...ERROR_CODES]);
 // `items`: `owner/repo#N`, lowercased, to the status its option maps to; an item
 // whose option maps to nothing is not here, its option name is in `unmapped`
 // (for `epic-pulse doctor`). `truncated`: the board had more pages than are read.
+// Doctor prints those names, so they pass safeText here too, not only where
+// GitHub's answer is read: an older version stored them as GitHub sent them.
 export const BoardSchema = z
   .object({
     project: ProjectConfigSchema,
@@ -39,18 +41,19 @@ export const BoardSchema = z
       .record(z.string().max(250), StatusSchema)
       .refine((items) => Object.keys(items).length <= BOARD_LIMITS.maxItems)
       .readonly(),
-    unmapped: z.array(z.string().max(BOARD_LIMITS.maxNameLength)).max(BOARD_LIMITS.maxUnmapped).readonly(),
+    unmapped: z.array(safeText(BOARD_LIMITS.maxNameLength)).max(BOARD_LIMITS.maxUnmapped).readonly(),
   })
   .readonly();
 
 // One board item as GitHub answers it. `content` is `{}` for a pull request or a
 // draft issue, and the field value `{}` when the field is not a single select;
-// both read as "not on the board" rather than as a broken answer.
+// both read as "not on the board" rather than as a broken answer. An option's
+// name is whatever the board's editors typed (safeText).
 const BoardItemNodeSchema = z.object({
   content: z
     .looseObject({ number: IssueNumberSchema.optional(), repository: z.object({ nameWithOwner: z.string() }).optional() })
     .nullable(),
-  fieldValueByName: z.looseObject({ name: z.string().optional() }).nullable(),
+  fieldValueByName: z.looseObject({ name: safeText(BOARD_LIMITS.maxNameLength).optional() }).nullable(),
 });
 
 export const BoardDataSchema = z.object({
