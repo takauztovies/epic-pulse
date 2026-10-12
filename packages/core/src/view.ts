@@ -194,7 +194,7 @@ export function buildView(input: ViewInput): JsonV1 {
     generatedAt: iso(input.now),
     liveSessions: live.length,
     pending: pendingCount(scoped),
-    snapshot: { state: stateOf(scoped), fetchedAt: snapshot ? iso(snapshot.updatedAt) : null, error: errorOf(scoped) },
+    snapshot: { state: stateOf(scoped), fetchedAt: snapshot ? iso(snapshot.updatedAt) : null, error: errorOf(scoped), ...(snapshot?.board ? { boardError: snapshot.board.error } : {}) },
     epics: entries.map((entry) => jsonEpic(entry, { now: input.now, progress: input.progress ?? DEFAULT_PROGRESS, time: input.time, snapshot, bound })),
   };
 }

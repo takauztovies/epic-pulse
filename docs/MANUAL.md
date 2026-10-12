@@ -250,6 +250,28 @@ Epics are Jira Epics; their issues are the epic's children. Statuses come from J
 categories (To Do, In Progress, Done), with "review" statuses in review and Won't Do / Duplicate
 resolutions as dropped. There are no pull-request counts for Jira issues.
 
+### Statuses from a GitHub Project board
+
+A team that moves its issues across a GitHub Project board can have the board set their status. In
+`.epic-pulse.json`:
+
+```json
+{ "project": { "owner": "acme", "number": 3 } }
+```
+
+`owner` is the user or organisation that owns the project and `number` the number in its URL. The
+Status field is read unless `"field"` names another single-select field. An **open** sub-issue on
+the board takes the status of its option: Todo, Backlog and Ready are Todo; In progress, Doing and
+WIP are In progress; In review, Review, QA and Testing are In review; Done, Complete and Shipped
+are Done; Won't do, Dropped, Cancelled and Not planned are Dropped, and leave the count. Map any
+other option with `"statusMap": { "Blocked": "in_progress" }`. A **closed** issue keeps the status
+its close gives it, and an issue that is not on the board, or under an option nothing maps, keeps
+the status epic-pulse works out itself. In the Epics view nothing else changes.
+
+The token needs the `read:project` scope. Without it every status is worked out as before, and the
+Epics view shows **board: token lacks read:project** above the epics: run
+`gh auth refresh -s read:project`, and the board is read within 30 minutes.
+
 ## 8. Troubleshooting
 
 | You see | Do this |
@@ -262,6 +284,7 @@ resolutions as dropped. There are no pull-request counts for Jira issues.
 | A session opens as a new conversation | It was started in another folder or worktree; open that folder. |
 | **Start Working on This Epic…** does nothing useful | The epic-pulse plugin is not installed, so Claude Code does not know `/epic-pulse:intake`. |
 | A Jira epic says **No epic**, or **Refresh failed: no_token** | `JIRA_SITE`, `JIRA_EMAIL` and `JIRA_API_TOKEN` are not in the environment VS Code or Claude Code started with (restart them after setting), `JIRA_SITE` does not list the site in `.epic-pulse.json`, or the token has expired (Jira then answers with nothing). |
+| **board: token lacks read:project** | Run `gh auth refresh -s read:project`; the board is asked again within 30 minutes. `epic-pulse doctor` also lists board options that map to nothing. |
 | A bar looks behind the work in flight | By design: the bar counts closed work only. In-flight credit is `weightedPercent` in `epic-pulse json`. |
 
 `epic-pulse doctor` checks the setup from a terminal.

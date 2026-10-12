@@ -1,4 +1,4 @@
-import type { ErrorCode, JsonEpic, StateKind } from '@epic-pulse/core';
+import { BOARD_SCOPE_HINT, type ErrorCode, type JsonEpic, type StateKind } from '@epic-pulse/core';
 import { mergeEpics } from './merge.js';
 import type { RepoResult } from './poll.js';
 
@@ -17,6 +17,9 @@ export interface Model {
   readonly fetchedAt: string | null;
   readonly repoCount: number;
   readonly now: number;
+  // Set when a repository's project board could not be read for want of the
+  // read:project scope: statuses are derived meanwhile, so the data is still ok.
+  readonly boardNotice: string | null;
 }
 
 export interface ModelInput {
@@ -79,6 +82,10 @@ function newestFetch(results: readonly RepoResult[]): string | null {
   return times.reduce<string | null>((best, time) => (best === null || Date.parse(time) > Date.parse(best) ? time : best), null);
 }
 
+function boardNoticeOf(results: readonly RepoResult[]): string | null {
+  return results.some((result) => result.view.snapshot.boardError === 'scope') ? `board: ${BOARD_SCOPE_HINT}` : null;
+}
+
 export function buildModel(input: ModelInput): Model {
   const { results } = input;
   const epics = mergeEpics(results.map((result) => result.view));
@@ -91,5 +98,6 @@ export function buildModel(input: ModelInput): Model {
     fetchedAt: newestFetch(results),
     repoCount: results.length,
     now: input.now,
+    boardNotice: boardNoticeOf(results),
   };
 }

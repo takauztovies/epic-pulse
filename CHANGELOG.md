@@ -22,6 +22,21 @@ Every notable change to epic-pulse is listed here. Versions follow
   five hours ago, or that no reading has arrived. Only a terminal status line receives the reading,
   never the VS Code panel or the Desktop app; the README and the manual now say so, and that a
   terminal session running alongside lets the prompt hook warn the others.
+- **Statuses from a GitHub Project board.** A `project` block in `.epic-pulse.json`
+  (`{ "owner": "acme", "number": 3 }`, with an optional `field` and `statusMap`) names one Project
+  (v2) board. An open sub-issue on it takes the status its option maps to, Done and Dropped included,
+  and a board Dropped leaves the count like a not-planned close; a closed issue keeps the status its
+  close gives it, and an issue off the board or under an unmapped option keeps its derived status.
+  Option names are compared lowercased with everything but letters and digits removed, over a
+  default table (Todo/Backlog/Ready, In progress/Doing/WIP, In review/Review/QA/Testing,
+  Done/Complete/Shipped, Won't do/Dropped/Cancelled/Not planned). The board is one query of its own,
+  sent only when configured, cached like the epics, at most five pages of 100 items, each a point of
+  the shared hourly budget. A token without `read:project` leaves every status derived, is asked
+  again after 30 minutes, and `epic-pulse doctor` and the VS Code view say "board: token lacks
+  read:project — `gh auth refresh -s read:project`"; `doctor` also lists unmapped options. A board
+  failure never stops the epics refreshing. Snapshot children gain an optional `statusSource`
+  (`board` or `derived`), and `epic-pulse json` an optional `snapshot.boardError`; both additive, so
+  older snapshots still read and the JSON stays version 1.
 
 ### Fixed
 

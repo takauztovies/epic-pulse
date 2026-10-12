@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BoardSchema } from './board.js';
 import { ErrorCodeSchema, IssueNumberSchema, IssueRefSchema, StatusSchema } from './common.js';
 
 export const EpicKindSchema = z.enum(['subissues', 'checklist']);
@@ -26,6 +27,10 @@ export const ChildSchema = z
     assignees: z.array(z.string().max(40)).max(3).readonly().optional(),
     openPrs: z.number().int().positive().optional(),
     closedAt: z.number().int().nonnegative().optional(),
+    // Where `status` came from when a project board is configured: its Status
+    // option (an open issue on the board, under an option that maps), or the
+    // issue itself. Absent when no board is configured, and in older snapshots.
+    statusSource: z.enum(['board', 'derived']).optional(),
   })
   .readonly();
 
@@ -77,6 +82,9 @@ export const SnapshotSchema = z
     rateLimit: RateLimitSchema.nullable(),
     error: ErrorCodeSchema.nullable(),
     detail: z.string().max(120).nullable(),
+    // The configured project board as last read (board.ts). A malformed one
+    // reads as none rather than voiding the snapshot: it is fetched again.
+    board: BoardSchema.optional().catch(undefined),
   })
   .readonly();
 

@@ -150,9 +150,18 @@ function noticeNode(model: Model): NoticeNode | undefined {
   };
 }
 
+// The board notice sits below the state notice: it degrades status, it does
+// not stop anything from showing.
+function boardNoticeNode(model: Model): NoticeNode | undefined {
+  if (model.boardNotice === null) return undefined;
+  const tooltip = 'The project board is not read, so every status is derived from the issue itself until the token can read projects.';
+  const command = { command: COMMAND.showStatus, title: 'Show status details' };
+  return { kind: 'notice', id: 'notice:board', state: model.state, label: model.boardNotice, description: '', tooltip, icon: 'key', command };
+}
+
 export function treeOf(model: Model): readonly TreeNode[] {
-  const notice = noticeNode(model);
-  return [...(notice ? [notice] : []), ...model.epics.map((epic) => epicNode(epic, model.now))];
+  const notices = [noticeNode(model), boardNoticeNode(model)].filter((node) => node !== undefined);
+  return [...notices, ...model.epics.map((epic) => epicNode(epic, model.now))];
 }
 
 // What the tree shows before the first poll has finished.

@@ -12,11 +12,20 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { URL, fileURLToPath } from 'node:url';
 import { postGraphql, resolveToken } from '../packages/core/src/github.ts';
 import { phaseADocument, phaseBDocument } from '../packages/core/src/queries.ts';
+import { boardDocument } from '../packages/core/src/board-query.ts';
 
 const HOST = 'github.com';
 const VARIABLES = { owner: 'takauztovies', name: 'epic-pulse' };
 const MISSING = 9999;
 const OUT = fileURLToPath(new URL('../fixtures/graphql/', import.meta.url));
+
+// The demo board, https://github.com/users/takauztovies/projects/3, linked to
+// the demo repository: #4 Done, #5 Todo, #6 In Progress.
+const BOARD = { owner: 'takauztovies', field: 'Status' };
+const BOARD_NUMBER = 3;
+// A token WITHOUT the `project` scope, for the one recording that has to show
+// GitHub refusing the board (any account's: the demo board is public).
+const NO_PROJECT_TOKEN = 'EPIC_PULSE_NO_PROJECT_TOKEN';
 
 const UNDEFINED_FIELD = `query { repository(owner: "takauztovies", name: "epic-pulse") { issue(number: 1) { noSuchField } } }`;
 
@@ -31,17 +40,24 @@ const RECORDINGS = [
   { name: 'phase-b-missing', query: phaseBDocument([MISSING]), note: 'issue that does not exist' },
   { name: 'error-undefined-field', query: UNDEFINED_FIELD, note: 'schema lacks a field (what an older GHES answers)' },
   { name: 'error-bad-credentials', query: phaseADocument([1]), token: 'not-a-real-token', note: 'HTTP 401' },
+  { name: 'phase-b-board', query: phaseBDocument([1]), note: 'demo epic #1 next to the board recordings: #4 closed since the older ones' },
+  { name: 'board-demo', query: boardDocument(BOARD_NUMBER), variables: BOARD, note: 'demo project board, one page: #4 Done, #5 Todo, #6 In Progress' },
+  { name: 'board-paged', query: boardDocument(BOARD_NUMBER, 1), variables: BOARD, note: 'the first page of the demo board one item at a time: there are more' },
+  { name: 'board-not-found', query: boardDocument(99), variables: BOARD, note: 'a project number the owner does not have' },
+  { name: 'board-no-scope', query: boardDocument(BOARD_NUMBER), variables: BOARD, tokenEnv: NO_PROJECT_TOKEN, note: 'token without read:project' },
 ];
 
 // A recording must never contain something that looks like a credential.
 const TOKEN_SHAPE = /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/;
 
 async function record(recording, token) {
+  const own = recording.tokenEnv === undefined ? recording.token : process.env[recording.tokenEnv];
+  if (recording.tokenEnv !== undefined && !own) return `${recording.name}: skipped, set ${recording.tokenEnv} to a token without the project scope`;
   const response = await postGraphql({
     host: HOST,
-    token: recording.token ?? token,
+    token: own ?? token,
     query: recording.query,
-    variables: VARIABLES,
+    variables: recording.variables ?? VARIABLES,
   });
   const document = {
     recordedAt: new Date().toISOString(),
@@ -52,7 +68,7 @@ async function record(recording, token) {
     body: response.body ?? null,
   };
   const text = `${JSON.stringify(document, null, 2)}\n`;
-  if (TOKEN_SHAPE.test(text) || text.includes(token)) throw new Error(`${recording.name}: recording contains a credential`);
+  if (TOKEN_SHAPE.test(text) || text.includes(token) || (own && text.includes(own))) throw new Error(`${recording.name}: recording contains a credential`);
   await writeFile(`${OUT}${recording.name}.json`, text);
   return `${recording.name}: HTTP ${response.status}, ${text.length} bytes`;
 }

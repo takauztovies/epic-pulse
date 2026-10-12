@@ -1,4 +1,4 @@
-import { jiraFromEnv, loadJiraFor, refresh, registryDirFor } from '@epic-pulse/core';
+import { jiraFromEnv, loadJiraFor, loadProjectFor, projectFromEnv, refresh, registryDirFor } from '@epic-pulse/core';
 import { parseCommandArgs } from './args.js';
 import { failWith, NOT_A_REPO, printLine, usageError } from './io.js';
 import { recordAttempt } from './refresh-attempt.js';
@@ -26,7 +26,8 @@ export async function runRefresh(args: readonly string[], env: NodeJS.ProcessEnv
   if (dir === undefined) return failWith(NOT_A_REPO);
   // From the repository when run by hand, from the status line's handover when it started this.
   const jira = jiraFromEnv(env) ?? (await loadJiraFor(process.cwd()));
-  const outcome = await refresh({ dir, now: Date.now(), env, jira });
+  const project = projectFromEnv(env) ?? (await loadProjectFor(process.cwd()));
+  const outcome = await refresh({ dir, now: Date.now(), env, jira, project });
   if (outcome.status === 'paced') return waitingItsTurn(dir, outcome.until);
   if (outcome.status === 'busy') {
     printLine('epic-pulse: another refresh is running; leaving it to finish.');

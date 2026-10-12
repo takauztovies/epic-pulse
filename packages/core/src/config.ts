@@ -1,10 +1,12 @@
 import { readFile, stat } from 'node:fs/promises';
 import { join, relative } from 'node:path';
+import { parseProject } from './board-config.js';
 import { findWorktree } from './git.js';
 import { compileBranchPattern, DEFAULT_BRANCH_PATTERN } from './branch-pattern.js';
 import { parseJira, type JiraConfig } from './jira-config.js';
 import { DEFAULT_PROGRESS, parseProgress, type ProgressConfig } from './progress-config.js';
 import { parseJson } from './result.js';
+import type { ProjectConfig } from './schemas/board.js';
 import { CONFIG_LIMITS, RawConfigSchema } from './schemas/config.js';
 
 export const CONFIG_FILE = '.epic-pulse.json';
@@ -16,6 +18,8 @@ export interface Config {
   readonly progress: ProgressConfig;
   // Absent unless the repository declares a Jira site and projects.
   readonly jira?: JiraConfig;
+  // Absent unless the repository names a GitHub Project board to read Status from.
+  readonly project?: ProjectConfig;
 }
 
 export const DEFAULT_CONFIG: Config = {
@@ -47,6 +51,7 @@ export function parseConfig(value: unknown): Config {
   const raw = RawConfigSchema.safeParse(value);
   if (!raw.success) return DEFAULT_CONFIG;
   const jira = parseJira(raw.data.jira);
+  const project = parseProject(raw.data.project);
   const source = raw.data.branchIssuePattern;
   const compiled = source === undefined ? undefined : compileBranchPattern(source);
   return {
@@ -55,6 +60,7 @@ export function parseConfig(value: unknown): Config {
     ignoreMainCheckout: raw.data.ignoreMainCheckout ?? false,
     progress: parseProgress(raw.data.progress),
     ...(jira ? { jira } : {}),
+    ...(project ? { project } : {}),
   };
 }
 
@@ -68,6 +74,12 @@ export async function loadProgressFor(dir: string): Promise<ProgressConfig> {
 export async function loadJiraFor(dir: string): Promise<JiraConfig | undefined> {
   const worktree = await findWorktree(dir);
   return worktree ? (await loadConfig(worktree.root)).jira : undefined;
+}
+
+// The repository's project block, found from any directory inside it.
+export async function loadProjectFor(dir: string): Promise<ProjectConfig | undefined> {
+  const worktree = await findWorktree(dir);
+  return worktree ? (await loadConfig(worktree.root)).project : undefined;
 }
 
 export async function loadConfig(root: string): Promise<Config> {

@@ -50,6 +50,11 @@ function stateBlock(model: Model): string {
   return `**${label}**: ${detail}${code}${action}`;
 }
 
+// Our own fixed text, not an issue's, so its code span stays one.
+function boardBlock(model: Model): string {
+  return model.boardNotice === null ? '' : `**Board**: ${model.boardNotice.replace(/^board: /, '')}`;
+}
+
 function epicBlock(epic: JsonEpic, now: number): string {
   const line = [progressText(epic), countsText(epic), ...staleMarks(epic)].join(' · ');
   return `**${epic.key}** ${escapeMarkdown(epic.title)}  \n${line}  \n${[...detailLines(epic, now).map(escapeMarkdown), epicSessionsText(epic), ...activityLines(epic, now)].join('  \n')}`;
@@ -65,7 +70,7 @@ function colorOf(model: Model): string | undefined {
 }
 
 export function statusBarOf(model: Model): StatusBarView {
-  const blocks = [header(model), stateBlock(model), ...model.epics.map((epic) => epicBlock(epic, model.now))];
+  const blocks = [header(model), stateBlock(model), boardBlock(model), ...model.epics.map((epic) => epicBlock(epic, model.now))];
   return {
     visible: model.repoCount > 0,
     text: model.epics.length > 0 ? epicText(model) : stateText(model),

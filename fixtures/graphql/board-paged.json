@@ -1,0 +1,34 @@
+{
+  "recordedAt": "2026-10-12T15:43:07.875Z",
+  "note": "the first page of the demo board one item at a time: there are more",
+  "status": 200,
+  "remaining": 3754,
+  "retryAfter": false,
+  "body": {
+    "data": {
+      "repositoryOwner": {
+        "projectV2": {
+          "items": {
+            "nodes": [
+              {
+                "content": {
+                  "number": 4,
+                  "repository": {
+                    "nameWithOwner": "takauztovies/epic-pulse"
+                  }
+                },
+                "fieldValueByName": {
+                  "name": "Done"
+                }
+              }
+            ],
+            "pageInfo": {
+              "hasNextPage": true,
+              "endCursor": "Y3Vyc29yOnYyOpKqMDAwMDAwMDEuMM4QDeag"
+            }
+          }
+        }
+      }
+    }
+  }
+}

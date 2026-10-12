@@ -1,6 +1,6 @@
 import { readdir, stat } from 'node:fs/promises';
 import {
-  buildView, gatherRefs, loadJiraFor, loadProgressFor, pathsFor, pinsOf, readLiveSessions, readPins, readSnapshot, readTime, refresh,
+  buildView, gatherRefs, loadJiraFor, loadProgressFor, loadProjectFor, pathsFor, pinsOf, readLiveSessions, readPins, readSnapshot, readTime, refresh,
   type JsonV1, type RefreshOutcome, type RegistryPaths,
 } from '@epic-pulse/core';
 import { tokenUse, type Grant, type TokenUse } from './grant.js';
@@ -72,7 +72,8 @@ async function runRefresh(repo: RepoTarget, options: PollOptions): Promise<Pick<
   const hosts = await registryHosts(pathsFor(dir), options.now);
   const named = { token: tokenUse(options.grant, hosts), hosts: [...hosts] };
   try {
-    return { refresh: await refresh({ dir, now: options.now, env: options.env, tokens: options.grant, jira: await loadJiraFor(repo.folder) }), ...named };
+    const [jira, project] = await Promise.all([loadJiraFor(repo.folder), loadProjectFor(repo.folder)]);
+    return { refresh: await refresh({ dir, now: options.now, env: options.env, tokens: options.grant, jira, project }), ...named };
   } catch {
     return { refresh: { status: 'failed' }, ...named };
   }

@@ -1,3 +1,4 @@
+import { BOARD_HOST } from './board.js';
 import type { RateInfo } from './queries.js';
 import { refKey } from './ref.js';
 import { RATE_LIMITED_BACKOFF_MS, RETAIN_MS } from './refresh-plan.js';
@@ -40,8 +41,12 @@ function withOwnAnswer(key: string, resolution: Resolution, answered: ReadonlyMa
 // or an issue with neither sub-issues nor a checklist) removes the entry and
 // re-points every issue that led to it at "no epic", which the 30-minute
 // resolution cache then keeps instead of asking again every two minutes.
+// A sub-issue's status is read against the snapshot's project board, if any:
+// the refresher reads the board before the epics (board-fetch.ts), and only
+// for an epic on the board's host.
 export function applyEpics(snapshot: Snapshot, answers: readonly (readonly [IssueRef, EpicNode | null])[], now: number): Snapshot {
-  return applyBuiltEpics(snapshot, answers.map(([ref, node]) => [ref, node ? buildEpic(node, ref) : null] as const), now);
+  const board = (ref: IssueRef) => (ref.host === BOARD_HOST ? snapshot.board?.items : undefined);
+  return applyBuiltEpics(snapshot, answers.map(([ref, node]) => [ref, node ? buildEpic(node, ref, board(ref)) : null] as const), now);
 }
 
 // The same for an epic a provider has already turned into snapshot data (Jira
