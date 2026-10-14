@@ -3,7 +3,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from 'node:net';
 import type { TestContext } from 'node:test';
 import { z } from 'zod';
-import { API_BASE_TEST_ENV, apiUrl, type RawResponse } from '../src/github.js';
+import { endpointFor, type RawResponse } from '../src/github.js';
 import { parseJson } from '../src/result.js';
 
 // A real node:http server on 127.0.0.1 that answers github.com's GraphQL
@@ -24,6 +24,9 @@ export interface ReplayedRequest {
 }
 
 export interface Replay {
+  // Where github.com's API is for the length of the test: what the test hands to
+  // refresh(), or to a Context, as `githubApi`.
+  readonly origin: string;
   // Every request so far, in the order it came.
   readonly requests: readonly ReplayedRequest[];
 }
@@ -70,16 +73,12 @@ function stop(server: Server): Promise<void> {
   });
 }
 
-function restore(previous: string | undefined): void {
-  if (previous === undefined) delete process.env[API_BASE_TEST_ENV];
-  else process.env[API_BASE_TEST_ENV] = previous;
-}
-
-// Starts the server, points github.com's endpoint at it for the rest of the
-// test (the variable is put back, and the server stopped, when the test ends),
-// and refuses to go on unless the endpoint really moved: a seam that silently
-// did nothing would send the test's requests to GitHub, or let a test that
-// expects no request pass without ever having been able to see one.
+// Starts the server (stopped when the test ends) and hands back its address, for
+// the test to pass to what it exercises as `githubApi`; nothing global is touched.
+// It refuses to go on unless github.com's endpoint, as the request code resolves
+// it, really is that address: a seam that silently did nothing would send the
+// test's requests to GitHub, or let a test that expects no request pass without
+// ever having been able to see one.
 export async function replayServer(t: TestContext, reply: (request: ReplayedRequest) => RawResponse): Promise<Replay> {
   let seen: readonly ReplayedRequest[] = [];
   const server = createServer((req, res) => {
@@ -90,12 +89,7 @@ export async function replayServer(t: TestContext, reply: (request: ReplayedRequ
     });
   });
   const origin = await listen(server);
-  const previous = process.env[API_BASE_TEST_ENV];
-  process.env[API_BASE_TEST_ENV] = origin;
-  t.after(async () => {
-    restore(previous);
-    await stop(server);
-  });
-  assert.equal(apiUrl('github.com'), `${origin}/graphql`, 'github.com is not pointed at the replay server');
-  return { get requests() { return seen; } };
+  t.after(() => stop(server));
+  assert.equal(endpointFor({ host: 'github.com', endpoint: origin }), origin, 'github.com is not pointed at the replay server');
+  return { origin, get requests() { return seen; } };
 }

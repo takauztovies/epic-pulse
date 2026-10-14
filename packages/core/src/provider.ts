@@ -32,7 +32,9 @@ export interface Parsed {
 export interface Provider {
   readonly kind: ProviderKind;
   token(host: string, env: NodeJS.ProcessEnv): Promise<string | undefined>;
-  send(token: string, batch: Batch): Promise<Result<RawResponse, Failure>>;
+  // `endpoint`: where github.com's API is, for a test's replay server (github.ts
+  // endpointFor). Only the GitHub provider reads it; Jira has no use for it.
+  send(token: string, batch: Batch, endpoint?: string): Promise<Result<RawResponse, Failure>>;
   parse(batch: Batch, response: RawResponse, settings: ProviderSettings): Result<Parsed, Failure>;
 }
 

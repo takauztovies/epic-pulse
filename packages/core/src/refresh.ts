@@ -38,6 +38,11 @@ export interface RefreshOptions {
   // The repository's project block, if any: the board whose Status the open
   // sub-issues on it take (board-fetch.ts). Read by the caller, like `jira`.
   readonly project?: ProjectConfig | undefined;
+  // Where github.com's API is, in place of api.github.com's: a test's replay server
+  // (packages/core/test/replay-server.ts). Nothing that ships passes it, and no
+  // environment variable or file can, so a github.com token goes to api.github.com
+  // and nowhere else. Only github.com's endpoint moves (github.ts endpointFor).
+  readonly githubApi?: string;
 }
 
 export type RefreshOutcome =
@@ -202,7 +207,7 @@ async function refreshLocked(options: RefreshOptions, lock: Lock): Promise<Refre
   if (waitsItsTurn(start, refs)) return { status: 'paced', until: now + usage.waitMs };
   const started = performance.now();
   const clock = () => now + Math.round(performance.now() - started);
-  const ctx: Context = { tokens: await tokensFor(start, refs, options), lock, clock, ledger: usage.ledger, settings: { jira: options.jira }, project: options.project };
+  const ctx: Context = { tokens: await tokensFor(start, refs, options), lock, clock, ledger: usage.ledger, settings: { jira: options.jira }, project: options.project, githubApi: options.githubApi };
   const resolved = await runPhaseA(start, refs, ctx);
   const run = await runPhaseB(await runBoard(resolved, toFetch(resolved, refs), ctx), refs, ctx);
   const next = finalSnapshot(run, refs);

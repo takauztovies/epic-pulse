@@ -97,34 +97,8 @@ export async function resolveToken(host: string, env: NodeJS.ProcessEnv): Promis
   return viaCli ? { token: viaCli, source: 'gh-cli' } : undefined;
 }
 
-// A test's way to put a replay server where github.com's API is
-// (packages/core/test/replay-server.ts). Production never sets it. The board is
-// read from github.com alone and every other host is reached over https, so
-// without a way in here a server on this machine, which speaks plain http, could
-// not be asked anything. The way in is as narrow as it can be made: only the
-// endpoint of github.com moves, and only to an origin that is exactly
-// `http://127.0.0.1:<port>` or `http://localhost:<port>`. Any other value is
-// ignored, so the variable can hand a github.com token to this machine and to no
-// other.
-export const API_BASE_TEST_ENV = 'EPIC_PULSE_TEST_API_BASE';
-const LOCAL_HOSTS: ReadonlySet<string> = new Set(['127.0.0.1', 'localhost']);
-
-// The text is compared with the origin the URL parser makes of it, so credentials,
-// a path, a query, a fragment, the default port and every spelling of the address
-// that the parser would rewrite (127.1, 0x7f.0.0.1, upper case) all differ from it
-// and are refused. One closing slash is let through, as people write it.
-function testApiBase(env: NodeJS.ProcessEnv): string | undefined {
-  const text = env[API_BASE_TEST_ENV]?.replace(/\/$/, '');
-  if (text === undefined || !URL.canParse(text)) return undefined;
-  const url = new URL(text);
-  return url.origin === text && url.protocol === 'http:' && LOCAL_HOSTS.has(url.hostname) && url.port !== '' ? text : undefined;
-}
-
-export function apiUrl(host: string, env: NodeJS.ProcessEnv = process.env): string {
-  if (host === DEFAULT_HOST) {
-    const local = testApiBase(env);
-    return local === undefined ? 'https://api.github.com/graphql' : `${local}/graphql`;
-  }
+export function apiUrl(host: string): string {
+  if (host === DEFAULT_HOST) return 'https://api.github.com/graphql';
   // GitHub Enterprise Cloud with data residency serves its API from api.<host>.
   return host.endsWith('.ghe.com') ? `https://api.${host}/graphql` : `https://${host}/api/graphql`;
 }
@@ -135,12 +109,29 @@ export interface PostOptions {
   readonly query: string;
   readonly variables: Readonly<Record<string, string>>;
   readonly timeoutMs?: number;
+  // Where github.com's API is, in place of api.github.com's (see endpointFor).
+  readonly endpoint?: string;
+}
+
+// Where a request goes: the host's own endpoint. A test can put a replay server
+// (packages/core/test/replay-server.ts) where github.com's is by passing its
+// address as `endpoint`. The board is read from github.com alone and every other
+// host is reached over https, so without a way in here a server on this machine,
+// which speaks plain http, could not be asked anything. An earlier revision took
+// that address from an environment variable, narrowed to this machine; but a
+// variable the shipped code reads is a way for whatever sets the user's
+// environment to move the endpoint a token is sent to, and "nothing can move it"
+// is a better promise than "nothing can move it far". The address is an argument
+// now, nothing that ships passes one, and only github.com's endpoint moves, so
+// another host's token is never sent to a replay server.
+export function endpointFor(options: Pick<PostOptions, 'host' | 'endpoint'>): string {
+  return options.host === DEFAULT_HOST && options.endpoint !== undefined ? options.endpoint : apiUrl(options.host);
 }
 
 // Raw transport. Throws on network failure: callers pass the error through
 // `describeFetchError`, never straight into a message or a file.
 export async function postGraphql(options: PostOptions): Promise<RawResponse> {
-  const res = await fetch(apiUrl(options.host), {
+  const res = await fetch(endpointFor(options), {
     method: 'POST',
     redirect: 'error', // an API endpoint never redirects; refuse rather than follow with credentials
     signal: AbortSignal.timeout(options.timeoutMs ?? 15_000),

@@ -22,7 +22,9 @@ import { demo, noGhEnv } from './snapshot-helpers.js';
 // The board read through the real fetch, parse and paging loop, against a
 // replay server (replay-server.ts) that serves recorded responses: what
 // board.test.ts and board-refresh.test.ts can not reach offline, the loop in
-// readBoard and the gates in runBoard. The numbers asserted here are literals
+// readBoard and the gates in runBoard. The server's address goes in as `githubApi`,
+// and every token here is a made-up one, in an environment of the test's own, so
+// the user's credentials never reach it. The numbers asserted here are literals
 // on purpose: a test that imported BOARD_MAX_PAGES would follow it when it moves.
 const T0 = Date.parse('2026-10-12T12:00:00Z');
 const PROJECT = parseProject({ owner: 'takauztovies', number: 3 })!;
@@ -35,13 +37,13 @@ function demoBoard(at: number): Board {
   return boardEntry(PROJECT, [page.value], at);
 }
 
-async function started(t: TestContext, board?: Board): Promise<{ readonly run: Run; readonly ctx: Context }> {
+async function started(t: TestContext, githubApi: string, board?: Board): Promise<{ readonly run: Run; readonly ctx: Context }> {
   const lock = await acquireLock(join(tempDir(t), 'refresh.lock'), { now: T0, staleMs: 60_000 });
   assert.ok(lock, 'the lock is free');
   const snapshot = board === undefined ? emptySnapshot(T0) : { ...emptySnapshot(T0), board };
   return {
     run: { now: T0, snapshot, requests: 0, points: 0, failure: null },
-    ctx: { tokens: new Map([['github.com', 'test-token']]), lock, clock: () => T0, project: PROJECT },
+    ctx: { tokens: new Map([['github.com', 'test-token']]), lock, clock: () => T0, project: PROJECT, githubApi },
   };
 }
 
@@ -58,8 +60,8 @@ function pageEnding(cursor: string): RawResponse {
 }
 
 test('a board that never ends is read for five pages and no more, and says it was cut', async (t) => {
-  const { run, ctx } = await started(t);
   const replay = await replayServer(t, (request) => pageEnding(`cursor-${request.index + 1}`));
+  const { run, ctx } = await started(t, replay.origin);
   const read = await runBoard(run, [demo(1)], ctx);
   assert.equal(replay.requests.length, 5);
   assert.deepEqual(replay.requests.map((request) => request.variables['after']), [undefined, 'cursor-1', 'cursor-2', 'cursor-3', 'cursor-4']);
@@ -79,8 +81,8 @@ const RATE_LIMITED: RawResponse = {
 test('a rate-limited board read keeps the last board through the run, and backs the run off', async (t) => {
   const last = demoBoard(T0 - EPIC_TTL_MS);
   assert.equal(Object.keys(last.items).length, 3, 'there is something to keep');
-  const { run, ctx } = await started(t, last);
   const replay = await replayServer(t, () => RATE_LIMITED);
+  const { run, ctx } = await started(t, replay.origin, last);
   const read = await runBoard(run, [demo(1)], ctx);
   assert.equal(replay.requests.length, 1);
   assert.deepEqual(read.snapshot.board, { ...last, fetchedAt: T0, error: 'rate_limited' });
@@ -88,8 +90,8 @@ test('a rate-limited board read keeps the last board through the run, and backs 
 });
 
 test('a board read within its time to live makes no request, and a board past it makes exactly one', async (t) => {
-  const { run, ctx } = await started(t, demoBoard(T0 - EPIC_TTL_MS));
   const replay = await replayServer(t, () => loadFixture('board-demo'));
+  const { run, ctx } = await started(t, replay.origin, demoBoard(T0 - EPIC_TTL_MS));
   const due = await runBoard(run, [demo(1)], ctx);
   assert.equal(replay.requests.length, 1, 'the control: a board that is due is read, so a request would show');
   assert.equal(due.snapshot.board?.fetchedAt, T0);
@@ -125,8 +127,8 @@ for (const option of INHERITED) {
   test(`a board option named ${option} maps to nothing, and the refresh stores the board and the epic whole`, async (t) => {
     const paths = await boundRegistry(t, [demo(1)]);
     const replay = await replayServer(t, (request) => recorded(request, renamedBoard(option)));
-    const env = noGhEnv(t);
-    const outcome = await refresh({ dir: paths.dir, now: Date.now(), env, tokens: { 'github.com': 'test-token' }, project: PROJECT });
+    const env = noGhEnv(t, { GH_TOKEN: 'replay' });
+    const outcome = await refresh({ dir: paths.dir, now: Date.now(), env, project: PROJECT, githubApi: replay.origin });
     assert.deepEqual(replay.requests.map(documentOf), ['PhaseA', 'Board', 'PhaseB']);
     assert.deepEqual(outcome.status === 'done' ? [outcome.requests, outcome.error] : outcome, [3, null]);
     const read = await readSnapshot(paths.snapshotFile);

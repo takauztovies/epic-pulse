@@ -40,6 +40,9 @@ export interface Context {
   readonly settings?: ProviderSettings;
   // The repository's project block: the board read before Phase B (board-fetch.ts).
   readonly project?: ProjectConfig | undefined;
+  // Where github.com's API is, handed to the GitHub provider's requests and to the
+  // board read (RefreshOptions.githubApi). Unset in every shipped run.
+  readonly githubApi?: string;
 }
 
 export interface Batch {
@@ -138,7 +141,7 @@ export async function runBatch(run: Run, batch: Batch, ctx: Context): Promise<Ru
   if (!token.ok) return failed(run, batch, token.error);
   const reserved = await reserve(run, batch, ctx);
   if (reserved.failure) return failed(reserved.run, batch, reserved.failure);
-  const sent = await providerFor(batch.repo).send(token.value, batch);
+  const sent = await providerFor(batch.repo).send(token.value, batch, ctx.githubApi);
   await touchLock(ctx.lock, ctx.clock());
   const counted = { ...reserved.run, requests: reserved.run.requests + 1 };
   const next = sent.ok ? answered(counted, batch, { res: sent.value, settings: ctx.settings }) : failed(counted, batch, sent.error);

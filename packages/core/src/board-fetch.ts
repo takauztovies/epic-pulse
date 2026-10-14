@@ -22,13 +22,14 @@ interface PageRequest {
   readonly token: string;
   readonly project: ProjectConfig;
   readonly after: string | undefined;
+  readonly endpoint?: string;
 }
 
 async function sendPage(request: PageRequest): Promise<Result<BoardPage, Failure>> {
   const { project, after } = request;
   const variables = { owner: project.owner, field: project.field, ...(after === undefined ? {} : { after }) };
   try {
-    return parseBoardPage(await postGraphql({ host: BOARD_HOST, token: request.token, query: boardDocument(project.number), variables }));
+    return parseBoardPage(await postGraphql({ host: BOARD_HOST, token: request.token, query: boardDocument(project.number), variables, endpoint: request.endpoint }));
   } catch (error) {
     return fail(describeFetchError(error));
   }
@@ -81,5 +82,5 @@ export async function runBoard(run: Run, targets: readonly IssueRef[], ctx: Cont
   if (project === undefined || !boardDue(run.snapshot.board, run.now)) return run;
   const token = ctx.tokens.get(BOARD_HOST);
   if (token === undefined || !targets.some((ref) => ref.host === BOARD_HOST && ref.kind !== 'jira')) return run;
-  return readBoard(run, { token, project }, ctx);
+  return readBoard(run, { token, project, endpoint: ctx.githubApi }, ctx);
 }

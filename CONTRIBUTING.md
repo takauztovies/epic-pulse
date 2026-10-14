@@ -29,8 +29,10 @@ people and agents alike. In short:
   error that is printed or stored carries a code, never a library's message.
 - A token lives in memory only. The hook stays offline, always exits 0 and stores refs and timestamps
   only.
-- Tests use `node:test` through `tsx`, flat `test()` calls, and no mocks, stubs, fake servers or test
-  doubles: real temp directories, real git repositories, and recorded real GitHub responses.
+- Tests use `node:test` through `tsx` and flat `test()` calls. No mocks, stubs or test doubles. Network
+  tests use a real `node:http` replay server on 127.0.0.1 serving recorded responses
+  (`packages/core/test/replay-server.ts`), passed in as `githubApi`, never via env. Live tests still
+  cover api.github.com itself. Everything else is real too: temp directories and git repositories.
 - Every guard needs a test that can fail. Break the guard, watch the test go red for that reason,
   restore the file byte for byte, watch it go green.
 - Fixtures and examples come only from this repository's own public demo issues.
@@ -39,7 +41,7 @@ people and agents alike. In short:
 
 ## Tests that call GitHub
 
-Fetching is covered only by live tests against this repository's public demo issues. They need a
+The live tests call GitHub itself, against this repository's public demo issues. They need a
 token (`GH_TOKEN`, or `gh auth login`):
 
 ```

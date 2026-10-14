@@ -34,12 +34,15 @@ ESLint fails at 250 and 30 lines. Treat that as the ceiling, not the target.
 ## Tests
 
 - Runner: `node:test` through `tsx`. `pnpm test` runs everything offline.
-- No mocks, stubs, fake servers or test doubles. Use real temp directories, real
-  temp git repositories (`git init`, `git worktree add`) and recorded real
-  GraphQL responses fed to the parse layer (`fixtures/graphql/`, written by
-  `pnpm record-fixtures`).
-- Network fetching is covered only by live tests against the public demo repo,
-  gated behind `EPIC_PULSE_LIVE=1` (`pnpm test:live`).
+- No mocks, stubs or test doubles. Network tests use a real `node:http` replay
+  server on 127.0.0.1 serving recorded responses
+  (`packages/core/test/replay-server.ts`), passed in as `githubApi`, never via
+  env. Live tests still cover api.github.com itself.
+- Everything else is real too: temp directories, temp git repositories (`git
+  init`, `git worktree add`) and recorded real GraphQL responses fed to the parse
+  layer (`fixtures/graphql/`, written by `pnpm record-fixtures`).
+- Live tests run against the public demo repo, gated behind `EPIC_PULSE_LIVE=1`
+  (`pnpm test:live`).
 - Time is an argument (`now`), never a fake clock.
 - Every guard needs a test that can fail. Break the guard, watch that test go red
   for the intended reason, restore the file byte for byte, watch it go green.
