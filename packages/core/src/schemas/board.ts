@@ -6,7 +6,7 @@ import { ERROR_CODES, IssueNumberSchema, OwnerSchema, safeText, StatusSchema } f
 // project block is untrusted repository data, the board answer is GitHub's, and
 // the board entry is read back from the snapshot file.
 
-export const BOARD_LIMITS = { maxFieldLength: 100, maxNameLength: 100, maxStatusMap: 60, maxItems: 500, maxUnmapped: 20 } as const;
+export const BOARD_LIMITS = { maxFieldLength: 100, maxNameLength: 100, maxStatusMap: 60, maxItems: 500, maxUnmapped: 20, maxTimeMs: 8.64e15 } as const;
 
 // The project block once checked: whose project, its number, which single-select
 // field holds the status, and the repository's own option-name overrides, keyed
@@ -31,10 +31,19 @@ export const BoardErrorSchema = z.enum(['scope', ...ERROR_CODES]);
 // (for `epic-pulse doctor`). `truncated`: the board had more pages than are read.
 // Doctor prints those names, so they pass safeText here too, not only where
 // GitHub's answer is read: an older version stored them as GitHub sent them.
+// `fetchedAt` is the last attempt, which paces the next (board.ts boardDue), so
+// after a failure it is the failure's. `readAt` is when `items` were last read:
+// after a failure that kept them, the read before it, so doctor can say how old
+// the statuses are; null where no read is held. Doctor prints it as a date, and
+// a Date holds nothing past `maxTimeMs` (toISOString throws), so a corrupt one
+// makes the entry malformed, which reads as no board. So does an entry written
+// before `readAt` existed: it has no time to say its items are from, and it is
+// read again with the epics.
 export const BoardSchema = z
   .object({
     project: ProjectConfigSchema,
     fetchedAt: z.number().int().nonnegative(),
+    readAt: z.number().int().nonnegative().max(BOARD_LIMITS.maxTimeMs).nullable(),
     error: BoardErrorSchema.nullable(),
     truncated: z.boolean(),
     items: z

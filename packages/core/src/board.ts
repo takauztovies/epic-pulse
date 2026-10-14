@@ -39,15 +39,16 @@ export function boardEntry(project: ProjectConfig, pages: readonly BoardPage[], 
   });
   const unmapped = items.flatMap((item) => (item.option !== null && mapOption(project, item.option) === undefined ? [item.option.slice(0, BOARD_LIMITS.maxNameLength)] : []));
   const truncated = (pages.at(-1)?.next ?? null) !== null;
-  return { project, fetchedAt: now, error: null, truncated, items: Object.fromEntries(mapped), unmapped: [...new Set(unmapped)].slice(0, BOARD_LIMITS.maxUnmapped) };
+  return { project, fetchedAt: now, readAt: now, error: null, truncated, items: Object.fromEntries(mapped), unmapped: [...new Set(unmapped)].slice(0, BOARD_LIMITS.maxUnmapped) };
 }
 
-// A failed read. A transient one keeps what was read before; any other leaves
-// no items, so every issue shows its derived status until a read succeeds.
+// A failed read. A transient one keeps what was read before, and when; any other
+// leaves no items, so every issue shows its derived status until a read succeeds.
+// `fetchedAt` is this attempt's, so only `readAt` still says how old the items are.
 export function boardFailed(previous: Board | undefined, project: ProjectConfig, failure: { readonly failure: Failure; readonly now: number }): Board {
   const error = boardErrorOf(failure.failure);
   const kept = TRANSIENT.has(error) && previous ? previous : undefined;
-  return { project, fetchedAt: failure.now, error, truncated: kept?.truncated ?? false, items: kept?.items ?? {}, unmapped: kept?.unmapped ?? [] };
+  return { project, fetchedAt: failure.now, readAt: kept?.readAt ?? null, error, truncated: kept?.truncated ?? false, items: kept?.items ?? {}, unmapped: kept?.unmapped ?? [] };
 }
 
 // The board is read with the epics (EPIC_TTL_MS), and a lasting refusal is

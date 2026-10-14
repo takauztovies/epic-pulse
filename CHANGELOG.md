@@ -49,6 +49,16 @@ Every notable change to epic-pulse is listed here. Versions follow
   reached `epic-pulse json` and the VS Code views unchanged, as one in an `EPIC_PULSE_HOSTS` entry
   reached `epic-pulse doctor`. Every control character (C0, DEL, C1) and bidi control is now stored
   and shown as `?`, from a snapshot an older version wrote too; an emoji keeps its ZWJ and VS16.
+- **The same for summaries, assignees and the board's `field`, and for three more characters.** An
+  epic's summary and a Jira assignee's display name reached the VS Code hovers as their editors typed
+  them, and `epic-pulse doctor` printed `project.field` from `.epic-pulse.json` as written (GitHub is
+  still asked for it as written). All three now show a control or bidi character as `?`, and the
+  Arabic letter mark (U+061C) and the line and paragraph separators (U+2028, U+2029), which the set
+  had missed, now do too. A title cut at its limit no longer ends in half an emoji.
+- **`epic-pulse doctor` says where the statuses come from after a failed board read.** A network,
+  timeout or rate-limit failure keeps the last board's items, yet doctor said the statuses were
+  derived. It now says "from the last good read at" that read's time (the board entry gains
+  `readAt`), and keeps "derived" for a failure that kept no items.
 
 ## 0.3.6
 

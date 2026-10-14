@@ -5,6 +5,7 @@ import { boardDocument, parseBoardPage, type BoardPage } from '../src/board-quer
 import { BOARD_MAX_PAGES, BOARD_RETRY_MS, boardDue, boardEntry, boardFailed, boardFor, nextCursor } from '../src/board.js';
 import type { RawResponse } from '../src/github.js';
 import { EPIC_TTL_MS } from '../src/refresh-plan.js';
+import { BOARD_LIMITS } from '../src/schemas/board.js';
 import { SnapshotSchema } from '../src/schemas/snapshot.js';
 import { emptySnapshot } from '../src/snapshot.js';
 import { loadFixture } from './helpers.js';
@@ -94,6 +95,42 @@ test('a network failure keeps the last board and is asked again with the epics',
   assert.equal(boardDue(failed, T0 + 1 + EPIC_TTL_MS), true);
   assert.equal(boardDue(read, T0 + EPIC_TTL_MS - 1), false);
   assert.equal(boardDue(undefined, T0), true);
+});
+
+// `fetchedAt` is the last attempt, which is what paces the next one, so after a
+// failure it is the failure's time. `readAt` is when the items were read, for
+// doctor to say how old the statuses are: it must survive every failure that
+// keeps them, and be none where they were not kept.
+test('a failed read keeps when its items were read, however many fail after it, and none where they were not kept', () => {
+  const read = boardEntry(PROJECT, [page('board-demo')], T0);
+  const once = boardFailed(read, PROJECT, { failure: { code: 'network', detail: null }, now: T0 + 1 });
+  const twice = boardFailed(once, PROJECT, { failure: { code: 'timeout', detail: null }, now: T0 + 2 });
+  assert.deepEqual([read.readAt, once.readAt, twice.readAt, twice.fetchedAt], [T0, T0, T0, T0 + 2]);
+  const refused = boardFailed(read, PROJECT, { failure: { code: 'unauthorized', detail: null }, now: T0 + 1 });
+  assert.deepEqual([refused.readAt, refused.items], [null, {}]);
+  assert.equal(boardFailed(undefined, PROJECT, { failure: { code: 'network', detail: null }, now: T0 }).readAt, null);
+});
+
+// Doctor prints `readAt` as a date, and toISOString throws past the last instant
+// a Date holds: a time beyond it is a malformed entry, which reads as no board.
+test('a board whose read time is past the last date a Date holds reads as none', () => {
+  assert.doesNotThrow(() => new Date(BOARD_LIMITS.maxTimeMs).toISOString());
+  assert.throws(() => new Date(BOARD_LIMITS.maxTimeMs + 1).toISOString(), RangeError);
+  const entry = boardEntry(PROJECT, [page('board-demo')], T0);
+  const stored = (readAt: number) => SnapshotSchema.parse({ ...emptySnapshot(T0), board: { ...entry, readAt } }).board;
+  assert.equal(stored(BOARD_LIMITS.maxTimeMs)?.readAt, BOARD_LIMITS.maxTimeMs);
+  assert.equal(stored(BOARD_LIMITS.maxTimeMs + 1), undefined);
+});
+
+// A board entry from before `readAt` existed has no time to say its items are
+// from, so it is a malformed entry like any other: it reads as no board and is
+// read again with the epics, rather than shown with statuses nobody can date.
+test('a board entry written before readAt existed reads as none', () => {
+  const entry = boardEntry(PROJECT, [page('board-demo')], T0);
+  const older = Object.fromEntries(Object.entries(entry).filter(([key]) => key !== 'readAt'));
+  const stored = (board: unknown) => SnapshotSchema.parse({ ...emptySnapshot(T0), board }).board;
+  assert.deepEqual(stored(entry), entry, 'with its read time it is a board');
+  assert.equal(stored(older), undefined);
 });
 
 // GitHub's answer to a query past the token's hour: a 200 whose one error is

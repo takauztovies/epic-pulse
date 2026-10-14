@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { boardEntry, boardFailed, parseBoardPage, parseProject, projectToEnv, readSnapshot, writeSnapshot, type Board } from '@epic-pulse/core';
+import { boardEntry, boardFailed, parseBoardPage, parseProject, projectToEnv, readSnapshot, writeSnapshot, type Board, type BoardPage, type ErrorCode } from '@epic-pulse/core';
 import { demoSnapshot } from './fixtures.js';
 import { cliEnv, demoRepo, registryOf, runCli, sandbox, type Sandbox } from './helpers.js';
 
@@ -75,7 +75,7 @@ test('doctor names the scope a refused board needs, and the options that map to 
 // (U+202E) before an emoji held together by a ZWJ. Neither maps to a status.
 const HOSTILE: Readonly<Record<string, string>> = { Todo: '\u001b[2J\u009b31mBlocked', 'In Progress': '\u202e\u{1F469}\u200d\u{1F4BB} Pairing' };
 const SHOWN = ['?[2J?31mBlocked', '?\u{1F469}\u200d\u{1F4BB} Pairing'];
-const UNSAFE = /\p{Cc}|[\u200e\u200f\u202a-\u202e\u2066-\u2069]/u;
+const UNSAFE = /\p{Cc}|[\u061c\u200e\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069]/u;
 
 function hostileAnswer(): Board {
   const recording = JSON.parse(readFileSync(RECORDING, 'utf8')) as { status: number; body: unknown };
@@ -98,4 +98,66 @@ test('doctor prints an option name with ? for its control and bidi characters, a
   // As a version before the sanitiser stored them: the names GitHub sent.
   writeFileSync(registryOf(repo).snapshotFile, JSON.stringify({ ...demoSnapshot(NOW), board: { ...stored.board, unmapped: Object.values(HOSTILE) } }));
   assert.equal(await doctorBoardLine(repo, box), expected, 'a snapshot an older version wrote');
+});
+
+// `field` is the repository's own text, from .epic-pulse.json, and doctor prints
+// it: an escape sequence, a one-byte CSI, an override, a line separator and an
+// Arabic letter mark. The separator is not at an end, where the block's trim()
+// would take it. GitHub is still asked for the field as it was written.
+const FIELD = 'St\u001b[2J\u009b\u202ea\u2028t\u061cus';
+const LABEL = 'takauztovies project 3, field St?[2J??a?t?us';
+
+function failed(previous: Board | undefined, code: ErrorCode, now: number): Board {
+  return boardFailed(previous, PROJECT, { failure: { code, detail: null }, now });
+}
+
+test('doctor prints a field name with ? for its control and bidi characters, in every state of the board', async (t) => {
+  const repo = demoRepo(t);
+  const box = sandbox(t);
+  const project = parseProject({ ...BLOCK, field: FIELD })!;
+  writeFileSync(join(repo, '.epic-pulse.json'), JSON.stringify({ project: { ...BLOCK, field: FIELD } }));
+  const states: readonly (readonly [Board | undefined, string])[] = [
+    [undefined, 'not read yet'],
+    [boardEntry(project, [{ items: [], next: null }], NOW), '0 items mapped'],
+    [boardFailed(undefined, project, { failure: { code: 'network', detail: null }, now: NOW }), 'the last read failed (network); statuses are derived'],
+  ];
+  for (const [board, said] of states) {
+    const line = await boardLine(repo, box, board);
+    assert.equal(line, `${LABEL}: ${said}`);
+    assert.doesNotMatch(line ?? '', UNSAFE);
+  }
+  assert.equal(project.field, FIELD, 'GitHub is sent the name as written');
+});
+
+// After a failed read: a network, timeout or rate_limited failure keeps the
+// last board's items, so the statuses are from the read that made them, at its
+// time, however many reads failed since. Any other refusal left none, as did a
+// first read that failed and a last board that mapped no item.
+const NOTHING_MAPPED: BoardPage = { items: [{ key: 'takauztovies/epic-pulse#5', option: 'Icebox' }], next: null };
+
+test('doctor says a failed read left the statuses from the last good read, at its time, or derived when it kept no item', async (t) => {
+  const repo = demoRepo(t);
+  const box = sandbox(t);
+  writeFileSync(join(repo, '.epic-pulse.json'), JSON.stringify({ project: BLOCK }));
+  const at = new Date(NOW).toISOString();
+  const limited = failed(demoBoard(), 'rate_limited', NOW + 1000);
+  const said: readonly (readonly [Board, string])[] = [
+    [limited, `the last read failed (rate_limited); statuses are from the last good read at ${at}`],
+    [failed(limited, 'network', NOW + 2000), `the last read failed (network); statuses are from the last good read at ${at}`],
+    [failed(demoBoard(), 'unauthorized', NOW + 1000), 'the last read failed (unauthorized); statuses are derived'],
+    [failed(undefined, 'timeout', NOW), 'the last read failed (timeout); statuses are derived'],
+    [failed(boardEntry(PROJECT, [NOTHING_MAPPED], NOW), 'network', NOW + 1000), 'the last read failed (network); statuses are derived'],
+  ];
+  for (const [board, text] of said) assert.equal(await boardLine(repo, box, board), `takauztovies project 3, field Status: ${text}`);
+});
+
+// A snapshot is a file. A read time that no Date can print would make doctor
+// throw where it must report, so it is a malformed board: it reads as none.
+test('doctor still reports a board whose read time is no date', async (t) => {
+  const repo = demoRepo(t);
+  writeFileSync(join(repo, '.epic-pulse.json'), JSON.stringify({ project: BLOCK }));
+  const corrupt = { ...failed(demoBoard(), 'network', NOW + 1000), readAt: 9e15 };
+  await writeSnapshot(registryOf(repo).snapshotFile, demoSnapshot(NOW)); // makes the registry directory
+  writeFileSync(registryOf(repo).snapshotFile, JSON.stringify({ ...demoSnapshot(NOW), board: corrupt }));
+  assert.equal(await doctorBoardLine(repo, sandbox(t)), 'takauztovies project 3, field Status: not read yet');
 });

@@ -1,8 +1,11 @@
-import { loadProjectFor, pathsFor, readSnapshot, registryDirFor, sameProject, BOARD_SCOPE_HINT, type Board, type ProjectConfig } from '@epic-pulse/core';
-import type { Check } from './doctor-checks.js';
+import { loadProjectFor, pathsFor, readSnapshot, registryDirFor, safeChars, sameProject, BOARD_SCOPE_HINT, type Board, type ProjectConfig } from '@epic-pulse/core';
+import { iso, type Check } from './doctor-checks.js';
 
+// The block is the repository's own text (.epic-pulse.json) and doctor writes it
+// to a terminal, so a control or bidi character in `field` shows as `?`. Only
+// what is printed is cleaned: GitHub is still asked for the field as written.
 function named(project: ProjectConfig): string {
-  return `${project.owner} project ${project.number}, field ${project.field}`;
+  return safeChars(`${project.owner} project ${project.number}, field ${project.field}`);
 }
 
 // How the last read went: what it mapped, whether the board was cut at the
@@ -18,10 +21,19 @@ function readState(board: Board): string {
   return parts.join('; ');
 }
 
+// Where the statuses come from once a read failed. A failure that kept the last
+// board's items (network, timeout, rate_limited) leaves them from the read that
+// made them, which is older than the failure; any other left none, and so does a
+// board that had mapped none, so every issue shows its derived status.
+function statusSource(board: Board): string {
+  const { readAt, items } = board;
+  return readAt !== null && Object.keys(items).length > 0 ? `from the last good read at ${iso(readAt)}` : 'derived';
+}
+
 export function boardState(project: ProjectConfig, board: Board | undefined): string {
   if (board === undefined || !sameProject(board.project, project)) return `${named(project)}: not read yet`;
   if (board.error === 'scope') return BOARD_SCOPE_HINT;
-  if (board.error !== null) return `${named(project)}: the last read failed (${board.error}); statuses are derived`;
+  if (board.error !== null) return `${named(project)}: the last read failed (${board.error}); statuses are ${statusSource(board)}`;
   return `${named(project)}: ${readState(board)}`;
 }
 
