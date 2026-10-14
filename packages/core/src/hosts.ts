@@ -1,4 +1,4 @@
-import { HostSchema, safeChars } from './schemas/common.js';
+import { cutAt, HostSchema, safeChars } from './schemas/common.js';
 
 // An entry of EPIC_PULSE_HOSTS that is not a host, as it is shown, and why it
 // is not one. Such an entry used to be dropped without a word, so a mistyped
@@ -48,7 +48,7 @@ function reasonFor(entry: string): string {
 function shown(entry: string): string {
   if (TOKEN_PREFIX.test(entry) || SECRET_SHAPE.test(entry)) return '(not shown: it looks like a token)';
   const clean = safeChars(entry);
-  return clean.length > MAX_SHOWN ? `${clean.slice(0, MAX_SHOWN)}...` : clean;
+  return clean.length > MAX_SHOWN ? `${cutAt(clean, MAX_SHOWN)}...` : clean;
 }
 
 // The comma-separated EPIC_PULSE_HOSTS. Each entry is trimmed and lowercased as

@@ -61,6 +61,17 @@ test('an entry shows its C1 and bidi controls as ?, and an emoji in it whole', (
   assert.equal(shown('ghe.\u{1F469}\u200d\u{1F4BB}.com'), 'ghe.\u{1F469}\u200d\u{1F4BB}.com');
 });
 
+// The cut at 60 counts UTF-16 units, so it can fall between the two halves of an
+// emoji and keep the first: a lone surrogate in front of the dots, which a
+// terminal or a log file shows as U+FFFD. The emoji goes whole instead.
+const GRIN = '\u{1F600}';
+
+test('an entry cut at its limit never ends in half an emoji, and keeps one that fits', () => {
+  const shown = (entry: string) => parseHostList(entry).problems[0]?.entry;
+  assert.equal(shown(`${'a'.repeat(59)}${GRIN}${'b'.repeat(40)}`), `${'a'.repeat(59)}...`, 'the cut falls between its halves');
+  assert.equal(shown(`${'a'.repeat(58)}${GRIN}${'b'.repeat(40)}`), `${'a'.repeat(58)}${GRIN}...`, 'one that ends at the cut stays');
+});
+
 test('a problem reads as one line naming the entry and the reason', () => {
   const [problem] = parseHostList('https://ghe.example.com').problems;
   assert.ok(problem, 'no problem was reported');

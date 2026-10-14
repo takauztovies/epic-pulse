@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { test } from 'node:test';
 import { promisify } from 'node:util';
-import { apiUrl, describeFetchError, ghChildEnv, postGraphql, resolveToken } from '../src/github.js';
+import { API_BASE_TEST_ENV, apiUrl, describeFetchError, ghChildEnv, postGraphql, resolveToken } from '../src/github.js';
 
 // An empty directory as PATH makes `gh` unfindable, so only env vars can answer.
 async function withNoGh<T>(run: (path: string) => Promise<T>): Promise<T> {
@@ -137,6 +137,34 @@ test('API endpoint per host flavour', () => {
   assert.equal(apiUrl('github.com'), 'https://api.github.com/graphql');
   assert.equal(apiUrl('ghe.example.com'), 'https://ghe.example.com/api/graphql');
   assert.equal(apiUrl('acme.ghe.com'), 'https://api.acme.ghe.com/graphql');
+});
+
+// A test can put a replay server where github.com's API is (replay-server.ts),
+// and nothing else can move it: only an origin that is exactly http on
+// 127.0.0.1 or localhost with a port, so the variable can hand a github.com
+// token to this machine and to no other.
+const LOCAL = 'http://127.0.0.1:4010';
+
+test('the test variable moves github.com to an http origin on this machine, and no other host', () => {
+  assert.equal(apiUrl('github.com', { [API_BASE_TEST_ENV]: LOCAL }), 'http://127.0.0.1:4010/graphql');
+  assert.equal(apiUrl('github.com', { [API_BASE_TEST_ENV]: 'http://localhost:4010/' }), 'http://localhost:4010/graphql');
+  for (const host of ['ghe.example.com', 'acme.ghe.com']) assert.equal(apiUrl(host, { [API_BASE_TEST_ENV]: LOCAL }), apiUrl(host, {}), host);
+});
+
+// Each way of naming somewhere else, or something more than an origin: another
+// scheme, no port or the default one, another address, a name that only begins
+// like a local one, credentials, a path, a query, a fragment, IPv6, and the
+// spellings the URL parser would turn into 127.0.0.1 behind the text's back.
+const NOT_LOCAL = [
+  'https://127.0.0.1:4010', 'ftp://127.0.0.1:4010', 'http://127.0.0.1', 'http://127.0.0.1:80', 'http://127.0.0.2:4010', 'http://192.168.1.5:4010',
+  'http://example.com:4010', 'http://127.0.0.1.example.com:4010', 'http://localhost.example.com:4010', 'http://user@127.0.0.1:4010',
+  'http://127.0.0.1:4010/graphql', 'http://127.0.0.1:4010?x=1', 'http://127.0.0.1:4010#x', 'http://[::1]:4010', 'http://127.1:4010',
+  'http://0x7f.0.0.1:4010', 'HTTP://LOCALHOST:4010', '127.0.0.1:4010', 'localhost', '', ' ',
+];
+
+test('a value that is not exactly such an origin is ignored, and github.com is reached where it always was', () => {
+  for (const text of NOT_LOCAL) assert.equal(apiUrl('github.com', { [API_BASE_TEST_ENV]: text }), 'https://api.github.com/graphql', JSON.stringify(text));
+  assert.equal(apiUrl('github.com', {}), 'https://api.github.com/graphql');
 });
 
 test('a failed request maps to a code plus an errno name, not to the library message', async () => {

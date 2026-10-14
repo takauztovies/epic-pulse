@@ -59,6 +59,14 @@ Every notable change to epic-pulse is listed here. Versions follow
   timeout or rate-limit failure keeps the last board's items, yet doctor said the statuses were
   derived. It now says "from the last good read at" that read's time (the board entry gains
   `readAt`), and keeps "derived" for a failure that kept no items.
+- **A board option named `Constructor` no longer voids the board.** Option names were looked up in
+  plain objects, and `Constructor`, which reads as `constructor`, found the `Object` function where a
+  status belongs: the board entry was dropped when the snapshot was written, and the epic holding
+  that issue was stored with no children and `invalid_response`, on every refresh. Only an entry the
+  status map or the default table holds itself counts now, and it must be one of the five statuses.
+- **A summary or a host entry cut mid-text no longer ends in half an emoji.** The summary's cut at
+  half its limit, and the cut of a long `EPIC_PULSE_HOSTS` entry in `doctor`'s notice, could keep the
+  first half of an emoji in front of the ellipsis, which shows as U+FFFD. The emoji goes whole now.
 
 ## 0.3.6
 

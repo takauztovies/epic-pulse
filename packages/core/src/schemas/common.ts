@@ -41,10 +41,17 @@ export function safeChars(text: string): string {
 // snapshot parses it, so by then the text is at the cap and nothing is cut here.
 const HIGH_SURROGATE_AT_END = /[\uD800-\uDBFF]$/;
 
+// The same cut for text that gets a mark after it, an ellipsis (summary.ts,
+// hosts.ts): there the lone half would sit before the mark, not at the end, and
+// nothing later strips it.
+export function cutAt(text: string, max: number): string {
+  return text.slice(0, max).replace(HIGH_SURROGATE_AT_END, '');
+}
+
 // The pass, then a cap at `max` rather than a refusal, so one long title can
 // not void the snapshot that holds it.
 export function safeText(max: number): z.ZodPipe<z.ZodString, z.ZodTransform<string, string>> {
-  return z.string().transform((text) => safeChars(text).slice(0, max).replace(HIGH_SURROGATE_AT_END, ''));
+  return z.string().transform((text) => cutAt(safeChars(text), max));
 }
 
 // Which tracker a reference belongs to. Absent means GitHub, so every file

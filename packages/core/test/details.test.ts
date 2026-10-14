@@ -59,6 +59,18 @@ test('a summary is the readable opening of a description, never markup, links or
   assert.ok(cut.length <= SUMMARY_MAX + 1 && cut.endsWith('…') && !cut.includes('wor…'), cut);
 });
 
+// A run with no space to cut at is cut at half the limit, in UTF-16 units, which
+// can fall between the two halves of an emoji and keep the first: a lone
+// surrogate in front of the ellipsis. The snapshot's own cap (safeText) strips one
+// only at the very end, so this one would be stored and shown as U+FFFD.
+const GRIN = '\u{1F600}';
+
+test('a summary cut mid-word never ends in half an emoji, and keeps one that fits', () => {
+  const half = SUMMARY_MAX / 2;
+  assert.equal(summaryOf(`${'a'.repeat(half - 1)}${GRIN}${'b'.repeat(200)}`), `${'a'.repeat(half - 1)}…`, 'the cut falls between its halves');
+  assert.equal(summaryOf(`${'a'.repeat(half - 2)}${GRIN}${'b'.repeat(200)}`), `${'a'.repeat(half - 2)}${GRIN}…`, 'one that ends at the cut stays');
+});
+
 // GitHub's issue body limit. Each of these made one pattern rescan to the end
 // from every character: about two seconds each at this size, per epic, per refresh.
 test('a description built to make the cleaning patterns rescan can not stall a refresh', () => {

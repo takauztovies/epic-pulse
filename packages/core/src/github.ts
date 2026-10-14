@@ -97,8 +97,34 @@ export async function resolveToken(host: string, env: NodeJS.ProcessEnv): Promis
   return viaCli ? { token: viaCli, source: 'gh-cli' } : undefined;
 }
 
-export function apiUrl(host: string): string {
-  if (host === DEFAULT_HOST) return 'https://api.github.com/graphql';
+// A test's way to put a replay server where github.com's API is
+// (packages/core/test/replay-server.ts). Production never sets it. The board is
+// read from github.com alone and every other host is reached over https, so
+// without a way in here a server on this machine, which speaks plain http, could
+// not be asked anything. The way in is as narrow as it can be made: only the
+// endpoint of github.com moves, and only to an origin that is exactly
+// `http://127.0.0.1:<port>` or `http://localhost:<port>`. Any other value is
+// ignored, so the variable can hand a github.com token to this machine and to no
+// other.
+export const API_BASE_TEST_ENV = 'EPIC_PULSE_TEST_API_BASE';
+const LOCAL_HOSTS: ReadonlySet<string> = new Set(['127.0.0.1', 'localhost']);
+
+// The text is compared with the origin the URL parser makes of it, so credentials,
+// a path, a query, a fragment, the default port and every spelling of the address
+// that the parser would rewrite (127.1, 0x7f.0.0.1, upper case) all differ from it
+// and are refused. One closing slash is let through, as people write it.
+function testApiBase(env: NodeJS.ProcessEnv): string | undefined {
+  const text = env[API_BASE_TEST_ENV]?.replace(/\/$/, '');
+  if (text === undefined || !URL.canParse(text)) return undefined;
+  const url = new URL(text);
+  return url.origin === text && url.protocol === 'http:' && LOCAL_HOSTS.has(url.hostname) && url.port !== '' ? text : undefined;
+}
+
+export function apiUrl(host: string, env: NodeJS.ProcessEnv = process.env): string {
+  if (host === DEFAULT_HOST) {
+    const local = testApiBase(env);
+    return local === undefined ? 'https://api.github.com/graphql' : `${local}/graphql`;
+  }
   // GitHub Enterprise Cloud with data residency serves its API from api.<host>.
   return host.endsWith('.ghe.com') ? `https://api.${host}/graphql` : `https://${host}/api/graphql`;
 }

@@ -50,11 +50,23 @@ export function parseProject(value: unknown): ProjectConfig | undefined {
   return { owner, number, field: field ?? DEFAULT_BOARD_FIELD, statusMap: statusMapOf(raw.data.statusMap) };
 }
 
+// An option's name is whatever a board's editors typed, and both tables are
+// plain objects, so a read by that name finds what every object inherits: an
+// option called `Constructor` is `constructor` once normalised, and the table
+// answered with `Object`, a function that is no status. That one status voided
+// the board entry and the epic it sat in, on every run. Only an entry the table
+// holds itself counts, and what it holds must still be one of the five.
+function lookup(table: Readonly<Record<string, Status>>, key: string): Status | undefined {
+  if (!Object.hasOwn(table, key)) return undefined;
+  const status = StatusSchema.safeParse(table[key]);
+  return status.success ? status.data : undefined;
+}
+
 // The status an option name stands for: the repository's map first, then the
 // default table. Undefined: unmapped, so the issue keeps its derived status.
 export function mapOption(project: ProjectConfig, name: string): Status | undefined {
   const key = normaliseOption(name);
-  return project.statusMap[key] ?? DEFAULT_BOARD_MAP[key];
+  return lookup(project.statusMap, key) ?? lookup(DEFAULT_BOARD_MAP, key);
 }
 
 // Two project blocks are the same board, read the same way, whatever order the

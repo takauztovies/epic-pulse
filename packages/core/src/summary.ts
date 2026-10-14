@@ -1,3 +1,5 @@
+import { cutAt } from './schemas/common.js';
+
 // A few readable lines of an epic's description for the hover, never the
 // whole text: comments, code blocks, images, link targets, heading marks and
 // emphasis marks are dropped, whitespace is collapsed, and what is left is
@@ -28,5 +30,5 @@ export function summaryOf(body: string): string | undefined {
   if (text.length === 0) return undefined;
   if (text.length <= SUMMARY_MAX) return text;
   const cut = text.slice(0, SUMMARY_MAX);
-  return `${cut.slice(0, Math.max(cut.lastIndexOf(' '), SUMMARY_MAX / 2))}…`;
+  return `${cutAt(cut, Math.max(cut.lastIndexOf(' '), SUMMARY_MAX / 2))}…`;
 }
