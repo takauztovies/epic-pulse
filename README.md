@@ -63,9 +63,12 @@ closes, edits, labels or comments on an issue. See the [manual](docs/MANUAL.md).
 
 ## Near the usage limit
 
-Claude Code tells each session's status line how much of the account's 5-hour and weekly usage is
-spent (Claude Code 2.1.80 or later, on a subscription). From 90% the status line of **every** session
-puts a red warning in front of the epic:
+Only a terminal session receives the reading; the VS Code panel and the Desktop app do not. Running one
+terminal session alongside lets the prompt hook warn the others.
+
+Claude Code hands a terminal session's status line the reading: how much of the account's 5-hour and
+weekly usage is spent (Claude Code 2.1.80 or later, on a subscription). From 90% that status line puts
+a red warning in front of the epic:
 
 ```
 ⚠ 91% 5h limit, resets in 2h10m · /compact · #12 ▓▓▓░░░░░░░ 30% 3/10
@@ -73,12 +76,16 @@ puts a red warning in front of the epic:
 
 The plugin's prompt hook also tells each session's agent once, on your next prompt, to finish the step
 it is on, write a short handoff, start no new subagents or long-running work, and suggest `/compact`.
-It is told again at 95% and 99%, and again in the next usage window; the note is a few dozen tokens.
+It works from the reading a terminal session's status line saved in your user cache directory, which
+every session shares, so a VS Code session is told too, while that reading is no more than ten minutes
+old. It is told again at 95% and 99%, and again in the next usage window; the note is a few dozen tokens.
 
 What it can not do: no program can type `/compact` into another session for you, and compacting does
 not give back what was spent; it makes the next turns cheaper. Set `EPIC_PULSE_LIMIT_WARN` (50 to 100)
 to warn earlier or later, and `NO_COLOR` for no colour. Both need the status line installed
-(`epic-pulse statusline install`), since that is where Claude Code reports the usage.
+(`epic-pulse statusline install`), since that is where Claude Code reports the usage. The `usage limit`
+line of `epic-pulse doctor` says whether a reading has arrived and how old it is: `no reading yet`,
+`last reading` with its time and percentages, or `stale` once it is more than five hours old.
 
 ## Set up the status line
 
@@ -429,6 +436,7 @@ epic-pulse doctor
   statusLine (user):    installed: ~/.claude/settings.json
   statusLine (project): not installed: /path/to/repo/.claude/settings.json
   runtime:              present, the same build as this one: ~/.claude/epic-pulse/runtime.mjs
+  usage limit:          last reading 2026-01-01T12:00:00.000Z (5h 42%, 7d 12%)
 ```
 
 An entry of `EPIC_PULSE_HOSTS` that is not a host (`https://ghe.example.com`, `ghe.example.com/api`, a

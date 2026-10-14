@@ -17,6 +17,11 @@ Every notable change to epic-pulse is listed here. Versions follow
   with an `ETA:` line. Stale data and epics marked `+` keep their ETA. Each epic in
   `epic-pulse json` gains `eta`, an ISO datetime or `null` (fewer than two closed in the window, or
   nothing left to do); the change is additive, so the JSON stays version 1.
+- **`doctor` shows the usage reading.** A new `usage limit` line says when Claude Code last reported
+  the account's usage and the 5-hour and weekly percentages it gave, `stale` when that was more than
+  five hours ago, or that no reading has arrived. Only a terminal status line receives the reading,
+  never the VS Code panel or the Desktop app; the README and the manual now say so, and that a
+  terminal session running alongside lets the prompt hook warn the others.
 
 ### Fixed
 
