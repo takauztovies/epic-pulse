@@ -6,7 +6,9 @@ import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { test } from 'node:test';
 import { promisify } from 'node:util';
-import { apiUrl, describeFetchError, ghChildEnv, postGraphql, resolveToken } from '../src/github.js';
+import { apiUrl, describeFetchError, endpointFor, ghChildEnv, postGraphql, resolveToken } from '../src/github.js';
+import { loadFixture } from './helpers.js';
+import { replayServer } from './replay-server.js';
 
 // An empty directory as PATH makes `gh` unfindable, so only env vars can answer.
 async function withNoGh<T>(run: (path: string) => Promise<T>): Promise<T> {
@@ -137,6 +139,32 @@ test('API endpoint per host flavour', () => {
   assert.equal(apiUrl('github.com'), 'https://api.github.com/graphql');
   assert.equal(apiUrl('ghe.example.com'), 'https://ghe.example.com/api/graphql');
   assert.equal(apiUrl('acme.ghe.com'), 'https://api.acme.ghe.com/graphql');
+});
+
+// A test can put a replay server where github.com's API is (replay-server.ts) by
+// handing its address to the request, and nothing else can move it: the address
+// is an argument, so no variable or file reaches it, and it moves github.com's
+// endpoint alone, so no other host's token can be sent to it.
+const REPLAY = 'http://127.0.0.1:4010';
+
+test('an endpoint moves github.com and no other host, and without one every host is where it was', () => {
+  assert.equal(endpointFor({ host: 'github.com', endpoint: REPLAY }), REPLAY);
+  assert.equal(endpointFor({ host: 'github.com' }), 'https://api.github.com/graphql');
+  for (const host of ['ghe.example.com', 'acme.ghe.com']) {
+    assert.equal(endpointFor({ host, endpoint: REPLAY }), apiUrl(host), host);
+    assert.equal(endpointFor({ host }), apiUrl(host), host);
+  }
+});
+
+test('a request for github.com goes to the endpoint it is given, and one for another host never does', async (t) => {
+  const replay = await replayServer(t, () => loadFixture('board-demo'));
+  const sent = (host: string) => postGraphql({ host, token: 'replay', query: 'query { x }', variables: {}, endpoint: replay.origin, timeoutMs: 5000 });
+  assert.equal((await sent('github.com')).status, 200);
+  assert.equal(replay.requests.length, 1, 'the control: github.com reaches the replay server, so a request would show');
+  // .invalid never resolves (RFC 6761): the request goes to its own host and fails there.
+  const failure = await sent('epic-pulse.invalid').then(() => undefined, (error: unknown) => describeFetchError(error));
+  assert.equal(failure?.code, 'network');
+  assert.equal(replay.requests.length, 1, 'the replay server saw nothing of it');
 });
 
 test('a failed request maps to a code plus an errno name, not to the library message', async () => {

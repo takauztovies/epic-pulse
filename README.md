@@ -195,6 +195,24 @@ only limit is a 1.5-second tripwire that catches a render waiting on the network
 A close with no recorded reason (older closes have none) counts as Done: only "not planned" and
 "duplicate" take a sub-issue out of the count.
 
+### From a project board
+
+With a `project` block in `.epic-pulse.json` (see "Configuration"), an **open** sub-issue on that
+GitHub Project board takes the status its Status option names, Done and Dropped included. A board
+Dropped on an open issue takes it out of the count, as "not planned" does. A **closed** sub-issue
+keeps the status its close gives it: a board can not reopen it. An issue that is not on the board,
+or whose option maps to nothing, keeps the status in the table above. Option names are compared
+lowercased with everything but letters and digits removed, so `In Progress`, `in-progress` and
+`🚧 In progress` are one name:
+
+| Option names | Status |
+| --- | --- |
+| Todo, Backlog, Ready | Todo |
+| In progress, Doing, WIP | In progress |
+| In review, Review, QA, Testing | In review |
+| Done, Complete, Shipped | Done |
+| Won't do, Dropped, Cancelled, Not planned | Dropped |
+
 The percentage is Done over everything except Dropped. The bar next to it also credits work in
 flight: In progress counts a quarter and In review three quarters, so a bar ahead of the percentage
 means work is moving. It is full only when everything is Done. JSON v1 carries both, as `percent`
@@ -275,6 +293,12 @@ a field that is wrong falls back to its default without voiding the others.
     "site": "acme.atlassian.net",
     "projects": ["PROJ"],
     "statusMap": { "in qa": "in_review" }
+  },
+  "project": {
+    "owner": "acme",
+    "number": 3,
+    "field": "Status",
+    "statusMap": { "Blocked": "in_progress" }
   }
 }
 ```
@@ -300,6 +324,18 @@ a field that is wrong falls back to its default without voiding the others.
   (optional) lists the resolution names that mean the work was decided against; left out, it is
   Won't Do, Won't Fix, Duplicate, Declined, Rejected, Cannot Reproduce, Invalid and Obsolete. Without
   a valid `site` and at least one project the block is ignored.
+- `project`: a GitHub Project (v2) board whose single-select field sets the status of the open
+  sub-issues on it (see "From a project board"). `owner` is the user or organisation that owns the
+  project and `number` the number in its URL (`github.com/users/acme/projects/3`); without both the
+  block is ignored and no board is read. `field` is the field's name, `Status` when left out.
+  `statusMap` maps an option name (compared as above, up to 60) to `todo`, `in_progress`,
+  `in_review`, `done` or `dropped`, over the default table. Only the named project is read, with
+  one query of its own every two minutes alongside the epics, one point per 100 items, at most five
+  pages: on a larger board the rest keep their derived status. The token needs `read:project`
+  (`gh auth refresh -s read:project`); without it the board is skipped, every status is derived,
+  `epic-pulse doctor` and the VS Code view say so, and it is asked again after 30 minutes. A
+  board that fails never stops the epics from refreshing. `epic-pulse doctor` also lists option
+  names that map to nothing.
 
 ## Jira
 
@@ -462,6 +498,10 @@ about it.
   not fetched, is never made to wait.
 - **`error (forbidden)`** or **`error (not_found)`**: the token can not read that repository's
   issues, or it does not exist. GitHub's answer is kept for 30 minutes, so a fix shows within that.
+- **`board: token lacks read:project`** in `doctor` or the VS Code view: the `project` block names a
+  board the token can not read, so every status is derived. Run `gh auth refresh -s read:project`;
+  the board is asked again within 30 minutes. A `board:` line that lists **unmapped
+  options** names Status options the default table does not know: map them under `project.statusMap`.
 - **`runtime: present, a different build`** after an upgrade: start a new session, or run
   `epic-pulse statusline install` again.
 - **`epic-pulse json`** prints everything epic-pulse knows about the repository as versioned JSON,
@@ -476,7 +516,8 @@ about it.
   on itself stops where it repeats.
 - An epic's first 100 sub-issues, or the first 500 boxes of its task list, are counted; a larger epic
   is marked with `+`, not paged through.
-- Statuses come from issues, pull requests and assignees; GitHub Projects fields are not read yet.
+- Statuses come from issues, pull requests and assignees, and from one GitHub Project board when a
+  `project` block names it: its first 500 items, on github.com only. Other Projects fields are not read.
 - `statusline install` does not chain with a status line you already have; it refuses instead.
 - Only the direct parent of an issue is its epic.
 - A session that only reads issues (`gh issue view`) is not detected, by design.

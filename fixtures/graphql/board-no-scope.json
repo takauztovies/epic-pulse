@@ -1,0 +1,21 @@
+{
+  "recordedAt": "2026-10-12T15:43:08.365Z",
+  "note": "token without read:project",
+  "status": 200,
+  "remaining": 4998,
+  "retryAfter": false,
+  "body": {
+    "errors": [
+      {
+        "type": "INSUFFICIENT_SCOPES",
+        "locations": [
+          {
+            "line": 8,
+            "column": 91
+          }
+        ],
+        "message": "Your token has not been granted the required scopes to execute this query. The 'name' field requires one of the following scopes: ['read:project'], but your token has only been granted the: ['gist', 'read:org', 'repo', 'workflow'] scopes. Please modify your token's scopes at: https://github.com/settings/tokens."
+      }
+    ]
+  }
+}

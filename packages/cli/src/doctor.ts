@@ -1,5 +1,6 @@
 import { DEFAULT_HOST } from '@epic-pulse/core';
 import { parseCommandArgs } from './args.js';
+import { boardChecks } from './doctor-board.js';
 import {
   hostChecks, limitsCheck, nodeCheck, registryChecks, repoChecks, runtimeCheck, statusLineCheck, tokenCheck, type Check,
 } from './doctor-checks.js';
@@ -22,6 +23,7 @@ export async function runDoctor(args: readonly string[], env: NodeJS.ProcessEnv)
     await tokenCheck(repo.remote?.host ?? DEFAULT_HOST, env),
     ...hostChecks(env),
     ...(await registryChecks(cwd, env, Date.now())),
+    ...(await boardChecks(cwd, env)),
     await statusLineCheck('user', env, cwd),
     await statusLineCheck('project', env, cwd),
     await runtimeCheck(env),

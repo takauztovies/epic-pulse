@@ -1,6 +1,6 @@
 import {
-  buildView, HookPayloadSchema, limitWarning, loadJiraFor, readingFrom, userCacheDir, warnAt, warningVariants, writeLimits, loadProgressFor, parseJson, pathsFor, pinsOf, readPins, readSession, readSnapshot, registryDirFor,
-  renderStatusLine, type JiraConfig, type JsonV1,
+  buildView, HookPayloadSchema, limitWarning, loadJiraFor, loadProjectFor, readingFrom, userCacheDir, warnAt, warningVariants, writeLimits, loadProgressFor, parseJson, pathsFor, pinsOf, readPins, readSession, readSnapshot, registryDirFor,
+  renderStatusLine, type JiraConfig, type JsonV1, type ProjectConfig,
 } from '@epic-pulse/core';
 import { printLine, readStdin } from './io.js';
 import { readAttempt } from './refresh-attempt.js';
@@ -13,7 +13,7 @@ interface Rendered {
   readonly line: string;
   // The registry to refresh once the line is out, when something is due, and
   // the session the line is for.
-  readonly refresh: { readonly dir: string; readonly session: string; readonly jira: JiraConfig | undefined } | undefined;
+  readonly refresh: { readonly dir: string; readonly session: string; readonly jira: JiraConfig | undefined; readonly project: ProjectConfig | undefined } | undefined;
 }
 
 interface Origin {
@@ -81,24 +81,25 @@ async function render(env: NodeJS.ProcessEnv, now: number): Promise<Rendered> {
     return { line: withWarning((width) => renderStatusLine(empty, { width })), refresh: undefined };
   }
   const paths = pathsFor(registry);
-  const [session, snapshot, read, attempt, progress, jira] = await Promise.all([
+  const [session, snapshot, read, attempt, progress, jira, project] = await Promise.all([
     origin.sessionId === undefined ? undefined : readSession(paths, origin.sessionId),
     readSnapshot(paths.snapshotFile),
     readPins(paths),
     readAttempt(registry),
     loadProgressFor(origin.dir),
     loadJiraFor(origin.dir),
+    loadProjectFor(origin.dir),
   ]);
   const pins = pinsOf(read);
   const view = buildView({ snapshot, sessions: session ? [session] : [], pins, now, scope: { session }, progress });
   const due = session !== undefined && refreshDue({ snapshot, session, pins, now, attempt });
-  return { line: withWarning((width) => renderStatusLine(view, { width, color: colorOn(env) })), refresh: due ? { dir: registry, session: session.id, jira } : undefined };
+  return { line: withWarning((width) => renderStatusLine(view, { width, color: colorOn(env) })), refresh: due ? { dir: registry, session: session.id, jira, project } : undefined };
 }
 
 // Never throws and never prints nothing: every outcome is one explicit line.
 export async function runStatusline(env: NodeJS.ProcessEnv): Promise<number> {
   const rendered = await render(env, Date.now()).catch((): Rendered => ({ line: renderStatusLine(BROKEN), refresh: undefined }));
   printLine(rendered.line);
-  if (rendered.refresh !== undefined) spawnRefresh(rendered.refresh.dir, env, { session: rendered.refresh.session, jira: rendered.refresh.jira });
+  if (rendered.refresh !== undefined) spawnRefresh(rendered.refresh.dir, env, { session: rendered.refresh.session, jira: rendered.refresh.jira, project: rendered.refresh.project });
   return 0;
 }

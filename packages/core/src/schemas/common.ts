@@ -17,6 +17,43 @@ export const RepoSchema = z
 
 export const IssueNumberSchema = z.number().int().positive().max(2_147_483_647);
 
+// Free text that is stored and then printed: titles, an epic's summary, an
+// assignee's name, and a project board's option names, which doctor writes to a
+// terminal. Whoever can edit the issue, the profile or the board chooses it, so
+// a control character (C0, DEL or C1) could start an escape sequence, a bidi
+// control could reorder what a line says (U+061C, the Arabic letter mark, does
+// as U+200E and U+200F do), and a line or paragraph separator (U+2028, U+2029)
+// starts a line of its own in a terminal or an editor that follows the Unicode
+// line-break rules: each becomes `?`. The rest of \p{Cf} is left alone: an
+// emoji needs its ZWJ (U+200D), as it does its VS16 (U+FE0F).
+const UNSAFE_CHARS = /[\p{Cc}\u061C\u200E\u200F\u2028\u2029\u202A-\u202E\u2066-\u2069]/gu;
+
+// The character pass alone, for text that is cut its own way (hosts.ts).
+export function safeChars(text: string): string {
+  return text.replace(UNSAFE_CHARS, '?');
+}
+
+// A cap counts UTF-16 units, so a cut can fall between the two halves of an
+// emoji and keep the first: a lone surrogate, which is not text and which a
+// terminal or a file shows as U+FFFD. That half goes too, so the text is never
+// longer than the cap and never ends in half a character. It goes whether or not
+// this cut made it: buildEpic (resolve.ts) slices a title at 300 units before the
+// snapshot parses it, so by then the text is at the cap and nothing is cut here.
+const HIGH_SURROGATE_AT_END = /[\uD800-\uDBFF]$/;
+
+// The same cut for text that gets a mark after it, an ellipsis (summary.ts,
+// hosts.ts): there the lone half would sit before the mark, not at the end, and
+// nothing later strips it.
+export function cutAt(text: string, max: number): string {
+  return text.slice(0, max).replace(HIGH_SURROGATE_AT_END, '');
+}
+
+// The pass, then a cap at `max` rather than a refusal, so one long title can
+// not void the snapshot that holds it.
+export function safeText(max: number): z.ZodPipe<z.ZodString, z.ZodTransform<string, string>> {
+  return z.string().transform((text) => cutAt(safeChars(text), max));
+}
+
 // Which tracker a reference belongs to. Absent means GitHub, so every file
 // written before this field existed stays valid, byte for byte, and a GitHub
 // reference is still written without it. A Jira reference has the same four

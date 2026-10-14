@@ -1,3 +1,5 @@
+import { boardFor } from './board.js';
+import { runBoard } from './board-fetch.js';
 import type { JiraConfig } from './jira-config.js';
 import { providerFor } from './provider.js';
 import { acquireLock, releaseLock, type Lock } from './lock.js';
@@ -14,6 +16,7 @@ import { updateTime } from './time-store.js';
 import { MAX_TREE_DEPTH, subEpicRefs } from './tree.js';
 import { pruneSessions, readLiveSessions, readSession, type SessionState } from './registry.js';
 import { unfetchedEpics, unresolvedRefs } from './resolve.js';
+import type { ProjectConfig } from './schemas/board.js';
 import type { ErrorCode, IssueRef } from './schemas/common.js';
 import { SessionIdSchema } from './schemas/hook.js';
 import type { Snapshot } from './schemas/snapshot.js';
@@ -32,6 +35,14 @@ export interface RefreshOptions {
   // statuses map onto the five. The caller reads it; the refresher never opens
   // the working tree.
   readonly jira?: JiraConfig | undefined;
+  // The repository's project block, if any: the board whose Status the open
+  // sub-issues on it take (board-fetch.ts). Read by the caller, like `jira`.
+  readonly project?: ProjectConfig | undefined;
+  // Where github.com's API is, in place of api.github.com's: a test's replay server
+  // (packages/core/test/replay-server.ts). Nothing that ships passes it, and no
+  // environment variable or file can, so a github.com token goes to api.github.com
+  // and nowhere else. Only github.com's endpoint moves (github.ts endpointFor).
+  readonly githubApi?: string;
 }
 
 export type RefreshOutcome =
@@ -148,8 +159,10 @@ async function openUsage(options: RefreshOptions): Promise<UsageView> {
   return { ledger, spent: spentIn(lines, options.now), waitMs: pacingDelay(lines, ledger.repo, options.now) };
 }
 
-function startRun(before: SnapshotRead, now: number, usage: UsageView): Run {
-  const snapshot = before.status === 'ok' ? before.snapshot : emptySnapshot(now);
+// A board read for another project block, or for none, is dropped (boardFor).
+function startRun(before: SnapshotRead, options: RefreshOptions, usage: UsageView): Run {
+  const { now } = options;
+  const snapshot = boardFor(before.status === 'ok' ? before.snapshot : emptySnapshot(now), options.project);
   const rolled = { ...snapshot, usage: rollUsage(snapshot.usage, now) };
   return { now, snapshot: rolled, requests: 0, points: 0, failure: null, spent: usage.spent, paced: usage.waitMs > 0 };
 }
@@ -190,12 +203,13 @@ async function refreshLocked(options: RefreshOptions, lock: Lock): Promise<Refre
     readLiveSessions(paths, now), readPins(paths), readSnapshot(paths.snapshotFile), openUsage(options), ownSession(paths, options.env),
   ]);
   const refs = withSession(gatherRefs(sessions, pinsOf(pins), now), own, now);
-  const start = { ...startRun(before, now, usage), pinned: pinnedRefs(own ? [...sessions, own] : sessions, pinsOf(pins), now) };
+  const start = { ...startRun(before, options, usage), pinned: pinnedRefs(own ? [...sessions, own] : sessions, pinsOf(pins), now) };
   if (waitsItsTurn(start, refs)) return { status: 'paced', until: now + usage.waitMs };
   const started = performance.now();
   const clock = () => now + Math.round(performance.now() - started);
-  const ctx: Context = { tokens: await tokensFor(start, refs, options), lock, clock, ledger: usage.ledger, settings: { jira: options.jira } };
-  const run = await runPhaseB(await runPhaseA(start, refs, ctx), refs, ctx);
+  const ctx: Context = { tokens: await tokensFor(start, refs, options), lock, clock, ledger: usage.ledger, settings: { jira: options.jira }, project: options.project, githubApi: options.githubApi };
+  const resolved = await runPhaseA(start, refs, ctx);
+  const run = await runPhaseB(await runBoard(resolved, toFetch(resolved, refs), ctx), refs, ctx);
   const next = finalSnapshot(run, refs);
   if (run.requests > 0 || !unchanged(before, next, refs)) await writeSnapshot(paths.snapshotFile, { ...next, updatedAt: now });
   await updateTime(paths);

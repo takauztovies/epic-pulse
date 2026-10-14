@@ -8,11 +8,11 @@ import { fail, ok, type Result } from './result.js';
 // The only network call. A thrown error goes through describeFetchError's
 // whitelist, never into a message: undici echoes a malformed header value,
 // token included, in its error text.
-async function send(token: string, batch: Batch): Promise<Result<RawResponse, Failure>> {
+async function send(token: string, batch: Batch, endpoint?: string): Promise<Result<RawResponse, Failure>> {
   const numbers = batch.refs.map((ref) => ref.number);
   const query = batch.phase === 'A' ? phaseADocument(numbers) : phaseBDocument(numbers);
   try {
-    return ok(await postGraphql({ host: batch.repo.host, token, query, variables: { owner: batch.repo.owner, name: batch.repo.repo } }));
+    return ok(await postGraphql({ host: batch.repo.host, token, query, variables: { owner: batch.repo.owner, name: batch.repo.repo }, endpoint }));
   } catch (error) {
     return fail(describeFetchError(error));
   }

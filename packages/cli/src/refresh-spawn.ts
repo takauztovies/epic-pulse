@@ -2,8 +2,8 @@ import { spawn } from 'node:child_process';
 import { statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import {
-  emptySnapshot, epicsToWatch, gatherRefs, homeDirectory, needsFetch, needsResolution, pinnedRefs, REFRESH_SESSION_ENV, withSession, jiraToEnv,
-  type JiraConfig, type Pin, type SessionState, type SnapshotRead,
+  emptySnapshot, epicsToWatch, gatherRefs, homeDirectory, needsFetch, needsResolution, pinnedRefs, REFRESH_SESSION_ENV, withSession, jiraToEnv, projectToEnv,
+  type JiraConfig, type ProjectConfig, type Pin, type SessionState, type SnapshotRead,
 } from '@epic-pulse/core';
 import { retryingLater, type RefreshAttempt } from './refresh-attempt.js';
 import { bundlePath } from './runtime.js';
@@ -69,8 +69,16 @@ export function spawnDetached(file: string, args: readonly string[], env: NodeJS
 // The refresh runs on single-flight behind its lock. The registry is handed
 // over through EPIC_PULSE_DIR, which also works when no working directory
 // would, and the status line's own session, whose issues the refresh then keeps
-// current even when the session is not live, through EPIC_PULSE_SESSION.
-export function spawnRefresh(dir: string, env: NodeJS.ProcessEnv, extra: { readonly session?: string; readonly jira?: JiraConfig | undefined } = {}): void {
-  const handedOver = { ...env, EPIC_PULSE_DIR: dir, [REFRESH_SESSION_ENV]: extra.session ?? '', ...jiraToEnv(extra.jira) };
+// current even when the session is not live, through EPIC_PULSE_SESSION. The
+// jira and project blocks travel the same way: the refresh runs in a neutral
+// directory and can not read the repository's .epic-pulse.json itself.
+export interface SpawnExtra {
+  readonly session?: string;
+  readonly jira?: JiraConfig | undefined;
+  readonly project?: ProjectConfig | undefined;
+}
+
+export function spawnRefresh(dir: string, env: NodeJS.ProcessEnv, extra: SpawnExtra = {}): void {
+  const handedOver = { ...env, EPIC_PULSE_DIR: dir, [REFRESH_SESSION_ENV]: extra.session ?? '', ...jiraToEnv(extra.jira), ...projectToEnv(extra.project) };
   spawnDetached(process.execPath, [bundlePath(), 'refresh'], handedOver);
 }

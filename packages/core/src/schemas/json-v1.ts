@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BoardErrorSchema } from './board.js';
 import { ErrorCodeSchema, IssueNumberSchema, StateKindSchema, StatusCountsSchema, StatusSchema } from './common.js';
 import { EpicKindSchema } from './snapshot.js';
 
@@ -110,6 +111,10 @@ export const JsonV1Schema = z
         state: StateKindSchema,
         fetchedAt: z.iso.datetime().nullable(),
         error: ErrorCodeSchema.nullable(),
+        // How the configured project board's last read went: null when it was
+        // read, `scope` when the token lacks read:project. Absent without a
+        // board. Added to version 1 later.
+        boardError: BoardErrorSchema.nullable().optional(),
       })
       .readonly(),
     epics: z.array(JsonEpicSchema).readonly(),

@@ -1,0 +1,56 @@
+{
+  "recordedAt": "2026-10-12T15:43:07.390Z",
+  "note": "demo project board, one page: #4 Done, #5 Todo, #6 In Progress",
+  "status": 200,
+  "remaining": 3755,
+  "retryAfter": false,
+  "body": {
+    "data": {
+      "repositoryOwner": {
+        "projectV2": {
+          "items": {
+            "nodes": [
+              {
+                "content": {
+                  "number": 4,
+                  "repository": {
+                    "nameWithOwner": "takauztovies/epic-pulse"
+                  }
+                },
+                "fieldValueByName": {
+                  "name": "Done"
+                }
+              },
+              {
+                "content": {
+                  "number": 5,
+                  "repository": {
+                    "nameWithOwner": "takauztovies/epic-pulse"
+                  }
+                },
+                "fieldValueByName": {
+                  "name": "Todo"
+                }
+              },
+              {
+                "content": {
+                  "number": 6,
+                  "repository": {
+                    "nameWithOwner": "takauztovies/epic-pulse"
+                  }
+                },
+                "fieldValueByName": {
+                  "name": "In Progress"
+                }
+              }
+            ],
+            "pageInfo": {
+              "hasNextPage": false,
+              "endCursor": "Y3Vyc29yOnYyOpK5MDAwMDAwMDAuMzMzMzMzMzMzMzMzMzMzM84QDecK"
+            }
+          }
+        }
+      }
+    }
+  }
+}

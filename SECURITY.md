@@ -22,8 +22,9 @@ These are the properties a report would most usefully break:
 
 - **The token stays in memory.** It is never written to a file, a log or an error message.
 - **A token goes only to a host you trust.** `GH_TOKEN`, `GITHUB_TOKEN` and `gh`'s github.com login
-  are sent to `api.github.com` only, whatever a repository's remote or a command names. The
-  Enterprise variables `GH_ENTERPRISE_TOKEN` and `GITHUB_ENTERPRISE_TOKEN`, which `gh` ties to no
+  are sent to `api.github.com` only, whatever a repository's remote or a command names. No
+  environment variable or file can move that endpoint. The Enterprise variables
+  `GH_ENTERPRISE_TOKEN` and `GITHUB_ENTERPRISE_TOKEN`, which `gh` ties to no
   host, go only to the host `GH_HOST` names or one listed in `EPIC_PULSE_HOSTS`. Any other host gets
   nothing but the login made for it with `gh auth login --hostname`, or no token at all.
 - **Read-only.** epic-pulse sends nothing but GraphQL queries, and only to the GraphQL endpoint of the

@@ -109,12 +109,29 @@ export interface PostOptions {
   readonly query: string;
   readonly variables: Readonly<Record<string, string>>;
   readonly timeoutMs?: number;
+  // Where github.com's API is, in place of api.github.com's (see endpointFor).
+  readonly endpoint?: string;
+}
+
+// Where a request goes: the host's own endpoint. A test can put a replay server
+// (packages/core/test/replay-server.ts) where github.com's is by passing its
+// address as `endpoint`. The board is read from github.com alone and every other
+// host is reached over https, so without a way in here a server on this machine,
+// which speaks plain http, could not be asked anything. An earlier revision took
+// that address from an environment variable, narrowed to this machine; but a
+// variable the shipped code reads is a way for whatever sets the user's
+// environment to move the endpoint a token is sent to, and "nothing can move it"
+// is a better promise than "nothing can move it far". The address is an argument
+// now, nothing that ships passes one, and only github.com's endpoint moves, so
+// another host's token is never sent to a replay server.
+export function endpointFor(options: Pick<PostOptions, 'host' | 'endpoint'>): string {
+  return options.host === DEFAULT_HOST && options.endpoint !== undefined ? options.endpoint : apiUrl(options.host);
 }
 
 // Raw transport. Throws on network failure: callers pass the error through
 // `describeFetchError`, never straight into a message or a file.
 export async function postGraphql(options: PostOptions): Promise<RawResponse> {
-  const res = await fetch(apiUrl(options.host), {
+  const res = await fetch(endpointFor(options), {
     method: 'POST',
     redirect: 'error', // an API endpoint never redirects; refuse rather than follow with credentials
     signal: AbortSignal.timeout(options.timeoutMs ?? 15_000),

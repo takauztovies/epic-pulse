@@ -16,6 +16,7 @@ export const RawConfigSchema = z.looseObject({
   ignoreMainCheckout: z.boolean().optional().catch(undefined),
   progress: z.unknown().optional(),
   jira: z.unknown().optional(),
+  project: z.unknown().optional(),
 });
 
 export type RawConfig = z.infer<typeof RawConfigSchema>;

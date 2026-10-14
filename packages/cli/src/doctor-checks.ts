@@ -30,7 +30,7 @@ const RUNTIME_STATES: Readonly<Record<RuntimeState, string>> = {
 const READING_STALE_MS = 5 * 60 * 60 * 1000;
 const NO_READING = 'no reading yet: Claude Code reports usage only to a terminal status line (2.1.80+, on a paid plan)';
 
-function iso(ms: number): string {
+export function iso(ms: number): string {
   return new Date(ms).toISOString();
 }
 

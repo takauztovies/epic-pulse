@@ -1,4 +1,7 @@
 export * from './atomic.js';
+export * from './board.js';
+export * from './board-config.js';
+export * from './board-query.js';
 export * from './branch-pattern.js';
 export * from './canonical-path.js';
 export * from './checklist.js';

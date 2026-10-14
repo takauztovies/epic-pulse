@@ -1,0 +1,30 @@
+{
+  "recordedAt": "2026-10-12T15:43:08.150Z",
+  "note": "a project number the owner does not have",
+  "status": 200,
+  "remaining": 3753,
+  "retryAfter": false,
+  "body": {
+    "data": {
+      "repositoryOwner": {
+        "projectV2": null
+      }
+    },
+    "errors": [
+      {
+        "type": "NOT_FOUND",
+        "path": [
+          "repositoryOwner",
+          "projectV2"
+        ],
+        "locations": [
+          {
+            "line": 4,
+            "column": 7
+          }
+        ],
+        "message": "Could not resolve to a ProjectV2 with the number 99."
+      }
+    ]
+  }
+}

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { adfText } from '../src/jira-adf.js';
-import { parseJira } from '../src/jira-config.js';
+import { parseJira, type JiraConfig } from '../src/jira-config.js';
 import { epicAnswers, resolutionAnswers } from '../src/jira-epic.js';
 import { jiraKeysIn } from '../src/jira-keys.js';
 import { deriveJiraStatus } from '../src/jira-status.js';
@@ -9,6 +9,7 @@ import { jiraCredentials, jiraSites } from '../src/jira.js';
 import { displayKey, issueUrl, makeJiraRef, makeRef, parseIssueTarget, refKey, repoKey } from '../src/ref.js';
 import { applyBuiltEpics, applyResolutions } from '../src/refresh-apply.js';
 import { JiraPhaseASchema, JiraPhaseBSchema } from '../src/schemas/jira.js';
+import { EpicEntrySchema } from '../src/schemas/snapshot.js';
 import { emptySnapshot } from '../src/snapshot.js';
 import { buildView } from '../src/view.js';
 import { loadJiraFixture } from './helpers.js';
@@ -53,6 +54,65 @@ test('status comes from the category, with the repository\'s own map on top', ()
     [lane('To Do', 'new'), lane('In Progress', 'indeterminate'), lane('Code Review', 'indeterminate'), lane('Ready for QA', 'new'), lane('Done', 'done', 'Done'), lane('Closed', 'done', "Won't Do"), lane('Done', 'done'), lane('Weird', 'undefined')],
     ['todo', 'in_progress', 'in_review', 'in_review', 'done', 'dropped', 'done', 'todo'],
   );
+});
+
+// A status name is whatever a Jira admin typed, and the repository's map is a plain
+// object. Names are lowercased before the read, so `Constructor` is `constructor`,
+// which every object inherits as `Object`, a function that is no lane, and
+// `__proto__` is the prototype itself. Only an entry the map holds itself counts.
+const INHERITED = ['Constructor', ' CONSTRUCTOR ', '__proto__', '__PROTO__'];
+const CATEGORIES = [['new', undefined, 'todo'], ['indeterminate', undefined, 'in_progress'], ['done', 'Done', 'done'], ['done', "Won't Do", 'dropped']] as const;
+const facts = (statusName: string, categoryKey: string, resolution?: string) => ({ statusName, categoryKey, resolution });
+
+test('a status named for a member of Object.prototype takes its lane from its category, with a map or without', () => {
+  const maps = [undefined, parseJira({ site: HOST, projects: ['EPD'] }), parseJira({ site: HOST, projects: ['EPD'], statusMap: { 'ready for qa': 'in_review' } })];
+  for (const map of maps) {
+    for (const name of INHERITED) {
+      assert.deepEqual(CATEGORIES.map(([category, resolution]) => deriveJiraStatus(facts(name, category, resolution), map)), ['todo', 'in_progress', 'done', 'dropped'], name);
+    }
+  }
+});
+
+test('a map that names such a status itself maps it as written, and no other', () => {
+  const text = `{"site":"${HOST}","projects":["EPD"],"statusMap":{"constructor":"in_review","__proto__":"dropped"}}`;
+  const map = parseJira(JSON.parse(text) as unknown);
+  assert.deepEqual(['Constructor', '__proto__'].map((name) => deriveJiraStatus(facts(name, 'new'), map)), ['in_review', 'dropped']);
+  assert.equal(deriveJiraStatus(facts('Blocked', 'new'), map), 'todo');
+});
+
+// What a name reaches on the way up is not only Object.prototype's own members: a
+// dependency that pollutes it hands every map an entry for any name it likes.
+test('an entry inherited from a polluted Object.prototype is not an entry', () => {
+  Object.defineProperty(Object.prototype, 'blocked', { value: 'done', configurable: true });
+  try {
+    assert.equal(deriveJiraStatus(facts('Blocked', 'new'), parseJira({ site: HOST, projects: ['EPD'], statusMap: { parked: 'dropped' } })), 'todo');
+  } finally {
+    Reflect.deleteProperty(Object.prototype, 'blocked');
+  }
+  assert.equal('blocked' in {}, false, 'the prototype is as it was');
+});
+
+// The map is typed, but it is data: a block that did not come through parseJira
+// may hold anything. What is not a lane is not an answer, and the category decides.
+test('an entry that is no lane is not an answer', () => {
+  const junk = { statusMap: { blocked: 'banana', parked: 7 }, droppedResolutions: [] } as unknown as JiraConfig;
+  assert.deepEqual(['Blocked', 'Parked'].map((name) => deriveJiraStatus(facts(name, 'indeterminate'), junk)), ['in_progress', 'in_progress']);
+});
+
+// The recorded epic with its To Do status (EPD-6) renamed.
+function renamedStatus(name: string): unknown {
+  const text = JSON.stringify(loadJiraFixture('phase-b-epic').body).replace(JSON.stringify('To Do'), () => JSON.stringify(name));
+  assert.ok(text.includes(JSON.stringify(name)), 'the rename found its status');
+  return JSON.parse(text) as unknown;
+}
+
+test('a child whose status is named for a member of Object.prototype leaves its epic whole', () => {
+  for (const name of INHERITED) {
+    const built = epicAnswers([epd(1)], JiraPhaseBSchema.parse(renamedStatus(name)), config);
+    const entry = applyBuiltEpics(emptySnapshot(T0), built, T0).epics[refKey(epd(1))]!;
+    assert.equal(EpicEntrySchema.safeParse(entry).success, true, `${name}: the snapshot would drop the epic`);
+    assert.deepEqual(entry.children.map((child) => child.status), ['done', 'dropped', 'in_progress', 'in_review', 'todo', 'todo'], name);
+  }
 });
 
 test('a description in Atlassian Document Format reads as its text, and code is left out', () => {

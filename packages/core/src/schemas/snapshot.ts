@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { ErrorCodeSchema, IssueNumberSchema, IssueRefSchema, StatusSchema } from './common.js';
+import { BoardSchema } from './board.js';
+import { ErrorCodeSchema, IssueNumberSchema, IssueRefSchema, safeText, StatusSchema } from './common.js';
 
 export const EpicKindSchema = z.enum(['subissues', 'checklist']);
 
@@ -12,7 +13,7 @@ export const ChildSchema = z
     // A Jira issue's own key (PROJ-5): a child may be in another project than its epic,
     // so the number alone does not say. Absent on GitHub, where a child is #number.
     key: z.string().max(40).optional(),
-    title: z.string().max(300),
+    title: safeText(300),
     url: z.string().max(500).nullable(),
     status: StatusSchema,
     // How many sub-issues it has, when it has any: it is then an epic of its own, whose
@@ -21,11 +22,16 @@ export const ChildSchema = z
     // The labels on the item, lowercased, so a size can be read from them under
     // whatever table the repository configures; absent: it has none.
     labels: z.array(z.string().max(60)).max(20).readonly().optional(),
-    // Who it is assigned to (up to three logins), how many open pull requests will close it,
-    // and when it was closed. Each absent when unknown or none.
-    assignees: z.array(z.string().max(40)).max(3).readonly().optional(),
+    // Who it is assigned to (up to three logins, or on Jira display names, which their owners
+    // type: safeText), how many open pull requests will close it, and when it was closed.
+    // Each absent when unknown or none.
+    assignees: z.array(safeText(40)).max(3).readonly().optional(),
     openPrs: z.number().int().positive().optional(),
     closedAt: z.number().int().nonnegative().optional(),
+    // Where `status` came from when a project board is configured: its Status
+    // option (an open issue on the board, under an option that maps), or the
+    // issue itself. Absent when no board is configured, and in older snapshots.
+    statusSource: z.enum(['board', 'derived']).optional(),
   })
   .readonly();
 
@@ -36,13 +42,14 @@ export const MAX_CHILDREN = 500;
 export const EpicEntrySchema = z
   .object({
     ref: IssueRefSchema,
-    title: z.string().max(300),
+    title: safeText(300),
     url: z.string().max(500),
     kind: EpicKindSchema,
     children: z.array(ChildSchema).max(MAX_CHILDREN).readonly(),
     truncated: z.boolean(),
-    // A few readable lines of its description, and when it was opened.
-    summary: z.string().max(300).optional(),
+    // A few readable lines of its description, and when it was opened. summaryOf
+    // (summary.ts) drops markup, not control characters, so the lines pass safeText.
+    summary: safeText(300).optional(),
     createdAt: z.number().int().nonnegative().optional(),
     fetchedAt: z.number().int().nonnegative(),
     error: ErrorCodeSchema.nullable(),
@@ -77,6 +84,9 @@ export const SnapshotSchema = z
     rateLimit: RateLimitSchema.nullable(),
     error: ErrorCodeSchema.nullable(),
     detail: z.string().max(120).nullable(),
+    // The configured project board as last read (board.ts). A malformed one
+    // reads as none rather than voiding the snapshot: it is fetched again.
+    board: BoardSchema.optional().catch(undefined),
   })
   .readonly();
 

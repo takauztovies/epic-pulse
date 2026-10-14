@@ -1,5 +1,7 @@
+import { withBoardStatus } from './board.js';
 import { checklistChildren } from './checklist.js';
 import { makeRef, refKey } from './ref.js';
+import type { Board } from './schemas/board.js';
 import type { IssueRef, RepoRef } from './schemas/common.js';
 import type { EpicNode, PhaseAIssue, SubIssueNode } from './schemas/graphql.js';
 import { MAX_CHILDREN, type Child, type EpicEntry, type Snapshot } from './schemas/snapshot.js';
@@ -46,7 +48,12 @@ function timeOf(text: string | null | undefined): number | undefined {
   return Number.isFinite(ms) && ms >= 0 ? ms : undefined;
 }
 
-function subIssueChild(node: SubIssueNode, epic: IssueRef): Child {
+// The board's items, when a project board is configured (board.ts).
+type BoardItems = Board['items'] | undefined;
+
+// Open pull requests and the closing date follow the issue itself, whatever
+// lane a board puts it in.
+function subIssueChild(node: SubIssueNode, epic: IssueRef, board: BoardItems): Child {
   const labels = labelsOf(node);
   const assignees = assigneesOf(node);
   const status = deriveStatus(node, ownRepo(node, epic));
@@ -57,7 +64,7 @@ function subIssueChild(node: SubIssueNode, epic: IssueRef): Child {
     number: node.number,
     title: node.title.slice(0, 300),
     url: node.url.slice(0, 500),
-    status,
+    ...withBoardStatus(node, status, board),
     ...(labels.length === 0 ? {} : { labels }),
     ...(assignees.length === 0 ? {} : { assignees }),
     ...(openPrs === 0 ? {} : { openPrs }),
@@ -71,11 +78,13 @@ function subIssueChild(node: SubIssueNode, epic: IssueRef): Child {
 // i.e. it is not an epic at all. GitHub caps a page at 100 sub-issues and we do
 // not paginate, and the snapshot keeps at most MAX_CHILDREN of a checklist's
 // boxes, so a larger epic is flagged `truncated` instead of shown as if
-// complete.
-export function buildEpic(node: EpicNode, ref: IssueRef): EpicData | null {
+// complete. A project board, when configured, sets the status of the open
+// sub-issues on it; a checklist line says nothing of its issue's state, so a
+// checklist epic is not read against the board.
+export function buildEpic(node: EpicNode, ref: IssueRef, board?: BoardItems): EpicData | null {
   const subs = node.subIssues.nodes.filter((n): n is SubIssueNode => n !== null);
   const kind = node.subIssues.totalCount > 0 ? 'subissues' : 'checklist';
-  const children = kind === 'subissues' ? subs.map((n) => subIssueChild(n, ref)) : checklistChildren(node.body, ref);
+  const children = kind === 'subissues' ? subs.map((n) => subIssueChild(n, ref, board)) : checklistChildren(node.body, ref);
   if (children.length === 0) return null;
   const summary = summaryOf(node.body);
   return {

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { ROOT } from './helpers.js';
@@ -72,10 +73,25 @@ test('every address in the shipped bundle is on the allowlist', () => {
   assert.deepEqual(urls.filter((url) => !ALLOWED_URLS.has(url) && !isProjectLink(url)), []);
 });
 
-test('the shipped bundle makes two network calls, the GraphQL POST to apiUrl(host) and the Jira search, and opens no socket itself', () => {
+test("the shipped bundle makes two network calls, the GraphQL POST to the host's endpoint and the Jira search, and opens no socket itself", () => {
   const text = shippedBundle();
   const calls = [...text.matchAll(/\bfetch\s*\(/g)].map((match) => text.slice(match.index ?? 0).split(',')[0]);
-  assert.deepEqual([...calls].sort(), ['fetch(`https://${options.host}${SEARCH_PATH}`', 'fetch(apiUrl(options.host)']);
+  assert.deepEqual([...calls].sort(), ['fetch(`https://${options.host}${SEARCH_PATH}`', 'fetch(endpointFor(options)']);
   assert.deepEqual(importsOf(text).filter(isNetworkModule), []);
   assertAbsent(text, /\b(?:WebSocket|EventSource|XMLHttpRequest|sendBeacon)\b/, 'the bundle');
+});
+
+// SECURITY.md promises that no environment variable or file can move the endpoint a
+// github.com token is sent to. The endpoint is an argument (github.ts endpointFor)
+// that only `githubApi` fills, so the promise holds while the client reads no
+// environment of its own, which an earlier revision did to find a test server, and
+// while no entry point passes one: the CLI and the extension are where the user's
+// environment, files and flags come in.
+const ENTRY_POINTS = ['packages/cli/src', 'packages/vscode/src'];
+
+test('nothing the user controls can move the endpoint: the client reads no ambient environment, and no entry point passes githubApi', () => {
+  assertAbsent(readFileSync(GITHUB_CLIENT, 'utf8'), /\bprocess\.env\b/, 'github.ts');
+  const sources = ENTRY_POINTS.flatMap((dir) => readdirSync(join(ROOT, dir), { recursive: true, encoding: 'utf8' }).filter((file) => /\.tsx?$/.test(file)).map((file) => join(ROOT, dir, file)));
+  assert.ok(sources.length > 20, `found ${sources.length} entry point sources, so the scan no longer sees them`);
+  for (const file of sources) assertAbsent(readFileSync(file, 'utf8'), /\bgithubApi\b/, file);
 });

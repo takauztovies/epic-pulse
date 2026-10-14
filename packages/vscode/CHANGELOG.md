@@ -2,6 +2,10 @@
 
 ## 0.1.0 (unreleased)
 
+- A **board** notice above the epics when the repository's `project` board can not be read for want
+  of the `read:project` scope: **board: token lacks read:project**, cured by
+  `gh auth refresh -s read:project`.
+  Statuses are derived from the issues meanwhile.
 - The **Epics** view: each epic with its progress, its sub-issues grouped by status, and the number
   of live Claude Code sessions on each issue. A click opens the epic or the issue on GitHub.
 - A status-bar item with the current epic, and an explicit item for every other state: stale, no

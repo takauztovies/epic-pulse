@@ -6,9 +6,11 @@ import { assertAbsent, shippedBundle } from './privacy-bundle.js';
 // epic-pulse only ever reads from GitHub. Every document is a query: one
 // that starts with `query` and nowhere spells `mutation` or `subscription`.
 
-type DocumentBuilder = (numbers: readonly number[]) => unknown;
+type DocumentBuilder = (input: readonly number[] | number) => unknown;
 
 const SAMPLES: readonly (readonly number[])[] = [[1], [4, 8, 9999], Array.from({ length: 100 }, (_, i) => i + 1)];
+// The board document is built for one project number, not a list of issues.
+const SINGLE: ReadonlySet<string> = new Set(['boardDocument']);
 const WRITE_KEYWORDS = /\b(?:mutation|subscription)\b/;
 
 function isBuilder(value: unknown): value is DocumentBuilder {
@@ -22,10 +24,10 @@ function builders(): readonly (readonly [string, DocumentBuilder])[] {
 
 test('every GraphQL document core can build is a query, never a mutation or subscription', () => {
   const found = builders();
-  assert.ok(found.length >= 2, `found ${found.length} document builders in core, so the scan no longer sees them`);
+  assert.ok(found.length >= 3, `found ${found.length} document builders in core, so the scan no longer sees them`);
   for (const [name, build] of found) {
     for (const numbers of SAMPLES) {
-      const document = build(numbers);
+      const document = build(SINGLE.has(name) ? numbers.at(-1)! : numbers);
       assert.ok(typeof document === 'string', `${name} returned no string`);
       assert.match(document, /^query \w+\(/, name);
       assert.doesNotMatch(document, WRITE_KEYWORDS, name);

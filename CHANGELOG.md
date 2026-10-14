@@ -22,6 +22,21 @@ Every notable change to epic-pulse is listed here. Versions follow
   five hours ago, or that no reading has arrived. Only a terminal status line receives the reading,
   never the VS Code panel or the Desktop app; the README and the manual now say so, and that a
   terminal session running alongside lets the prompt hook warn the others.
+- **Statuses from a GitHub Project board.** A `project` block in `.epic-pulse.json`
+  (`{ "owner": "acme", "number": 3 }`, with an optional `field` and `statusMap`) names one Project
+  (v2) board. An open sub-issue on it takes the status its option maps to, Done and Dropped included,
+  and a board Dropped leaves the count like a not-planned close; a closed issue keeps the status its
+  close gives it, and an issue off the board or under an unmapped option keeps its derived status.
+  Option names are compared lowercased with everything but letters and digits removed, over a
+  default table (Todo/Backlog/Ready, In progress/Doing/WIP, In review/Review/QA/Testing,
+  Done/Complete/Shipped, Won't do/Dropped/Cancelled/Not planned). The board is one query of its own,
+  sent only when configured, cached like the epics, at most five pages of 100 items, each a point of
+  the shared hourly budget. A token without `read:project` leaves every status derived, is asked
+  again after 30 minutes, and `epic-pulse doctor` and the VS Code view say "board: token lacks
+  read:project — `gh auth refresh -s read:project`"; `doctor` also lists unmapped options. A board
+  failure never stops the epics refreshing. Snapshot children gain an optional `statusSource`
+  (`board` or `derived`), and `epic-pulse json` an optional `snapshot.boardError`; both additive, so
+  older snapshots still read and the JSON stays version 1.
 
 ### Fixed
 
@@ -29,6 +44,34 @@ Every notable change to epic-pulse is listed here. Versions follow
   repository as its own, so a "Fixes #N" body or GitHub's own closing link from one counted as the
   issue's review. Every route now needs a branch in the repository itself, as branch-named and
   mentioning PRs already did. An outside contributor's PR no longer shows its issue as In review.
+- **Control and bidi characters in titles and option names show as `?`.** Whoever can edit an issue
+  or a project board chooses its title or option names, and a C1 control or a bidi override in one
+  reached `epic-pulse json` and the VS Code views unchanged, as one in an `EPIC_PULSE_HOSTS` entry
+  reached `epic-pulse doctor`. Every control character (C0, DEL, C1) and bidi control is now stored
+  and shown as `?`, from a snapshot an older version wrote too; an emoji keeps its ZWJ and VS16.
+- **The same for summaries, assignees and the board's `field`, and for three more characters.** An
+  epic's summary and a Jira assignee's display name reached the VS Code hovers as their editors typed
+  them, and `epic-pulse doctor` printed `project.field` from `.epic-pulse.json` as written (GitHub is
+  still asked for it as written). All three now show a control or bidi character as `?`, and the
+  Arabic letter mark (U+061C) and the line and paragraph separators (U+2028, U+2029), which the set
+  had missed, now do too. A title cut at its limit no longer ends in half an emoji.
+- **`epic-pulse doctor` says where the statuses come from after a failed board read.** A network,
+  timeout or rate-limit failure keeps the last board's items, yet doctor said the statuses were
+  derived. It now says "from the last good read at" that read's time (the board entry gains
+  `readAt`), and keeps "derived" for a failure that kept no items.
+- **A board option named `Constructor` no longer voids the board.** Option names were looked up in
+  plain objects, and `Constructor`, which reads as `constructor`, found the `Object` function where a
+  status belongs: the board entry was dropped when the snapshot was written, and the epic holding
+  that issue was stored with no children and `invalid_response`, on every refresh. Only an entry the
+  status map or the default table holds itself counts now, and it must be one of the five statuses.
+- **A Jira status named `Constructor` no longer voids its epic.** The jira block's `statusMap` was
+  read by status name in a plain object, and `Constructor`, which reads as `constructor` (as does
+  `__proto__`), found the `Object` function where a status belongs: the epic holding that issue was
+  stored with no children and `invalid_response`, on every refresh. Only an entry the map holds
+  itself counts now, and it must be one of the five statuses.
+- **A summary or a host entry cut mid-text no longer ends in half an emoji.** The summary's cut at
+  half its limit, and the cut of a long `EPIC_PULSE_HOSTS` entry in `doctor`'s notice, could keep the
+  first half of an emoji in front of the ellipsis, which shows as U+FFFD. The emoji goes whole now.
 
 ## 0.3.6
 
